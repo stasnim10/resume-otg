@@ -2,7 +2,10 @@
 Handle .docx file operations: extraction and deterministic replacement
 Word-style Find & Replace that preserves formatting
 """
+import io
+
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, Inches
 from typing import List, Tuple, Dict, Any
 
@@ -362,4 +365,123 @@ def _clean_markdown(text: str) -> str:
     text = '\n'.join(cleaned_lines)
     return text
 
+
+def _set_default_page_layout(doc: Document) -> None:
+    """Apply simple ATS-friendly page settings."""
+    section = doc.sections[0]
+    section.top_margin = Inches(0.6)
+    section.bottom_margin = Inches(0.6)
+    section.left_margin = Inches(0.7)
+    section.right_margin = Inches(0.7)
+
+
+def _add_section_heading(doc: Document, title: str) -> None:
+    """Add a simple resume section heading."""
+    paragraph = doc.add_paragraph()
+    run = paragraph.add_run(title.upper())
+    run.bold = True
+    run.font.size = Pt(11)
+    paragraph.paragraph_format.space_before = Pt(8)
+    paragraph.paragraph_format.space_after = Pt(2)
+
+
+def _add_bullets(doc: Document, items: List[str]) -> None:
+    """Add bullet items using Word's built-in list style."""
+    for item in items:
+        bullet = doc.add_paragraph(style="List Bullet")
+        bullet.paragraph_format.space_after = Pt(0)
+        bullet.add_run(item)
+
+
+def build_resume_from_scratch(payload: Dict[str, Any]) -> bytes:
+    """
+    Build a simple ATS-friendly resume document from validated builder JSON.
+
+    Returns the .docx file bytes so the UI can offer a direct download.
+    """
+    doc = Document()
+    _set_default_page_layout(doc)
+
+    normal_style = doc.styles["Normal"]
+    normal_style.font.name = "Arial"
+    normal_style.font.size = Pt(10.5)
+
+    basics = payload.get("basics", {})
+
+    name_paragraph = doc.add_paragraph()
+    name_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    name_run = name_paragraph.add_run(basics.get("full_name", ""))
+    name_run.bold = True
+    name_run.font.size = Pt(16)
+
+    contact_parts = [
+        basics.get("email", ""),
+        basics.get("phone", ""),
+        basics.get("location", ""),
+        basics.get("linkedin", ""),
+    ]
+    contact_line = " | ".join([part for part in contact_parts if part])
+    if contact_line:
+        contact_paragraph = doc.add_paragraph()
+        contact_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        contact_paragraph.add_run(contact_line)
+        contact_paragraph.paragraph_format.space_after = Pt(6)
+
+    summary = payload.get("summary", "").strip()
+    if summary:
+        _add_section_heading(doc, "Summary")
+        doc.add_paragraph(summary)
+
+    education_items = payload.get("education", [])
+    if education_items:
+        _add_section_heading(doc, "Education")
+        for item in education_items:
+            paragraph = doc.add_paragraph()
+            school_run = paragraph.add_run(item.get("school", ""))
+            school_run.bold = True
+            degree = item.get("degree", "")
+            graduation_date = item.get("graduation_date", "")
+            trailing = " | ".join([part for part in [degree, graduation_date] if part])
+            if trailing:
+                paragraph.add_run(f" | {trailing}")
+            details = item.get("details", [])
+            if details:
+                _add_bullets(doc, details)
+
+    experience_items = payload.get("experience", [])
+    if experience_items:
+        _add_section_heading(doc, "Experience")
+        for item in experience_items:
+            paragraph = doc.add_paragraph()
+            title_run = paragraph.add_run(item.get("title", ""))
+            title_run.bold = True
+            organization = item.get("organization", "")
+            location = item.get("location", "")
+            dates = item.get("dates", "")
+            trailing = " | ".join([part for part in [organization, location, dates] if part])
+            if trailing:
+                paragraph.add_run(f" | {trailing}")
+            bullets = item.get("bullets", [])
+            if bullets:
+                _add_bullets(doc, bullets)
+
+    project_items = payload.get("projects", [])
+    if project_items:
+        _add_section_heading(doc, "Projects")
+        for item in project_items:
+            paragraph = doc.add_paragraph()
+            name_run = paragraph.add_run(item.get("name", ""))
+            name_run.bold = True
+            details = item.get("details", [])
+            if details:
+                _add_bullets(doc, details)
+
+    skill_items = payload.get("skills", [])
+    if skill_items:
+        _add_section_heading(doc, "Skills")
+        doc.add_paragraph(", ".join(skill_items))
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    return buffer.getvalue()
 

@@ -62,3 +62,105 @@ RESUME TEXT
 JOB DESCRIPTION
 {job_description}
 """
+
+
+def build_builder_prompt(
+    full_name: str,
+    contact_info: str,
+    education: str,
+    experience_dump: str,
+    activities: str,
+    skills: str,
+    job_description: str,
+    career_stage: str,
+    target_role: str,
+) -> str:
+    """Generate a future-facing prompt for the first-resume builder stub."""
+    jd_block = job_description if job_description.strip() else "No specific job description was provided."
+
+    return f"""ROLE
+Act as an empathetic university career advisor and resume writer.
+
+PERSONA CONTEXT
+The candidate is at the {career_stage} stage and is targeting a {target_role} role.
+
+OBJECTIVE
+Turn the candidate's plain-English background into a clean first professional resume. Use only the information provided below. Do not invent achievements, certifications, dates, or tools.
+
+INSTRUCTIONS
+1. Translate casual experience into professional, truthful bullet points.
+2. Highlight transferable skills, leadership, teamwork, and reliability when relevant.
+3. Keep the tone appropriate for a first or early-career resume.
+4. If a job description is provided, align the language carefully without fabricating experience.
+5. Return only valid JSON.
+
+OUTPUT JSON SCHEMA
+{{
+  "basics": {{
+    "full_name": "Jane Doe",
+    "email": "jane@example.com",
+    "phone": "555-555-5555",
+    "location": "New York, NY",
+    "linkedin": "linkedin.com/in/janedoe"
+  }},
+  "summary": "1 short professional summary paragraph",
+  "education": [
+    {{
+      "school": "University Name",
+      "degree": "B.S. in Something",
+      "graduation_date": "May 2027",
+      "details": [
+        "Relevant Coursework: ...",
+        "GPA: 3.8/4.0"
+      ]
+    }}
+  ],
+  "experience": [
+    {{
+      "title": "Barista",
+      "organization": "Coffee Shop",
+      "location": "Boston, MA",
+      "dates": "Jun 2024 - Aug 2024",
+      "bullets": [
+        "Professional bullet 1",
+        "Professional bullet 2"
+      ]
+    }}
+  ],
+  "projects": [
+    {{
+      "name": "Project Name",
+      "details": [
+        "Project bullet 1",
+        "Project bullet 2"
+      ]
+    }}
+  ],
+  "skills": [
+    "Excel",
+    "SQL",
+    "Customer Service"
+  ]
+}}
+
+CANDIDATE NAME
+{full_name}
+
+CONTACT INFO
+{contact_info}
+
+EDUCATION
+{education}
+
+EXPERIENCE BRAIN DUMP
+{experience_dump}
+
+ACTIVITIES / LEADERSHIP / PROJECTS
+{activities}
+
+SKILLS
+{skills}
+
+JOB DESCRIPTION
+{jd_block}
+"""

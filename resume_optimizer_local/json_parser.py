@@ -130,6 +130,116 @@ def build_validation_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _validate_string_field(value: Any, label: str, required: bool = False) -> Tuple[bool, Optional[str]]:
+    """Validate a JSON string field."""
+    if value is None or value == "":
+        if required:
+            return False, f"{label} is required."
+        return True, None
+    if not isinstance(value, str):
+        return False, f"{label} must be a string."
+    return True, None
+
+
+def _validate_string_list(value: Any, label: str) -> Tuple[bool, Optional[str]]:
+    """Validate a list of strings."""
+    if not isinstance(value, list):
+        return False, f"{label} must be an array."
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item.strip():
+            return False, f"{label}[{index}] must be a non-empty string."
+    return True, None
+
+
+def validate_builder_payload(payload: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    """Validate the first-resume builder payload structure."""
+    if not isinstance(payload, dict):
+        return False, "Payload must be a JSON object."
+
+    required_keys = {"basics", "summary", "education", "experience", "projects", "skills"}
+    missing_keys = [key for key in required_keys if key not in payload]
+    if missing_keys:
+        return False, f"Missing required top-level key(s): {', '.join(sorted(missing_keys))}."
+
+    basics = payload.get("basics")
+    if not isinstance(basics, dict):
+        return False, "basics must be an object."
+    for key in ("full_name", "email", "phone", "location", "linkedin"):
+        is_valid, error = _validate_string_field(basics.get(key), f"basics.{key}", required=(key == "full_name"))
+        if not is_valid:
+            return False, error
+
+    is_valid, error = _validate_string_field(payload.get("summary"), "summary", required=True)
+    if not is_valid:
+        return False, error
+
+    education = payload.get("education")
+    if not isinstance(education, list):
+        return False, "education must be an array."
+    for index, item in enumerate(education):
+        if not isinstance(item, dict):
+            return False, f"education[{index}] must be an object."
+        for key in ("school", "degree", "graduation_date"):
+            is_valid, error = _validate_string_field(item.get(key), f"education[{index}].{key}", required=True)
+            if not is_valid:
+                return False, error
+        details = item.get("details", [])
+        is_valid, error = _validate_string_list(details, f"education[{index}].details")
+        if not is_valid:
+            return False, error
+
+    experience = payload.get("experience")
+    if not isinstance(experience, list):
+        return False, "experience must be an array."
+    for index, item in enumerate(experience):
+        if not isinstance(item, dict):
+            return False, f"experience[{index}] must be an object."
+        for key in ("title", "organization", "location", "dates"):
+            is_valid, error = _validate_string_field(item.get(key), f"experience[{index}].{key}", required=True)
+            if not is_valid:
+                return False, error
+        bullets = item.get("bullets", [])
+        is_valid, error = _validate_string_list(bullets, f"experience[{index}].bullets")
+        if not is_valid:
+            return False, error
+
+    projects = payload.get("projects")
+    if not isinstance(projects, list):
+        return False, "projects must be an array."
+    for index, item in enumerate(projects):
+        if not isinstance(item, dict):
+            return False, f"projects[{index}] must be an object."
+        is_valid, error = _validate_string_field(item.get("name"), f"projects[{index}].name", required=True)
+        if not is_valid:
+            return False, error
+        details = item.get("details", [])
+        is_valid, error = _validate_string_list(details, f"projects[{index}].details")
+        if not is_valid:
+            return False, error
+
+    skills = payload.get("skills")
+    is_valid, error = _validate_string_list(skills, "skills")
+    if not is_valid:
+        return False, error
+
+    return True, None
+
+
+def build_builder_validation_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Create UI-friendly stats for the builder path."""
+    return {
+        "valid": True,
+        "errors": [],
+        "warnings": [],
+        "stats": {
+            "education_items": len(payload.get("education", [])),
+            "experience_items": len(payload.get("experience", [])),
+            "project_items": len(payload.get("projects", [])),
+            "skills_items": len(payload.get("skills", [])),
+        },
+    }
+
+
 def parse_replacement_payload(raw_text: str) -> Dict[str, Any]:
     """
     Extract and validate a replacement payload.
@@ -138,6 +248,15 @@ def parse_replacement_payload(raw_text: str) -> Dict[str, Any]:
     """
     payload = extract_json_from_text(raw_text)
     is_valid, error_message = validate_payload(payload)
+    if not is_valid:
+        raise ValueError(error_message)
+    return payload
+
+
+def parse_builder_payload(raw_text: str) -> Dict[str, Any]:
+    """Extract and validate a builder payload."""
+    payload = extract_json_from_text(raw_text)
+    is_valid, error_message = validate_builder_payload(payload)
     if not is_valid:
         raise ValueError(error_message)
     return payload
