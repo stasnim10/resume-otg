@@ -154,10 +154,24 @@ def example_json():
                 "replacement_text": "Managed 8-person analytics team building ML-powered demand forecasting models (Python/SQL), cutting stockouts by 30% and generating $5M in annual savings."
             }
         ],
-        "skills_replacement": {
-            "match_anchor": "Technical Skills: Python, SQL, Excel, SAP, Tableau, Supply Chain Management, Data Analysis",
-            "replacement_text": "Technical Skills: Python, SQL, Advanced Excel, SAP ERP, Tableau, Power BI, Supply Chain Optimization, Predictive Analytics, Machine Learning"
-        }
+        "skills_replacements": [
+            {
+                "match_anchor": "Supply Chain & Operations: Supply Chain Management, Operations Management, Cloud Experience, Supply Chain Analytics",
+                "replacement_text": "Supply Chain & Operations: Supply Chain Management, Operations Management, Network Optimization, Capacity Planning, Supplier Performance Management, Lean Process Improvement, Logistics Cost Optimization, KPI Governance"
+            },
+            {
+                "match_anchor": "Analytics: Excel, SQL, Tableau",
+                "replacement_text": "Analytics & Data Tools: Advanced Excel (Financial Modeling, Scenario Analysis), SQL, Tableau, Data Visualization, KPI Dashboard Development"
+            },
+            {
+                "match_anchor": "Programming & Systems: Python, R, SAP",
+                "replacement_text": "ERP & Enterprise Systems: SAP (Reporting & Data Extraction), CRM-Enabled Workflow Support, Programming & Technical Tools: Python, R"
+            },
+            {
+                "match_anchor": "Web & Mobile Application: GitHub, Cursor, Google Firebase Studio, Figma, IOS app Developer, Xcode, Android app developer",
+                "replacement_text": "Digital Product & Systems Exposure: GitHub, Firebase Studio, Figma, Xcode, Android Development Tools"
+            }
+        ]
     }
     return jsonify(example)
 

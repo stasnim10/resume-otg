@@ -150,16 +150,16 @@ def apply_replacements(doc_path: str, payload: Dict[str, Any], output_path: str 
                     errors.append(str(e))
                     print(str(e))
         
-        # Skills replacement
-        if "skills_replacement" in payload:
-            sr = payload["skills_replacement"]
-            try:
-                msg = replace_exact_paragraph(doc, sr["match_anchor"], sr["replacement_text"])
-                replaced_anchors.append(sr["match_anchor"])
-                print(msg)
-            except ValueError as e:
-                errors.append(str(e))
-                print(str(e))
+        # Skills replacements
+        if "skills_replacements" in payload:
+            for idx, skill in enumerate(payload["skills_replacements"]):
+                try:
+                    msg = replace_exact_paragraph(doc, skill["match_anchor"], skill["replacement_text"])
+                    replaced_anchors.append(skill["match_anchor"])
+                    print(msg)
+                except ValueError as e:
+                    errors.append(str(e))
+                    print(str(e))
         
         # If any errors, fail
         if errors:

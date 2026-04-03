@@ -1,0 +1,5 @@
+python-docx
+streamlit
+openai
+anthropic
+google-genai

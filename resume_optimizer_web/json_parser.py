@@ -79,13 +79,16 @@ def validate_payload(payload: Dict[str, Any]) -> tuple:
             if "match_anchor" not in bullet or "replacement_text" not in bullet:
                 return False, f"❌ bullet_replacements[{idx}] must have match_anchor and replacement_text"
     
-    # Check skills_replacement
-    if "skills_replacement" in payload:
-        sr = payload["skills_replacement"]
-        if not isinstance(sr, dict):
-            return False, "❌ skills_replacement must be an object"
-        if "match_anchor" not in sr or "replacement_text" not in sr:
-            return False, "❌ skills_replacement must have match_anchor and replacement_text"
+    # Check skills_replacements
+    if "skills_replacements" in payload:
+        sr = payload["skills_replacements"]
+        if not isinstance(sr, list):
+            return False, "❌ skills_replacements must be an array"
+        for idx, skill in enumerate(sr):
+            if not isinstance(skill, dict):
+                return False, f"❌ skills_replacements[{idx}] must be an object"
+            if "match_anchor" not in skill or "replacement_text" not in skill:
+                return False, f"❌ skills_replacements[{idx}] must have match_anchor and replacement_text"
     
     return True, None
 

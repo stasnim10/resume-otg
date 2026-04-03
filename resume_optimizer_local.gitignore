@@ -4,9 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -23,33 +20,29 @@ wheels/
 .installed.cfg
 *.egg
 
-# Flask
-instance/
-.webassets-cache
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
 
-# Uploads
-uploads/*
-!uploads/.gitkeep
-
-# Environment
-.env
-.env.local
-
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
-Thumbs.db
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
+# Output files
+*_Optimized.docx
+*.docx
+*.doc
 
-# Logs
+# Temporary files
+*.tmp
 *.log
+
+# Analysis/Debug files
+analyze_mismatch.py
+compare_docs.py

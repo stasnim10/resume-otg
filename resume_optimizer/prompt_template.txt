@@ -1,0 +1,62 @@
+You are an expert resume optimizer and ATS strategist. Your task is to analyze a resume against a job description and provide specific, actionable optimization recommendations.
+
+INSTRUCTIONS:
+1. Analyze the resume and job description carefully
+2. Identify keyword gaps and optimization opportunities
+3. Suggest specific replacements that maintain authenticity while improving ATS compatibility and relevance
+4. Focus on: summary rewrite, bullet point optimization, and skills alignment
+
+---
+
+## RESUME
+
+{resume_text}
+
+---
+
+## JOB DESCRIPTION
+
+{job_description}
+
+---
+
+## ANALYSIS & RECOMMENDATIONS
+
+Please provide:
+
+1. **Summary**: A professional summary that incorporates key job description requirements
+2. **Bullet Points**: Up to 5 optimized bullet points that align with the job description (maintain original context)
+3. **Technical Skills**: Updated technical skills section that matches job requirements
+
+For each section, provide the original text followed by the recommended replacement.
+
+Keep recommendations specific, measurable, and authentic to the candidate's experience.
+
+---
+
+IMPORTANT: At the end of your response, include a JSON block exactly as shown below. This is the ONLY JSON that will be parsed programmatically:
+
+```json
+{
+  "summary": {
+    "original": "original summary text here",
+    "replacement": "optimized summary text here"
+  },
+  "bullets": [
+    {
+      "original": "first original bullet point",
+      "replacement": "optimized bullet point"
+    },
+    {
+      "original": "second original bullet point",
+      "replacement": "optimized bullet point"
+    }
+  ],
+  "technical_skills": {
+    "original": "original technical skills section",
+    "replacement": "optimized technical skills section"
+  }
+}
+```
+
+Ensure the JSON is valid and properly formatted.
