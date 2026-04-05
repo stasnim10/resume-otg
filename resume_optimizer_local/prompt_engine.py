@@ -1,6 +1,158 @@
 """
 Prompt generation for the Streamlit prototype.
 """
+from __future__ import annotations
+
+import re
+
+
+def normalize_role_title(extracted_title: str) -> str:
+    """Strip company, location, and LinkedIn-style framing from a role title."""
+    title = " ".join(extracted_title.split()).strip()
+    if not title:
+        return ""
+
+    title = re.sub(r"^.*?\bhiring\s+", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\s+in\s+[^,]+,\s*[A-Z]{2}.*$", "", title)
+    title = re.sub(r"\s+-\s+remote$", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\s+\|\s+linkedin.*$", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\s+at\s+[A-Z][A-Za-z0-9&' .,-]*$", "", title)
+    title = re.sub(r"\s{2,}", " ", title).strip(" -|,")
+    return title
+
+
+def _extract_role_specific_priorities(job_description: str, target_role: str, target_industry: str) -> list[str]:
+    """Return up to five priorities tailored to the JD and normalized role."""
+    jd_lower = job_description.lower()
+    role_lower = target_role.lower()
+    industry_lower = target_industry.lower()
+
+    mappings = [
+        {
+            "keywords": (
+                "route optimization",
+                "routing",
+                "network design",
+                "transportation modeling",
+                "flow-path",
+                "mode selection",
+            ),
+            "priority": "Route optimization & network design",
+        },
+        {
+            "keywords": (
+                "analytics",
+                "dashboard",
+                "dashboards",
+                "kpi",
+                "reporting",
+                "metrics",
+                "data-driven",
+                "forecasting",
+            ),
+            "priority": "Advanced analytics, dashboards & performance reporting",
+        },
+        {
+            "keywords": (
+                "cost",
+                "savings",
+                "budget",
+                "efficiency",
+                "reduce",
+                "freight",
+                "$100mm",
+                "cost-reduction",
+            ),
+            "priority": "Cost reduction, budget management & operational efficiency",
+        },
+        {
+            "keywords": (
+                "supplier",
+                "vendor",
+                "negotiation",
+                "contract",
+                "procurement",
+                "sourcing",
+            ),
+            "priority": "Supplier management, sourcing & contract negotiation",
+        },
+        {
+            "keywords": (
+                "cross-functional",
+                "collaboration",
+                "stakeholder",
+                "distribution",
+                "inventory",
+                "finance",
+                "carrier",
+                "operations",
+            ),
+            "priority": "Cross-functional collaboration & stakeholder management",
+        },
+        {
+            "keywords": (
+                "strategy",
+                "strategic",
+                "planning",
+                "execution",
+                "initiative",
+                "initiatives",
+            ),
+            "priority": "Strategic planning, project execution & operational leadership",
+        },
+        {
+            "keywords": (
+                "process",
+                "improvement",
+                "standardized",
+                "standardizing",
+                "documentation",
+                "procedures",
+                "workflow",
+            ),
+            "priority": "Process improvement, standardization & workflow design",
+        },
+        {
+            "keywords": (
+                "product strategy",
+                "roadmap",
+                "customer insight",
+                "experimentation",
+                "prioritization",
+            ),
+            "priority": "Product strategy, customer insight & roadmap prioritization",
+        },
+    ]
+
+    priorities: list[str] = []
+    seen: set[str] = set()
+    for mapping in mappings:
+        if any(keyword in jd_lower or keyword in role_lower or keyword in industry_lower for keyword in mapping["keywords"]):
+            if mapping["priority"] not in seen:
+                priorities.append(mapping["priority"])
+                seen.add(mapping["priority"])
+
+    fallback_priorities = [
+        "Core responsibilities and skill keywords from the target role",
+        "Quantified business impact, metrics, and measurable outcomes",
+        "Cross-functional leadership, collaboration, and ownership",
+        "Systems thinking, process improvement, and execution discipline",
+        "Strategic relevance to the target role and industry",
+    ]
+    for fallback in fallback_priorities:
+        if len(priorities) >= 5:
+            break
+        if fallback not in seen:
+            priorities.append(fallback)
+            seen.add(fallback)
+
+    return priorities[:5]
+
+
+def _build_prioritization_block(target_role: str, target_industry: str, job_description: str) -> str:
+    """Return a deterministic prioritization block for the optimizer prompt."""
+    priorities = _extract_role_specific_priorities(job_description, target_role, target_industry)
+    return "\n".join(f"{index}. {priority}" for index, priority in enumerate(priorities, start=1))
 
 
 def build_optimizer_prompt(
@@ -11,16 +163,24 @@ def build_optimizer_prompt(
     target_industry: str,
 ) -> str:
     """Generate the manual/API prompt for the optimizer flow."""
+    normalized_role = normalize_role_title(target_role) or "the target role"
     industry_text = target_industry if target_industry else "the target industry"
+    prioritization_block = _build_prioritization_block(normalized_role, industry_text, job_description)
 
     return f"""ROLE
 Act as an expert recruiter, resume strategist, and professional editor focused on {industry_text}.
 
 PERSONA CONTEXT
-The candidate is at the {career_stage} stage and is targeting a {target_role} role.
+The candidate is at the {career_stage} stage and is targeting a {normalized_role} role.
 
 OBJECTIVE
 Optimize the uploaded resume for the target role using only information that is clearly supported by the resume. Improve relevance, clarity, and ATS alignment while preserving honesty.
+
+PRIORITIZATION
+Focus your optimization on these areas (in order of importance):
+{prioritization_block}
+
+When rewriting, emphasize accomplishments and experience that directly align with these five areas.
 
 RULES
 1. Do not invent employers, job titles, dates, certifications, scope, or metrics.
@@ -29,6 +189,23 @@ RULES
 4. Use exact paragraph text from the resume as each match_anchor.
 5. Return only valid JSON. No markdown fences. No explanation before or after the JSON.
 6. Every match_anchor must exactly match one full paragraph from the resume text below.
+7. If no changes are needed for a section, omit it from the output. Return {{}} if no changes are needed at all.
+
+BULLET-WRITING REQUIREMENTS
+Each bullet point in replacements should:
+- Start with a strong action verb (Led, Managed, Developed, Coordinated, Negotiated, Established, Implemented, etc.)
+- Include a quantifiable result or impact when present in the original (metrics, percentages, cost savings, efficiency gains)
+- Remain concise (1-2 lines maximum)
+- Focus on outcome and impact, not just activities
+- Align with the prioritization areas above
+
+SKILLS SECTION GUIDANCE
+For skills replacements:
+- Prioritize technical and operational skills from the job description
+- Include analytical tools and platforms mentioned in the JD when they are already supported by the resume
+- Remain truthful to resume experience and do not add unsupported skills
+- Order skills by relevance to the {normalized_role} role
+- Group related skills together when it improves readability
 
 OUTPUT JSON SCHEMA
 {{

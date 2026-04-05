@@ -4,6 +4,8 @@ Streamlit prototype for the Resume Optimizer MVP.
 from __future__ import annotations
 
 import io
+import json
+import re
 import tempfile
 from pathlib import Path
 
@@ -12,6 +14,8 @@ import streamlit.components.v1 as components
 
 from ai_gateway import PROVIDER_CONFIG, optimize_with_provider
 from docx_handler import apply_replacements, build_resume_from_scratch, extract_text
+from jd_cleaning import clean_job_description
+from jd_fetcher import fetch_job_description_from_url, looks_like_url
 from json_parser import (
     build_builder_validation_summary,
     build_validation_summary,
@@ -42,6 +46,26 @@ INDUSTRIES = [
     "General Business",
 ]
 
+ROLE_KEYWORDS = [
+    "Analyst",
+    "Manager",
+    "Engineer",
+    "Specialist",
+    "Consultant",
+    "Coordinator",
+    "Associate",
+    "Intern",
+    "Designer",
+    "Administrator",
+    "Strategist",
+    "Recruiter",
+    "Marketer",
+    "Developer",
+    "Scientist",
+    "Product Manager",
+    "Program Manager",
+]
+
 
 def format_preview_text(text: str, max_len: int = 260) -> str:
     """Trim long paragraph previews so comparison cards stay readable."""
@@ -51,29 +75,143 @@ def format_preview_text(text: str, max_len: int = 260) -> str:
     return f"{cleaned[:max_len].rstrip()}..."
 
 
-def render_status_card(review_stats: dict, stats: dict) -> None:
-    """Render the high-level validation summary."""
-    lines = [
-        "- Resume loaded",
-        "- Job description loaded",
-        "- Structured output valid",
-        f"- Requested replacements: {stats.get('requested_replacements', 0)}",
-        f"- Exact matches: {review_stats.get('matched_replacements', 0)}",
-        f"- Needs manual review: {review_stats.get('unmatched_replacements', 0) + review_stats.get('duplicate_replacements', 0)}",
+def detect_role_title(job_description: str) -> str:
+    """Infer a role title from the pasted job description."""
+    if not job_description.strip():
+        return ""
+
+    top_section = job_description[:700]
+    role_suffixes = "|".join(
+        [
+            "Analyst",
+            "Manager",
+            "Engineer",
+            "Specialist",
+            "Consultant",
+            "Coordinator",
+            "Associate",
+            "Intern",
+            "Designer",
+            "Administrator",
+            "Strategist",
+            "Recruiter",
+            "Marketer",
+            "Developer",
+            "Scientist",
+        ]
+    )
+    ignore_markers = [
+        "requirements",
+        "education",
+        "years of experience",
+        "skills",
+        "physical requirements",
+        "safety",
+        "salary",
+        "benefits",
+        "preferred",
     ]
-    st.markdown("**Validation Summary**")
-    st.info("\n".join(lines))
+    patterns = [
+        r"(?im)^\s*(?:job title|title|role|position)\s*[:\-]\s*(.+)$",
+        rf"(?im)^\s*([A-Z][A-Za-z/&,\-\s]{{2,80}}(?:{role_suffixes}))\s*$",
+        rf"(?i)\bthe\s+([A-Z][A-Za-z/&,\-\s]{{1,80}}(?:{role_suffixes}))\s+(?:plays|is|will|works|supports|leads)\b",
+        rf"\b((?:Senior|Lead|Principal|Staff|Junior|Associate|Assistant)\s+[A-Z][A-Za-z/&,\-\s]{{1,80}}(?:{role_suffixes})|[A-Z][A-Za-z/&,\-\s]{{1,80}}(?:{role_suffixes}))\b",
+    ]
+    for pattern in patterns:
+        for text_block in [top_section, job_description]:
+            matches = re.findall(pattern, text_block)
+            if not matches:
+                continue
+            for raw_match in matches:
+                cleaned_match = " ".join(raw_match.split())
+                cleaned_match = re.sub(
+                    r"^(?:about the job|job description|job)\s+",
+                    "",
+                    cleaned_match,
+                    flags=re.IGNORECASE,
+                ).strip()
+                cleaned_match = re.sub(r"^the\s+", "", cleaned_match, flags=re.IGNORECASE).strip()
+                cleaned_match = re.sub(r"\s+-\s+remote$", "", cleaned_match, flags=re.IGNORECASE).strip()
+                lowered = cleaned_match.lower()
+                if any(marker in lowered for marker in ignore_markers):
+                    continue
+                if len(cleaned_match) > 90:
+                    continue
+                return cleaned_match
+
+    for line in job_description.splitlines()[:12]:
+        cleaned = " ".join(line.split())
+        if not cleaned or len(cleaned) > 90:
+            continue
+        lowered = cleaned.lower()
+        if any(marker in lowered for marker in ignore_markers):
+            continue
+        if any(keyword.lower() in cleaned.lower() for keyword in ROLE_KEYWORDS):
+            return cleaned
+
+    return ""
 
 
-def render_replacement_preview(item: dict, index: int) -> None:
+def detect_industry(job_description: str) -> str:
+    """Infer an industry bucket from the pasted job description."""
+    text = job_description.lower()
+    if not text:
+        return ""
+
+    keyword_map = {
+        "Supply Chain / Operations": [
+            "supply chain",
+            "logistics",
+            "transportation",
+            "warehouse",
+            "inventory",
+            "distribution",
+            "carrier",
+            "routing",
+            "fulfillment",
+            "delivery network",
+        ],
+        "Finance": ["finance", "financial", "fp&a", "banking", "investment", "accounting", "budget", "forecasting"],
+        "Consulting": ["consulting", "client engagement", "advisory", "strategy projects"],
+        "Technology": ["software", "saas", "cloud", "developer", "product", "tech", "automation platform"],
+        "Healthcare": ["healthcare", "clinical", "patient", "medical", "hospital", "pharma"],
+        "Marketing": ["marketing", "brand", "campaign", "growth", "content", "seo"],
+    }
+    scores = {
+        industry: sum(text.count(keyword) for keyword in keywords)
+        for industry, keywords in keyword_map.items()
+    }
+    best_industry = max(scores, key=scores.get)
+    if scores[best_industry] > 0:
+        return best_industry
+    return "General Business"
+
+
+def get_effective_target_role(job_description: str) -> str:
+    """Use the manual override when present, otherwise JD detection."""
+    return (
+        st.session_state.target_role.strip()
+        or (st.session_state.jd_role_hint.strip() if st.session_state.jd_source_url else "")
+        or detect_role_title(job_description)
+        or "the target role"
+    )
+
+
+def get_effective_industry(job_description: str) -> str:
+    """Use the manual override when present, otherwise JD detection."""
+    return st.session_state.target_industry.strip() or detect_industry(job_description)
+
+
+def render_replacement_preview(item: dict, index: int, key_prefix: str, show_status: bool = True) -> None:
     """Render a cleaner before/after preview for one replacement."""
     status = item["status"]
-    if status == "matched":
-        st.success(f"{index}. {item['section']} updated automatically")
-    elif status == "duplicate":
-        st.error(f"{index}. {item['section']} needs manual review because multiple paragraphs matched")
-    else:
-        st.error(f"{index}. {item['section']} needs manual review because no exact anchor was found")
+    if show_status:
+        if status == "matched":
+            st.markdown("**✏️ AI-updated**")
+        elif status == "duplicate":
+            st.markdown("**⚠️ Needs manual review: multiple paragraphs matched**")
+        else:
+            st.markdown("**⚠️ Needs manual review: no exact anchor was found**")
 
     left_col, right_col = st.columns(2)
     with left_col:
@@ -83,7 +221,7 @@ def render_replacement_preview(item: dict, index: int) -> None:
             value=item["match_anchor"],
             height=130,
             disabled=True,
-            key=f"review-anchor-{index}",
+            key=f"{key_prefix}-anchor-{index}",
         )
         st.caption(format_preview_text(item["match_anchor"]))
     with right_col:
@@ -93,7 +231,7 @@ def render_replacement_preview(item: dict, index: int) -> None:
             value=item["replacement_text"],
             height=130,
             disabled=True,
-            key=f"review-replacement-{index}",
+            key=f"{key_prefix}-replacement-{index}",
         )
         st.caption(format_preview_text(item["replacement_text"]))
 
@@ -104,6 +242,49 @@ def render_replacement_preview(item: dict, index: int) -> None:
         ]
         st.caption("Closest resume paragraphs:")
         st.code("\n\n".join(suggestion_lines), language="text")
+
+
+def _section_label(count: int, singular: str, plural: str) -> str:
+    """Return a compact count label."""
+    return f"{count} {singular if count == 1 else plural}"
+
+
+def _group_review_results(review_results: list[dict]) -> dict[str, list[dict]]:
+    """Group review items into user-facing sections."""
+    grouped = {"Summary": [], "Bullet": [], "Skills": []}
+    for item in review_results:
+        grouped.setdefault(item.get("section", "Other"), []).append(item)
+    return grouped
+
+
+def render_review_section(title: str, items: list[dict], expanded: bool = False) -> None:
+    """Render one grouped review section with progressive disclosure."""
+    count_label = _section_label(len(items), "change", "changes")
+    section_slug = title.lower().replace(" ", "-")
+    with st.expander(f"{title} · {count_label}", expanded=expanded):
+        if not items:
+            st.caption("No changes in this section.")
+            return
+
+        if title != "Bullet Points" and len(items) == 1:
+            render_replacement_preview(items[0], 1, f"{section_slug}-1", show_status=True)
+            return
+
+        for index, item in enumerate(items, start=1):
+            status = item["status"]
+            if status == "matched":
+                status_label = "✏️ AI-updated"
+            elif status == "duplicate":
+                status_label = "⚠️ Needs manual review"
+            else:
+                status_label = "⚠️ Needs manual review"
+
+            nested_title = f"{index}. {status_label}"
+            if title == "Bullet Points":
+                nested_title = f"{index}. {status_label} · {format_preview_text(item['replacement_text'], 72)}"
+
+            with st.expander(nested_title, expanded=(len(items) == 1 and expanded)):
+                render_replacement_preview(item, index, f"{section_slug}-{index}", show_status=False)
 
 
 def init_session_state() -> None:
@@ -127,7 +308,6 @@ def init_session_state() -> None:
         "output_filename": None,
         "last_error": None,
         "review_details": None,
-        "cover_letter_later": False,
         "builder_full_name": "",
         "builder_contact_info": "",
         "builder_education": "",
@@ -140,6 +320,11 @@ def init_session_state() -> None:
         "builder_validation_summary": None,
         "builder_output_docx_bytes": None,
         "builder_output_filename": None,
+        "jd_source_url": "",
+        "jd_cleaning_result": None,
+        "show_review_changes": False,
+        "pending_job_description_input": None,
+        "jd_role_hint": "",
     }
 
     for key, value in defaults.items():
@@ -212,6 +397,17 @@ def build_output_docx(payload: dict) -> tuple[bytes, str]:
         return output_path.read_bytes(), message
 
 
+def ensure_export_file_ready() -> None:
+    """Generate the optimized output once when export is safe."""
+    if st.session_state.output_docx_bytes or not st.session_state.validated_payload:
+        return
+
+    output_bytes, _message = build_output_docx(st.session_state.validated_payload)
+    original_name = Path(st.session_state.resume_name)
+    st.session_state.output_docx_bytes = output_bytes
+    st.session_state.output_filename = f"{original_name.stem}_Optimized{original_name.suffix}"
+
+
 def render_landing() -> None:
     """Landing page."""
     st.title("Resume Optimizer")
@@ -236,6 +432,36 @@ def render_landing() -> None:
 
 def render_input_screen() -> None:
     """Resume and job input screen."""
+    def fetch_and_store_job_description(job_input: str) -> bool:
+        """Fetch, clean, and store JD text from a pasted URL."""
+        try:
+            with st.spinner("Validating link and extracting the job description..."):
+                extracted_text, final_url, role_hint = fetch_job_description_from_url(job_input)
+            cleaning_result = clean_job_description(extracted_text)
+            cleaned_text = cleaning_result["cleaned_text"]
+            st.session_state.job_description = cleaned_text
+            st.session_state.pending_job_description_input = cleaned_text
+            st.session_state.jd_source_url = final_url
+            st.session_state.jd_cleaning_result = cleaning_result
+            st.session_state.jd_role_hint = role_hint or detect_role_title(cleaned_text)
+            st.success("Job description extracted and cleaned successfully. Review the text below before continuing.")
+            return True
+        except Exception as error:
+            st.warning(f"{error} Please paste the job description text manually if the page blocks extraction.")
+            return False
+
+    def clean_pasted_job_description(job_input: str) -> bool:
+        """Normalize manually pasted JD text so downstream detection is cleaner."""
+        cleaned_result = clean_job_description(job_input)
+        cleaned_text = cleaned_result["cleaned_text"]
+        st.session_state.job_description = cleaned_text
+        st.session_state.pending_job_description_input = cleaned_text
+        st.session_state.jd_source_url = ""
+        st.session_state.jd_cleaning_result = cleaned_result
+        st.session_state.jd_role_hint = detect_role_title(cleaned_text)
+        st.success("Job description cleaned and ready. Review the text below before continuing.")
+        return True
+
     st.title("Optimizer Input")
     st.write("Upload your draft resume and describe the role you want to target.")
 
@@ -244,37 +470,75 @@ def render_input_screen() -> None:
         save_uploaded_resume(uploaded_file)
         st.success(f"Loaded `{uploaded_file.name}`")
 
+    if st.session_state.pending_job_description_input is not None:
+        st.session_state.job_description_input = st.session_state.pending_job_description_input
+        st.session_state.pending_job_description_input = None
+
+    if "job_description_input" not in st.session_state:
+        st.session_state.job_description_input = st.session_state.job_description
+
     job_description = st.text_area(
         "Job Description",
-        value=st.session_state.job_description,
         height=220,
-        placeholder="Paste the full job description here.",
+        placeholder="Paste the full job description here, or paste a job-post URL.",
+        key="job_description_input",
     )
+    job_description = st.session_state.get("job_description_input", job_description)
+    st.caption("Click below to process a pasted job link or clean pasted job description text.")
+    if st.button("Process Job Description", use_container_width=True):
+        current_input = st.session_state.get("job_description_input", job_description)
+        if looks_like_url(current_input):
+            if fetch_and_store_job_description(current_input):
+                st.rerun()
+        elif current_input.strip():
+            if clean_pasted_job_description(current_input):
+                st.rerun()
+        else:
+            st.info("Paste a job description or job link first.")
+
+    if st.session_state.jd_source_url and not looks_like_url(st.session_state.job_description):
+        st.caption(f"Loaded from URL: {st.session_state.jd_source_url}")
+    if st.session_state.jd_cleaning_result:
+        cleaning_result = st.session_state.jd_cleaning_result
+        st.success(str(cleaning_result["confidence_message"]))
+
+    detected_role = (
+        st.session_state.jd_role_hint if st.session_state.jd_source_url else detect_role_title(job_description)
+    )
+    detected_industry = detect_industry(job_description) if job_description.strip() else ""
+
     career_stage = st.selectbox(
         "Career Stage",
         CAREER_STAGES,
         index=CAREER_STAGES.index(st.session_state.career_stage),
     )
-    target_role = st.text_input(
-        "Target Role Title",
-        value=st.session_state.target_role,
-        placeholder="Example: Product Manager Intern",
-    )
-    target_industry = st.selectbox(
-        "Industry (Optional)",
-        INDUSTRIES,
-        index=INDUSTRIES.index(st.session_state.target_industry),
-    )
-    cover_letter_later = st.checkbox(
-        "Generate cover letter later",
-        value=st.session_state.cover_letter_later,
-    )
+    if job_description.strip():
+        detected_lines = [
+            f"Detected role: {detected_role or 'Could not confidently detect'}",
+            f"Detected industry: {detected_industry or 'Could not confidently detect'}",
+        ]
+        st.caption("Auto-detected from the job description")
+        st.info("\n".join(detected_lines))
+
+    with st.expander("Advanced options", expanded=False):
+        target_role = st.text_input(
+            "Target Role Title Override",
+            value=st.session_state.target_role,
+            placeholder=detected_role or "Example: Product Manager Intern",
+            help="Leave blank to use the detected role title from the JD.",
+        )
+        industry_options = INDUSTRIES if st.session_state.target_industry in INDUSTRIES else [""] + INDUSTRIES[1:]
+        target_industry = st.selectbox(
+            "Industry Override",
+            industry_options,
+            index=industry_options.index(st.session_state.target_industry),
+            help="Leave blank to use the detected industry from the JD.",
+        )
 
     st.session_state.job_description = job_description
     st.session_state.career_stage = career_stage
     st.session_state.target_role = target_role
     st.session_state.target_industry = target_industry
-    st.session_state.cover_letter_later = cover_letter_later
 
     col1, col2 = st.columns(2)
     with col1:
@@ -285,11 +549,15 @@ def render_input_screen() -> None:
         can_continue = bool(
             st.session_state.resume_text
             and job_description.strip()
-            and target_role.strip()
         )
         if st.button("Continue", use_container_width=True, disabled=not can_continue):
-            st.session_state.screen = "mode"
-            st.rerun()
+            if looks_like_url(job_description):
+                if fetch_and_store_job_description(job_description):
+                    st.rerun()
+            else:
+                st.session_state.jd_cleaning_result = None
+                st.session_state.screen = "mode"
+                st.rerun()
 
 
 def render_builder_input_screen() -> None:
@@ -392,17 +660,15 @@ def render_builder_stub_screen() -> None:
     summary_col2.metric("Target Role", st.session_state.target_role or "Not set")
     summary_col3.metric("Has JD", "Yes" if st.session_state.builder_job_description.strip() else "No")
 
-    st.text_area(
-        "Generated Builder Prompt",
-        value=st.session_state.builder_prompt,
-        height=360,
-        disabled=True,
-    )
-    render_copy_prompt_button(st.session_state.builder_prompt)
+    render_prompt_block("Generated Builder Prompt", st.session_state.builder_prompt, 360, "builder")
 
-    st.code(
-        "1. Paste the prompt into ChatGPT, Claude, or Gemini\n2. Ask it to return only the structured output\n3. Paste the result below and validate it",
-        language="text",
+    render_instruction_panel(
+        "What To Do Next",
+        [
+            "Copy the builder prompt above and paste it into ChatGPT, Claude, or Gemini.",
+            "Ask the AI to return only the structured JSON output for the first resume.",
+            "Paste the AI result below, then click Validate Builder Output.",
+        ],
     )
 
     pasted_output = st.text_area(
@@ -545,8 +811,8 @@ def render_mode_screen() -> None:
                 st.session_state.resume_text,
                 st.session_state.job_description,
                 st.session_state.career_stage,
-                st.session_state.target_role,
-                st.session_state.target_industry,
+                get_effective_target_role(st.session_state.job_description),
+                get_effective_industry(st.session_state.job_description),
             )
             st.session_state.screen = "manual"
             st.rerun()
@@ -560,8 +826,8 @@ def render_mode_screen() -> None:
                 st.session_state.resume_text,
                 st.session_state.job_description,
                 st.session_state.career_stage,
-                st.session_state.target_role,
-                st.session_state.target_industry,
+                get_effective_target_role(st.session_state.job_description),
+                get_effective_industry(st.session_state.job_description),
             )
             st.session_state.screen = "api"
             st.rerun()
@@ -578,28 +844,90 @@ def handle_validated_payload(payload: dict) -> None:
     st.session_state.review_details = analyze_payload(payload)
     st.session_state.output_docx_bytes = None
     st.session_state.output_filename = None
+    st.session_state.show_review_changes = False
     st.session_state.screen = "review"
 
 
-def render_copy_prompt_button(prompt: str) -> None:
-    """Render a lightweight copy-to-clipboard button."""
-    escaped_prompt = (
-        prompt.replace("\\", "\\\\")
-        .replace("`", "\\`")
-        .replace("${", "\\${")
+def render_copy_prompt_button(prompt: str, key: str) -> None:
+    """Render a one-click clipboard copy button with feedback."""
+    prompt_json = json.dumps(prompt)
+    button_id = f"copy-btn-{key}"
+    feedback_id = f"copy-feedback-{key}"
+    components.html(
+        f"""
+        <div style="display:flex;flex-direction:column;align-items:flex-end;margin:0.1rem 0 0.45rem 0;">
+          <button
+            id="{button_id}"
+            type="button"
+            style="background:#2563eb;color:white;border:none;padding:0.55rem 0.9rem;border-radius:0.55rem;cursor:pointer;font-weight:700;font-size:0.92rem;"
+          >
+            📋 Copy Prompt
+          </button>
+          <span id="{feedback_id}" style="min-height:1.15rem;margin-top:0.35rem;font-size:0.88rem;font-weight:700;color:#15803d;"></span>
+        </div>
+        <script>
+          const button = document.getElementById("{button_id}");
+          const feedback = document.getElementById("{feedback_id}");
+          const promptText = {prompt_json};
+          button.addEventListener("click", async () => {{
+            try {{
+              await navigator.clipboard.writeText(promptText);
+              feedback.textContent = "✓ Copied!";
+              feedback.style.color = "#15803d";
+              setTimeout(() => {{
+                feedback.textContent = "";
+              }}, 2000);
+            }} catch (err) {{
+              feedback.textContent = "Failed to copy. Try Cmd+C instead.";
+              feedback.style.color = "#b45309";
+              setTimeout(() => {{
+                feedback.textContent = "";
+              }}, 2000);
+            }}
+          }});
+        </script>
+        """,
+        height=74,
+    )
+
+
+def render_prompt_block(label: str, prompt: str, height: int, copy_key: str) -> None:
+    """Render the prompt with a heading and right-aligned copy button."""
+    st.markdown(f"**{label}**")
+    render_copy_prompt_button(prompt, copy_key)
+    st.text_area(
+        label,
+        value=prompt,
+        height=height,
+        key=f"{copy_key}-prompt-display",
+        label_visibility="collapsed",
+        help="Select the prompt text manually if the browser blocks clipboard access.",
+    )
+
+
+def render_instruction_panel(title: str, steps: list[str]) -> None:
+    """Render a prominent instruction block."""
+    step_html = "".join(
+        [
+            f"""
+            <div style="display:flex;gap:0.75rem;align-items:flex-start;margin-bottom:0.8rem;">
+              <div style="background:#0f766e;color:white;min-width:1.9rem;height:1.9rem;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:700;">
+                {index}
+              </div>
+              <div style="color:#e5e7eb;line-height:1.45;">{step}</div>
+            </div>
+            """
+            for index, step in enumerate(steps, start=1)
+        ]
     )
     components.html(
         f"""
-        <div style="margin: 0.5rem 0 1rem 0;">
-          <button
-            onclick="navigator.clipboard.writeText(`{escaped_prompt}`); this.innerText='Prompt Copied';"
-            style="background:#0f766e;color:white;border:none;padding:0.6rem 1rem;border-radius:0.5rem;cursor:pointer;font-weight:600;"
-          >
-            Copy Prompt
-          </button>
+        <div style="margin: 0.8rem 0 1rem 0; padding: 1rem 1rem 0.4rem 1rem; border: 1px solid #1f2937; border-radius: 0.85rem; background: linear-gradient(180deg, rgba(15,118,110,0.18), rgba(17,24,39,0.92));">
+          <div style="color:white;font-weight:700;font-size:1rem;margin-bottom:0.9rem;">{title}</div>
+          {step_html}
         </div>
         """,
-        height=55,
+        height=max(170, 88 + (len(steps) * 58)),
     )
 
 
@@ -609,28 +937,14 @@ def render_manual_screen() -> None:
     st.info("Copy the prompt into your AI tool, then paste the structured result back here.")
     st.warning("Manual copy-paste works best on desktop. Large JSON payloads can be frustrating on mobile.")
 
-    if st.session_state.resume_paragraphs:
-        with st.expander("Resume Paragraph Helper", expanded=False):
-            st.caption("Use the full exact paragraph text below as each match_anchor.")
-            for index, paragraph in enumerate(st.session_state.resume_paragraphs, start=1):
-                st.text_area(
-                    f"Paragraph {index}",
-                    value=paragraph,
-                    height=90,
-                    disabled=True,
-                    key=f"resume-paragraph-{index}",
-                )
-
-    st.text_area(
-        "Generated Prompt",
-        value=st.session_state.generated_prompt or "",
-        height=320,
-        disabled=True,
-    )
-    render_copy_prompt_button(st.session_state.generated_prompt or "")
-    st.code(
-        "1. Paste the prompt into ChatGPT, Claude, or Gemini\n2. Ask it to return only the structured output\n3. Paste the result below and validate it",
-        language="text",
+    render_prompt_block("Generated Prompt", st.session_state.generated_prompt or "", 320, "manual")
+    render_instruction_panel(
+        "What To Do Next",
+        [
+            "Copy the prompt above and paste it into ChatGPT, Claude, or Gemini.",
+            "Ask the AI to return only the structured JSON output with no extra explanation.",
+            "Paste the AI result into the box below, then click Validate Output.",
+        ],
     )
 
     pasted_output = st.text_area(
@@ -712,95 +1026,121 @@ def render_review_screen() -> None:
     review_warnings = review_details.get("warnings", [])
     ready_for_export = review_stats.get("ready_for_export", False)
     manual_review_count = review_stats.get("unmatched_replacements", 0) + review_stats.get("duplicate_replacements", 0)
+    grouped_results = _group_review_results(review_results)
+
+    if ready_for_export and not st.session_state.output_docx_bytes:
+        try:
+            ensure_export_file_ready()
+        except Exception as error:
+            st.error(str(error))
+            ready_for_export = False
 
     st.title("Validation and Export")
-    st.success("Structured output validated successfully.")
+    if not st.session_state.show_review_changes:
+        if ready_for_export:
+            st.success("All replacements validated successfully.")
+            st.markdown(
+                "\n".join(
+                    [
+                        "Your resume has been optimized and is ready to download.",
+                        f"- {review_stats.get('matched_replacements', 0)} replacements matched exactly",
+                        "- 0 issues found",
+                        "- Safe to export",
+                    ]
+                )
+            )
+        else:
+            st.warning("This result needs review before export.")
+            issue_count = manual_review_count
+            st.markdown(
+                "\n".join(
+                    [
+                        "We validated the structured output, but some replacements still need attention before download.",
+                        f"- {review_stats.get('matched_replacements', 0)} replacements matched exactly",
+                        f"- {issue_count} issue(s) need review",
+                        "- Export stays disabled until every anchor matches safely",
+                    ]
+                )
+            )
 
-    render_status_card(review_stats, stats)
+        summary_col1, summary_col2, summary_col3 = st.columns(3)
+        summary_col1.metric("Summary Section", _section_label(stats.get("summary_replacements", 0), "change", "changes"))
+        summary_col2.metric("Bullet Points", _section_label(stats.get("bullet_replacements", 0), "change", "changes"))
+        summary_col3.metric("Skills Section", _section_label(stats.get("skills_replacements", 0), "change", "changes"))
 
-    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
-    metric_col1.metric("Requested", stats.get("requested_replacements", 0))
-    metric_col2.metric("Exact Matches", review_stats.get("matched_replacements", 0))
-    metric_col3.metric("Unmatched", review_stats.get("unmatched_replacements", 0))
-    metric_col4.metric("Duplicates", review_stats.get("duplicate_replacements", 0))
+        if review_warnings:
+            for warning in review_warnings:
+                st.caption(warning)
 
-    detail_col1, detail_col2, detail_col3 = st.columns(3)
-    detail_col1.metric("Summary Edits", stats.get("summary_replacements", 0))
-    detail_col2.metric("Bullet Edits", stats.get("bullet_replacements", 0))
-    detail_col3.metric("Skills Edits", stats.get("skills_replacements", 0))
+        action_col1, action_col2, action_col3 = st.columns(3)
+        with action_col1:
+            if ready_for_export and st.session_state.output_docx_bytes and st.session_state.output_filename:
+                st.download_button(
+                    "Download Optimized Resume (.docx)",
+                    data=io.BytesIO(st.session_state.output_docx_bytes),
+                    file_name=st.session_state.output_filename,
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                )
+            else:
+                st.button("Download Optimized Resume (.docx)", use_container_width=True, disabled=True)
+        with action_col2:
+            if st.button("Review Changes", use_container_width=True):
+                st.session_state.show_review_changes = True
+                st.rerun()
+        with action_col3:
+            if st.button("Start Over", use_container_width=True):
+                reset_flow()
+                st.rerun()
 
-    if review_warnings:
-        for warning in review_warnings:
-            st.warning(warning)
-    elif ready_for_export:
-        st.info("All requested replacements matched exactly. This payload is ready for export.")
-
-    preview_col1, preview_col2 = st.columns(2)
-    preview_col1.metric("Updated Automatically", review_stats.get("matched_replacements", 0))
-    preview_col2.metric("Needs Manual Review", manual_review_count)
-
-    with st.expander("Replacement Preview", expanded=True):
-        for index, item in enumerate(review_results, start=1):
-            render_replacement_preview(item, index)
-            if index != len(review_results):
-                st.divider()
-
-    with st.expander("Validated Payload", expanded=True):
-        st.json(st.session_state.validated_payload)
-
-    col1, col2 = st.columns(2)
-    with col1:
+        previous_screen = "manual" if st.session_state.execution_mode == "manual" else "api"
         if st.button("Back", use_container_width=True):
-            previous_screen = "manual" if st.session_state.execution_mode == "manual" else "api"
             st.session_state.screen = previous_screen
             st.rerun()
-    with col2:
-        if st.button("Generate Optimized .docx", use_container_width=True, disabled=not ready_for_export):
-            try:
-                with st.spinner("Applying exact paragraph replacements..."):
-                    output_bytes, _message = build_output_docx(st.session_state.validated_payload)
-                original_name = Path(st.session_state.resume_name)
-                st.session_state.output_docx_bytes = output_bytes
-                st.session_state.output_filename = f"{original_name.stem}_Optimized{original_name.suffix}"
-                st.success("Optimized resume generated successfully.")
-            except Exception as error:
-                st.error(str(error))
+        return
 
-    if not ready_for_export:
-        st.info("Export is disabled until every replacement has exactly one matching paragraph in the uploaded resume.")
+    if st.button("Back", key="review-back-button"):
+        st.session_state.show_review_changes = False
+        st.rerun()
 
-    if st.session_state.output_docx_bytes and st.session_state.output_filename:
-        st.markdown("**Export Ready**")
-        st.success(
-            f"Your optimized file is ready. {review_stats.get('matched_replacements', 0)} replacement(s) were prepared for export."
-        )
-        st.download_button(
-            "Download Optimized Resume (.docx)",
-            data=io.BytesIO(st.session_state.output_docx_bytes),
-            file_name=st.session_state.output_filename,
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True,
-        )
+    st.subheader("Optimization Summary")
+    st.caption("Review only the sections you care about. Everything is collapsed by default.")
 
-        action_col1, action_col2 = st.columns(2)
-        with action_col1:
-            st.button("Generate Cover Letter", use_container_width=True, disabled=True)
-        with action_col2:
-            st.button("Compare with Original", use_container_width=True, disabled=True)
+    render_review_section("Summary Section", grouped_results.get("Summary", []), expanded=manual_review_count > 0)
+    render_review_section("Bullet Points", grouped_results.get("Bullet", []), expanded=False)
+    render_review_section("Skills Section", grouped_results.get("Skills", []), expanded=False)
 
-        with st.expander("Original Resume Snapshot", expanded=False):
+    if manual_review_count and st.session_state.resume_paragraphs:
+        with st.expander("Need help finding the exact resume text?", expanded=False):
+            st.caption("If the AI used the wrong wording, use the exact text below from your resume.")
             for index, paragraph in enumerate(st.session_state.resume_paragraphs, start=1):
                 st.text_area(
-                    f"Original Paragraph {index}",
+                    f"Resume text {index}",
                     value=paragraph,
-                    height=80,
+                    height=90,
                     disabled=True,
-                    key=f"original-paragraph-{index}",
+                    key=f"resume-helper-{index}",
                 )
 
-        if st.button("Optimize Another Role", use_container_width=True):
+    bottom_col1, bottom_col2, bottom_col3 = st.columns(3)
+    with bottom_col1:
+        if ready_for_export and st.session_state.output_docx_bytes and st.session_state.output_filename:
+            st.download_button(
+                "Download Optimized Resume",
+                data=io.BytesIO(st.session_state.output_docx_bytes),
+                file_name=st.session_state.output_filename,
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+            )
+        else:
+            st.button("Download Optimized Resume", use_container_width=True, disabled=True)
+    with bottom_col2:
+        if st.button("Back", use_container_width=True, key="review-back-bottom"):
+            st.session_state.show_review_changes = False
+            st.rerun()
+    with bottom_col3:
+        if st.button("Start Over", use_container_width=True, key="review-start-over"):
             reset_flow()
-            st.session_state.screen = "input"
             st.rerun()
 
 
