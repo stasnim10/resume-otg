@@ -302,6 +302,8 @@ def init_session_state() -> None:
         "execution_mode": None,
         "selected_provider": "OpenAI",
         "generated_prompt": None,
+        "api_prompt_customized": False,
+        "api_prompt_override": "",
         "validated_payload": None,
         "validation_summary": None,
         "output_docx_bytes": None,
@@ -325,6 +327,9 @@ def init_session_state() -> None:
         "show_review_changes": False,
         "pending_job_description_input": None,
         "jd_role_hint": "",
+        "custom_api_base_url": "http://localhost:11434/v1",
+        "custom_api_model": "mistral",
+        "custom_api_key": "",
     }
 
     for key, value in defaults.items():
@@ -814,6 +819,8 @@ def render_mode_screen() -> None:
                 get_effective_target_role(st.session_state.job_description),
                 get_effective_industry(st.session_state.job_description),
             )
+            st.session_state.api_prompt_customized = False
+            st.session_state.api_prompt_override = st.session_state.generated_prompt or ""
             st.session_state.screen = "manual"
             st.rerun()
 
@@ -829,6 +836,8 @@ def render_mode_screen() -> None:
                 get_effective_target_role(st.session_state.job_description),
                 get_effective_industry(st.session_state.job_description),
             )
+            st.session_state.api_prompt_customized = False
+            st.session_state.api_prompt_override = st.session_state.generated_prompt or ""
             st.session_state.screen = "api"
             st.rerun()
 
@@ -971,7 +980,10 @@ def render_manual_screen() -> None:
 def render_api_screen() -> None:
     """Multi-provider API mode screen."""
     st.title("API Mode")
-    st.caption("The app uses the same prompt and validation flow, but runs it for the user.")
+    st.caption("Use your own hosted or local model. The app still validates the output before export.")
+
+    if not st.session_state.api_prompt_override and st.session_state.generated_prompt:
+        st.session_state.api_prompt_override = st.session_state.generated_prompt
 
     provider = st.selectbox(
         "Provider",
@@ -980,22 +992,95 @@ def render_api_screen() -> None:
     )
     st.session_state.selected_provider = provider
     provider_config = PROVIDER_CONFIG[provider]
-    api_key = st.text_input(
-        provider_config["key_label"],
-        type="password",
-        placeholder=provider_config["placeholder"],
-    )
-    model = st.selectbox("Model", provider_config["models"], index=0)
+    st.info(str(provider_config.get("description", "")))
+
+    api_key = ""
+    base_url = ""
+    if provider == "Local Model / Custom Endpoint":
+        st.caption("Works with Ollama and other OpenAI-compatible local endpoints.")
+        base_url = st.text_input(
+            "Base URL",
+            value=st.session_state.custom_api_base_url,
+            placeholder="http://localhost:11434/v1",
+            help="For Ollama, use http://localhost:11434/v1",
+        )
+        model = st.text_input(
+            "Model name",
+            value=st.session_state.custom_api_model,
+            placeholder="mistral",
+            help="Use the exact local model tag available on your machine.",
+        )
+        api_key = st.text_input(
+            provider_config["key_label"],
+            type="password",
+            value=st.session_state.custom_api_key,
+            placeholder=provider_config["placeholder"],
+            help="Most local endpoints do not require a key. Leave blank if not needed.",
+        )
+        st.session_state.custom_api_base_url = base_url
+        st.session_state.custom_api_model = model
+        st.session_state.custom_api_key = api_key
+        st.warning("Local models can return malformed JSON. If that happens, retry or switch to Manual Mode.")
+    else:
+        api_key = st.text_input(
+            provider_config["key_label"],
+            type="password",
+            placeholder=provider_config["placeholder"],
+        )
+        model = st.selectbox("Model", provider_config["models"], index=0)
+        st.caption("Your key is used only for this session and is not stored.")
     st.info("After the provider responds, the same JSON validator and exact-match review still run before export.")
 
-    st.text_area(
-        "Prompt Preview",
-        value=st.session_state.generated_prompt or "",
-        height=220,
-        disabled=True,
+    with st.expander("Prompt Preview", expanded=False):
+        customize_prompt = st.checkbox(
+            "Customize prompt before sending",
+            value=st.session_state.api_prompt_customized,
+            help="Advanced option. Editing the prompt may reduce JSON reliability.",
+        )
+        st.session_state.api_prompt_customized = customize_prompt
+        if customize_prompt:
+            edited_prompt = st.text_area(
+                "Editable Prompt",
+                value=st.session_state.api_prompt_override or st.session_state.generated_prompt or "",
+                height=260,
+                key="api-prompt-editor",
+                help="Advanced option. Keep the JSON instructions intact for best results.",
+            )
+            st.session_state.api_prompt_override = edited_prompt
+            if st.button("Reset to Recommended Prompt", key="reset-api-prompt"):
+                st.session_state.api_prompt_override = st.session_state.generated_prompt or ""
+                st.session_state.api_prompt_customized = False
+                st.rerun()
+            st.warning("Changing the prompt may reduce JSON reliability. Use this only if you know what you want to adjust.")
+        else:
+            st.text_area(
+                "Prompt Preview",
+                value=st.session_state.generated_prompt or "",
+                height=220,
+                disabled=True,
+            )
+
+    prompt_to_send = (
+        st.session_state.api_prompt_override.strip()
+        if st.session_state.api_prompt_customized and st.session_state.api_prompt_override.strip()
+        else st.session_state.generated_prompt
     )
 
-    col1, col2 = st.columns(2)
+    checklist = [
+        f"Resume loaded: {'Yes' if st.session_state.resume_name else 'No'}",
+        f"Job description loaded: {'Yes' if st.session_state.job_description.strip() else 'No'}",
+        f"Provider selected: {provider}",
+        f"Model selected: {model if model else 'Missing'}",
+        f"Prompt mode: {'Customized' if st.session_state.api_prompt_customized else 'Recommended'}",
+    ]
+    if provider == "Local Model / Custom Endpoint":
+        checklist.append(f"Base URL ready: {'Yes' if base_url.strip() else 'No'}")
+    else:
+        checklist.append(f"API key provided: {'Yes' if api_key.strip() else 'No'}")
+    st.caption("Ready check")
+    st.info("\n".join(f"- {line}" for line in checklist))
+
+    col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("Back", use_container_width=True):
             st.session_state.screen = "mode"
@@ -1007,13 +1092,19 @@ def render_api_screen() -> None:
                     payload = optimize_with_provider(
                         provider=provider,
                         api_key=api_key,
-                        prompt=st.session_state.generated_prompt,
+                        prompt=prompt_to_send,
                         model=model,
+                        base_url=base_url,
                     )
                 handle_validated_payload(payload)
                 st.rerun()
             except Exception as error:
                 st.error(str(error))
+    with col3:
+        if st.button("Switch to Manual Mode", use_container_width=True):
+            st.session_state.execution_mode = "manual"
+            st.session_state.screen = "manual"
+            st.rerun()
 
 
 def render_review_screen() -> None:
