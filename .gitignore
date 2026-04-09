@@ -32,6 +32,8 @@ instance/
 **/uploads/*
 !**/uploads/.gitkeep
 **/*_Optimized.docx
+**/career_profile.db
+**/career_profile.db-*
 
 # Environment
 .env

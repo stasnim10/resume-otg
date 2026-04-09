@@ -161,11 +161,21 @@ def build_optimizer_prompt(
     career_stage: str,
     target_role: str,
     target_industry: str,
+    profile_context: str = "",
 ) -> str:
     """Generate the manual/API prompt for the optimizer flow."""
     normalized_role = normalize_role_title(target_role) or "the target role"
     industry_text = target_industry if target_industry else "the target industry"
     prioritization_block = _build_prioritization_block(normalized_role, industry_text, job_description)
+
+    profile_context_block = ""
+    if profile_context.strip():
+        profile_context_block = f"""
+PROFILE EVIDENCE TO PRIORITIZE
+Use this career-profile evidence as a relevance guide when choosing what to emphasize. Only use it when it is already supported by the uploaded resume text below. Do not introduce facts that cannot be anchored back to the resume.
+
+{profile_context}
+"""
 
     return f"""ROLE
 Act as an expert recruiter, resume strategist, and professional editor focused on {industry_text}.
@@ -232,6 +242,7 @@ TOP-LEVEL RULES
 - Include only sections that truly need updating.
 - Each replacement object must contain both match_anchor and replacement_text.
 - Do not include comments, analysis, or any extra keys.
+{profile_context_block}
 
 RESUME TEXT
 {resume_text}
