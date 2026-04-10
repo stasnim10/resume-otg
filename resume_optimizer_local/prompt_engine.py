@@ -22,112 +22,145 @@ def normalize_role_title(extracted_title: str) -> str:
 
 
 def _extract_role_specific_priorities(job_description: str, target_role: str, target_industry: str) -> list[str]:
-    """Return up to five priorities tailored to the JD and normalized role."""
+    """Return up to five priorities tailored to the JD and normalized role.
+
+    Mappings are ordered from most specific to most general.  The first five
+    that match the combined text of role + industry + JD are returned; the
+    universal fallback list fills any remaining slots so there are always five.
+    """
     jd_lower = job_description.lower()
     role_lower = target_role.lower()
     industry_lower = target_industry.lower()
 
     mappings = [
+        # ── Supply chain / logistics ──────────────────────────────────────────
         {
             "keywords": (
-                "route optimization",
-                "routing",
-                "network design",
-                "transportation modeling",
-                "flow-path",
-                "mode selection",
+                "route optimization", "routing", "network design",
+                "transportation modeling", "flow-path", "mode selection",
+                "last-mile", "freight", "carrier", "logistics",
             ),
-            "priority": "Route optimization & network design",
+            "priority": "Route optimization, network design & freight cost management",
         },
         {
             "keywords": (
-                "analytics",
-                "dashboard",
-                "dashboards",
-                "kpi",
-                "reporting",
-                "metrics",
-                "data-driven",
-                "forecasting",
-            ),
-            "priority": "Advanced analytics, dashboards & performance reporting",
-        },
-        {
-            "keywords": (
-                "cost",
-                "savings",
-                "budget",
-                "efficiency",
-                "reduce",
-                "freight",
-                "$100mm",
-                "cost-reduction",
-            ),
-            "priority": "Cost reduction, budget management & operational efficiency",
-        },
-        {
-            "keywords": (
-                "supplier",
-                "vendor",
-                "negotiation",
-                "contract",
-                "procurement",
-                "sourcing",
+                "supplier", "vendor", "negotiation", "contract",
+                "procurement", "sourcing", "purchase order",
             ),
             "priority": "Supplier management, sourcing & contract negotiation",
         },
         {
             "keywords": (
-                "cross-functional",
-                "collaboration",
-                "stakeholder",
-                "distribution",
-                "inventory",
-                "finance",
-                "carrier",
-                "operations",
+                "inventory", "demand planning", "demand forecasting",
+                "replenishment", "safety stock", "s&op",
+            ),
+            "priority": "Demand planning, inventory optimization & S&OP",
+        },
+        # ── Software / product engineering ────────────────────────────────────
+        {
+            "keywords": (
+                "software development", "engineering", "backend", "frontend",
+                "full-stack", "api", "microservices", "cloud", "devops",
+                "ci/cd", "deployment", "architecture",
+            ),
+            "priority": "Software design, system architecture & engineering best practices",
+        },
+        {
+            "keywords": (
+                "product strategy", "roadmap", "customer insight",
+                "experimentation", "prioritization", "user research",
+                "product manager", "product owner",
+            ),
+            "priority": "Product strategy, customer insight & roadmap prioritization",
+        },
+        # ── Marketing / growth ────────────────────────────────────────────────
+        {
+            "keywords": (
+                "marketing", "brand", "campaign", "go-to-market",
+                "growth", "demand generation", "content", "seo", "paid media",
+                "acquisition", "retention",
+            ),
+            "priority": "Marketing strategy, brand building & growth execution",
+        },
+        {
+            "keywords": (
+                "sales", "revenue", "quota", "pipeline", "crm", "closing",
+                "account management", "business development", "b2b", "b2c",
+            ),
+            "priority": "Sales execution, revenue growth & customer relationship management",
+        },
+        # ── Finance / accounting ──────────────────────────────────────────────
+        {
+            "keywords": (
+                "financial modeling", "valuation", "dcf", "lbo", "m&a",
+                "financial analysis", "fp&a", "budgeting", "forecasting",
+                "accounting", "audit", "gaap",
+            ),
+            "priority": "Financial modeling, analysis & reporting",
+        },
+        # ── Data / analytics ─────────────────────────────────────────────────
+        {
+            "keywords": (
+                "analytics", "dashboard", "dashboards", "kpi",
+                "reporting", "metrics", "data-driven", "sql",
+                "tableau", "power bi", "python", "machine learning", "ml",
+            ),
+            "priority": "Advanced analytics, dashboards & data-driven decision making",
+        },
+        # ── Consulting / strategy ─────────────────────────────────────────────
+        {
+            "keywords": (
+                "consulting", "management consulting", "client engagement",
+                "advisory", "transformation", "due diligence",
+            ),
+            "priority": "Client engagement, strategic advisory & transformation delivery",
+        },
+        # ── People / HR ───────────────────────────────────────────────────────
+        {
+            "keywords": (
+                "talent", "recruiting", "hiring", "hrbp", "people operations",
+                "performance management", "org design", "culture",
+            ),
+            "priority": "Talent strategy, people operations & organizational effectiveness",
+        },
+        # ── Operations / general management ───────────────────────────────────
+        {
+            "keywords": (
+                "cost", "savings", "budget", "efficiency", "reduce",
+                "cost-reduction", "p&l", "ebitda",
+            ),
+            "priority": "Cost reduction, budget management & operational efficiency",
+        },
+        {
+            "keywords": (
+                "cross-functional", "collaboration", "stakeholder",
+                "distribution", "finance", "operations", "leadership",
             ),
             "priority": "Cross-functional collaboration & stakeholder management",
         },
         {
             "keywords": (
-                "strategy",
-                "strategic",
-                "planning",
-                "execution",
-                "initiative",
-                "initiatives",
+                "strategy", "strategic", "planning", "execution",
+                "initiative", "initiatives",
             ),
             "priority": "Strategic planning, project execution & operational leadership",
         },
         {
             "keywords": (
-                "process",
-                "improvement",
-                "standardized",
-                "standardizing",
-                "documentation",
-                "procedures",
-                "workflow",
+                "process", "improvement", "standardized", "standardizing",
+                "documentation", "procedures", "workflow", "lean", "six sigma",
             ),
             "priority": "Process improvement, standardization & workflow design",
-        },
-        {
-            "keywords": (
-                "product strategy",
-                "roadmap",
-                "customer insight",
-                "experimentation",
-                "prioritization",
-            ),
-            "priority": "Product strategy, customer insight & roadmap prioritization",
         },
     ]
 
     priorities: list[str] = []
     seen: set[str] = set()
     for mapping in mappings:
-        if any(keyword in jd_lower or keyword in role_lower or keyword in industry_lower for keyword in mapping["keywords"]):
+        if any(
+            keyword in jd_lower or keyword in role_lower or keyword in industry_lower
+            for keyword in mapping["keywords"]
+        ):
             if mapping["priority"] not in seen:
                 priorities.append(mapping["priority"])
                 seen.add(mapping["priority"])

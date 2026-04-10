@@ -2,6 +2,7 @@
 Resume Optimizer - Desktop Application
 Tkinter-based GUI for resume optimization using OpenAI
 """
+import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 from tkinter import ttk
@@ -129,72 +130,69 @@ class ResumeOptimizerApp:
             self.optimize_btn.config(state="disabled")
     
     def _optimize(self):
-        """Main optimization workflow"""
+        """Main optimization workflow — runs API call and file I/O in a background thread."""
         if not self.resume_path or not self.resume_text:
             messagebox.showerror("Error", "Please select a resume")
             return
-        
+
         jd_text = self.jd_text.get("1.0", "end").strip()
         if not jd_text or jd_text == "Paste job description here...":
             messagebox.showerror("Error", "Please paste a job description")
             return
-        
+
         self._log("🔄 Starting optimization...\n")
         self.optimize_btn.config(state="disabled")
-        
-        try:
-            # Step 1: Call LLM
-            self._log("📤 Sending to OpenAI...\n")
-            success, parsed_json, raw_response = self.llm_client.optimize_resume(
-                self.resume_text,
-                jd_text
-            )
-            
-            if not success:
-                self._log(f"❌ {parsed_json}\n", "error")
-                messagebox.showerror("API Error", parsed_json)
-                self.optimize_btn.config(state="normal")
-                return
-            
-            # Step 2: Format replacements
-            self._log("📦 Processing recommendations...\n")
-            replacements = self.llm_client.format_replacements(parsed_json)
-            
-            if not replacements:
-                self._log("⚠️ No replacements generated\n", "warning")
-                messagebox.showwarning("No Changes", "No optimization recommendations were found")
-                self.optimize_btn.config(state="normal")
-                return
-            
-            self._log(f"Found {len(replacements)} optimization(s):\n")
-            for r in replacements:
-                anchor_preview = r["match_anchor"][:60]
-                self._log(f"  • {anchor_preview}...\n")
-            
-            # Step 3: Apply to document
-            self._log("\n📝 Applying changes to document...\n")
-            output_path = self._generate_output_filename(self.resume_path)
-            success_msg, message = optimize_resume(
-                self.resume_path,
-                replacements,
-                output_path
-            )
-            
-            if success_msg:
-                self._log(f"\n{message}\n", "success")
-                self._log(f"💾 Saved to: {output_path}\n", "success")
-                messagebox.showinfo("Success", f"Resume optimized!\n\nSaved as:\n{output_path}")
-            else:
-                self._log(f"\n❌ {message}\n", "error")
-                messagebox.showerror("Error", message)
-            
-        except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            self._log(f"\n❌ {error_msg}\n", "error")
-            messagebox.showerror("Error", error_msg)
-        
-        finally:
-            self.optimize_btn.config(state="normal")
+
+        resume_text = self.resume_text
+        resume_path = self.resume_path
+        output_path = self._generate_output_filename(resume_path)
+
+        def _worker():
+            try:
+                self._log("📤 Sending to OpenAI...\n")
+                success, parsed_json, _raw = self.llm_client.optimize_resume(resume_text, jd_text)
+
+                if not success:
+                    self._log(f"❌ {parsed_json}\n")
+                    self.root.after(0, lambda: messagebox.showerror("API Error", parsed_json))
+                    return
+
+                self._log("📦 Processing recommendations...\n")
+                replacements = self.llm_client.format_replacements(parsed_json)
+
+                if not replacements:
+                    self._log("⚠️ No replacements generated\n")
+                    self.root.after(0, lambda: messagebox.showwarning(
+                        "No Changes", "No optimization recommendations were found"
+                    ))
+                    return
+
+                self._log(f"Found {len(replacements)} optimization(s):\n")
+                for r in replacements:
+                    self._log(f"  • {r['match_anchor'][:60]}...\n")
+
+                self._log("\n📝 Applying changes to document...\n")
+                success_msg, message = optimize_resume(resume_path, replacements, output_path)
+
+                if success_msg:
+                    self._log(f"\n{message}\n")
+                    self._log(f"💾 Saved to: {output_path}\n")
+                    self.root.after(0, lambda: messagebox.showinfo(
+                        "Success", f"Resume optimized!\n\nSaved as:\n{output_path}"
+                    ))
+                else:
+                    self._log(f"\n❌ {message}\n")
+                    self.root.after(0, lambda: messagebox.showerror("Error", message))
+
+            except Exception as e:
+                error_msg = f"Unexpected error: {str(e)}"
+                self._log(f"\n❌ {error_msg}\n")
+                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+
+            finally:
+                self.root.after(0, lambda: self.optimize_btn.config(state="normal"))
+
+        threading.Thread(target=_worker, daemon=True).start()
     
     def _generate_output_filename(self, original_path: str) -> str:
         """Generate output filename with _Optimized suffix"""

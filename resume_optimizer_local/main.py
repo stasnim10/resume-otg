@@ -2,6 +2,7 @@
 Resume Optimizer - Local Desktop Application
 Tkinter-based GUI for deterministic resume optimization
 """
+import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 from tkinter import ttk
@@ -266,88 +267,95 @@ class ResumeOptimizerApp:
             self.save_cover_btn.config(state="disabled")
     
     def _optimize(self):
-        """Main optimization workflow"""
+        """Main optimization workflow — runs I/O in a background thread."""
         if not self.resume_path:
             messagebox.showerror("Error", "Please select a resume")
             return
-        
+
         json_text = self.json_text.get("1.0", "end").strip()
         if not json_text:
             messagebox.showerror("Error", "Please paste JSON payload")
             return
-        
+
         self._log("🔄 Starting optimization...\n")
         self.optimize_btn.config(state="disabled")
-        
-        try:
-            # Step 1: Parse JSON
-            self._log("📋 Parsing JSON...\n")
-            payload = parse_replacement_payload(json_text)
-            self._log("✅ JSON valid\n")
-            
-            # Step 2: Apply replacements
-            self._log("📝 Applying replacements...\n")
-            success, message = apply_replacements(self.resume_path, payload)
-            
-            if success:
-                self._log(f"\n{message}\n")
-                messagebox.showinfo("Success", message)
-            else:
-                self._log(f"\n{message}\n")
-                messagebox.showerror("Error", message)
-        
-        except ValueError as e:
-            self._log(f"\n❌ {str(e)}\n")
-            messagebox.showerror("Error", str(e))
-        
-        except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            self._log(f"\n❌ {error_msg}\n")
-            messagebox.showerror("Error", error_msg)
-        
-        finally:
-            self.optimize_btn.config(state="normal")
+
+        def _worker():
+            try:
+                self._log("📋 Parsing JSON...\n")
+                payload = parse_replacement_payload(json_text)
+                self._log("✅ JSON valid\n")
+
+                self._log("📝 Applying replacements...\n")
+                success, message = apply_replacements(self.resume_path, payload)
+
+                if success:
+                    self._log(f"\n{message}\n")
+                    self.root.after(0, lambda: messagebox.showinfo("Success", message))
+                else:
+                    self._log(f"\n{message}\n")
+                    self.root.after(0, lambda: messagebox.showerror("Error", message))
+
+            except ValueError as e:
+                msg = str(e)
+                self._log(f"\n❌ {msg}\n")
+                self.root.after(0, lambda: messagebox.showerror("Error", msg))
+
+            except Exception as e:
+                error_msg = f"Unexpected error: {str(e)}"
+                self._log(f"\n❌ {error_msg}\n")
+                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+
+            finally:
+                self.root.after(0, lambda: self.optimize_btn.config(state="normal"))
+
+        threading.Thread(target=_worker, daemon=True).start()
     
     def _save_cover_letter_content(self):
-        """Update cover letter by replacing body content while preserving formatting"""
+        """Update cover letter — runs I/O in a background thread."""
         if not self.cover_letter_path:
             messagebox.showerror("Error", "Please select a cover letter template first")
             return
-        
+
         content = self.cover_content_text.get("1.0", "end").strip()
-        
+
         if not content or content == "Paste your ChatGPT-generated cover letter text here...":
             messagebox.showerror("Error", "Please paste cover letter content first")
             return
-        
+
         # Save to a new _Updated file to preserve the original template
-        from pathlib import Path as _Path
-        _p = _Path(self.cover_letter_path)
+        _p = Path(self.cover_letter_path)
         output_path = str(_p.parent / f"{_p.stem}_Updated{_p.suffix}")
-        
+
         self._log("✉️ Updating cover letter...\n")
         self.save_cover_btn.config(state="disabled")
-        
-        try:
-            success, message = save_cover_letter_content(self.cover_letter_path, content, output_path)
-            
-            if success:
-                self._log(f"\n{message}\n")
-                messagebox.showinfo("Success", message)
-                # Clear the text box
-                self.cover_content_text.delete("1.0", "end")
-                self.cover_content_text.insert("1.0", "Paste your ChatGPT-generated cover letter text here...")
-            else:
-                self._log(f"\n{message}\n")
-                messagebox.showerror("Error", message)
-        
-        except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            self._log(f"\n❌ {error_msg}\n")
-            messagebox.showerror("Error", error_msg)
-        
-        finally:
-            self.save_cover_btn.config(state="normal")
+
+        template_path = self.cover_letter_path
+
+        def _worker():
+            try:
+                success, message = save_cover_letter_content(template_path, content, output_path)
+
+                if success:
+                    self._log(f"\n{message}\n")
+                    self.root.after(0, lambda: messagebox.showinfo("Success", message))
+                    self.root.after(0, lambda: (
+                        self.cover_content_text.delete("1.0", "end"),
+                        self.cover_content_text.insert("1.0", "Paste your ChatGPT-generated cover letter text here..."),
+                    ))
+                else:
+                    self._log(f"\n{message}\n")
+                    self.root.after(0, lambda: messagebox.showerror("Error", message))
+
+            except Exception as e:
+                error_msg = f"Unexpected error: {str(e)}"
+                self._log(f"\n❌ {error_msg}\n")
+                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+
+            finally:
+                self.root.after(0, lambda: self.save_cover_btn.config(state="normal"))
+
+        threading.Thread(target=_worker, daemon=True).start()
     
     def _log(self, message: str):
         """Write to output"""
