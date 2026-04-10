@@ -7,7 +7,7 @@ from typing import Tuple, List
 
 def extract_text_from_docx(file_path: str) -> str:
     """
-    Extract plain text from a .docx file.
+    Extract plain text from a .docx file, including content inside tables.
     
     Args:
         file_path: Path to the .docx file
@@ -16,8 +16,25 @@ def extract_text_from_docx(file_path: str) -> str:
         Plain text content from the document
     """
     doc = Document(file_path)
-    text = "\n".join([para.text for para in doc.paragraphs])
-    return text
+    parts = []
+
+    for block in doc.element.body:
+        tag = block.tag.split("}")[-1] if "}" in block.tag else block.tag
+        if tag == "p":
+            from docx.text.paragraph import Paragraph
+            para = Paragraph(block, doc)
+            if para.text.strip():
+                parts.append(para.text)
+        elif tag == "tbl":
+            from docx.table import Table
+            table = Table(block, doc)
+            for row in table.rows:
+                for cell in row.cells:
+                    cell_text = cell.text.strip()
+                    if cell_text:
+                        parts.append(cell_text)
+
+    return "\n".join(parts)
 
 
 def find_paragraph_by_anchor(doc, anchor: str) -> int:

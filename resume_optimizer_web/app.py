@@ -12,7 +12,18 @@ from docx_handler import apply_replacements
 from json_parser import extract_json_from_text, validate_payload
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+_secret_key = os.environ.get('SECRET_KEY')
+if not _secret_key:
+    import secrets as _secrets
+    _secret_key = _secrets.token_hex(32)
+    print(
+        "WARNING: SECRET_KEY environment variable is not set. "
+        "A random key has been generated for this session — sessions will not persist across restarts. "
+        "Set SECRET_KEY in your environment before deploying to production.",
+        flush=True,
+    )
+app.secret_key = _secret_key
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'docx'}

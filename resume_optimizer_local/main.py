@@ -320,8 +320,10 @@ class ResumeOptimizerApp:
             messagebox.showerror("Error", "Please paste cover letter content first")
             return
         
-        # Output to the same path (overwrite the template)
-        output_path = self.cover_letter_path
+        # Save to a new _Updated file to preserve the original template
+        from pathlib import Path as _Path
+        _p = _Path(self.cover_letter_path)
+        output_path = str(_p.parent / f"{_p.stem}_Updated{_p.suffix}")
         
         self._log("✉️ Updating cover letter...\n")
         self.save_cover_btn.config(state="disabled")

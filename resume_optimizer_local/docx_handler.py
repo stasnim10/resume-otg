@@ -12,7 +12,7 @@ from typing import List, Tuple, Dict, Any
 
 def extract_text(doc_path: str) -> str:
     """
-    Extract plain text from .docx file.
+    Extract plain text from .docx file, including content inside tables.
     
     Args:
         doc_path: Path to .docx file
@@ -21,56 +21,93 @@ def extract_text(doc_path: str) -> str:
         Full plain text from document
     """
     doc = Document(doc_path)
-    text = "\n".join([para.text for para in doc.paragraphs])
-    return text
+    parts: List[str] = []
+
+    for block in doc.element.body:
+        tag = block.tag.split("}")[-1] if "}" in block.tag else block.tag
+        if tag == "p":
+            from docx.text.paragraph import Paragraph
+            para = Paragraph(block, doc)
+            if para.text.strip():
+                parts.append(para.text)
+        elif tag == "tbl":
+            from docx.table import Table
+            table = Table(block, doc)
+            for row in table.rows:
+                for cell in row.cells:
+                    cell_text = cell.text.strip()
+                    if cell_text:
+                        parts.append(cell_text)
+
+    return "\n".join(parts)
+
+
+def _capture_run_fmt(run) -> dict:
+    """Snapshot the character formatting of a run."""
+    try:
+        color_rgb = run.font.color.rgb if run.font.color.type is not None else None
+    except Exception:
+        color_rgb = None
+    return {
+        "bold": run.bold,
+        "italic": run.italic,
+        "underline": run.underline,
+        "font_name": run.font.name,
+        "font_size": run.font.size,
+        "color_rgb": color_rgb,
+    }
+
+
+def _apply_run_fmt(run, fmt: dict) -> None:
+    """Apply a previously captured format snapshot to a run."""
+    run.bold = fmt["bold"]
+    run.italic = fmt["italic"]
+    run.underline = fmt["underline"]
+    if fmt["font_name"]:
+        run.font.name = fmt["font_name"]
+    if fmt["font_size"]:
+        run.font.size = fmt["font_size"]
+    if fmt["color_rgb"] is not None:
+        try:
+            run.font.color.rgb = fmt["color_rgb"]
+        except Exception:
+            pass
 
 
 def replace_paragraph_text(para, replacement: str) -> bool:
     """
-    Replace entire paragraph text while preserving formatting.
-    
+    Replace entire paragraph text while preserving character formatting.
+
+    The replacement text is written as a single run using the formatting
+    from the first (dominant) run of the original paragraph.  This covers
+    the common case of a uniformly formatted bullet or summary paragraph.
+    Mixed-format paragraphs (e.g. bold label + normal body) lose their
+    internal mixed formatting, but that is unavoidable when replacing the
+    full text with a new string.
+
     Args:
         para: Paragraph object
         replacement: New text for the entire paragraph
-        
+
     Returns:
         True if replacement successful
     """
     if not para.runs:
         para.add_run(replacement)
         return True
-    
-    # Get formatting from first run
-    first_run = para.runs[0]
-    first_fmt = {
-        'bold': first_run.bold,
-        'italic': first_run.italic,
-        'underline': first_run.underline,
-        'font_name': first_run.font.name,
-        'font_size': first_run.font.size,
-        'font_color': first_run.font.color.rgb if hasattr(first_run.font.color, 'rgb') else None,
-    }
-    
-    # Clear all runs
+
+    # Capture format from the first non-empty run (or first run as fallback)
+    source_run = next((r for r in para.runs if r.text.strip()), para.runs[0])
+    fmt = _capture_run_fmt(source_run)
+
+    # Clear all existing runs
     for run in para.runs:
-        r = run._element
-        r.getparent().remove(r)
-    
-    # Add replacement text with original formatting
+        run._element.getparent().remove(run._element)
+
+    # Write replacement text with preserved formatting
     new_run = para.add_run(replacement)
-    new_run.bold = first_fmt['bold']
-    new_run.italic = first_fmt['italic']
-    new_run.underline = first_fmt['underline']
-    if first_fmt['font_name']:
-        new_run.font.name = first_fmt['font_name']
-    if first_fmt['font_size']:
-        new_run.font.size = first_fmt['font_size']
-    if first_fmt['font_color']:
-        try:
-            new_run.font.color.rgb = first_fmt['font_color']
-        except:
-            pass
-    
+    _apply_run_fmt(new_run, fmt)
+
     return True
 
 
