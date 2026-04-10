@@ -339,10 +339,7 @@ class ResumeOptimizerApp:
                 if success:
                     self._log(f"\n{message}\n")
                     self.root.after(0, lambda: messagebox.showinfo("Success", message))
-                    self.root.after(0, lambda: (
-                        self.cover_content_text.delete("1.0", "end"),
-                        self.cover_content_text.insert("1.0", "Paste your ChatGPT-generated cover letter text here..."),
-                    ))
+                    self.root.after(0, self._clear_cover_letter_input)
                 else:
                     self._log(f"\n{message}\n")
                     self.root.after(0, lambda: messagebox.showerror("Error", message))
@@ -356,6 +353,11 @@ class ResumeOptimizerApp:
                 self.root.after(0, lambda: self.save_cover_btn.config(state="normal"))
 
         threading.Thread(target=_worker, daemon=True).start()
+
+    def _clear_cover_letter_input(self):
+        """Reset the cover letter content text area to its placeholder."""
+        self.cover_content_text.delete("1.0", "end")
+        self.cover_content_text.insert("1.0", "Paste your ChatGPT-generated cover letter text here...")
     
     def _log(self, message: str):
         """Write to output"""

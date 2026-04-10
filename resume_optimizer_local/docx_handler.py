@@ -45,7 +45,11 @@ def extract_text(doc_path: str) -> str:
 def _capture_run_fmt(run) -> dict:
     """Snapshot the character formatting of a run."""
     try:
-        color_rgb = run.font.color.rgb if run.font.color.type is not None else None
+        color_rgb = (
+            run.font.color.rgb
+            if run.font.color is not None and run.font.color.type is not None
+            else None
+        )
     except Exception:
         color_rgb = None
     return {
