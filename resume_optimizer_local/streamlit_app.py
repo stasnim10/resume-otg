@@ -2956,74 +2956,133 @@ def _render_fit_delta_card(before_report: dict, after_report: dict) -> None:
 
 
 def render_fit_report_screen() -> None:
-    """Show a free deterministic resume/job fit report before choosing run mode."""
+    """Pre-optimization match report with match % circle and key signals (redesigned)."""
     report = _evaluate_current_resume_fit()
-    score, strength_label, recommendation, primary_action, action_description = summarize_fit_recommendation(report)
+    score = report.get("overall_score", 0)
+
+    # Get match band label
+    if score >= 85:
+        band = "EXCELLENT MATCH"
+        band_color = "#27ae60"  # Green
+    elif score >= 70:
+        band = "STRONG MATCH"
+        band_color = "#2ecc71"  # Lighter green
+    elif score >= 50:
+        band = "FAIR MATCH"
+        band_color = "#f39c12"  # Orange
+    else:
+        band = "POOR MATCH"
+        band_color = "#e74c3c"  # Red
+
+    # Extract key signals
+    signals = extract_key_signals(
+        st.session_state.resume_text,
+        st.session_state.job_description
+    )
+
     job_title = get_effective_target_role(st.session_state.job_description) or "This role"
     company = st.session_state.get("current_application_company", "").strip()
-    details_visible = st.session_state.get("show_fit_details", False)
+
     logger.info(
-        "Fit report shown: score=%s, job_title=%s, company=%s, details_visible=%s",
+        "Pre-optimization match shown: score=%s, job_title=%s, company=%s, signals=%s",
         score,
         job_title,
         company or "Unknown",
-        details_visible,
+        len(signals.get("matches", [])) + len(signals.get("gaps", []))
     )
+
     render_shell_start()
     render_screen_intro(
         "fit_report",
-        "Resume Fit Report",
+        "Step 2 of 5",
         "Answer the big question first: should you apply?",
-        "Start with the recommendation. Open the details only if you want the deeper evidence behind the score.",
+        "We show your match score and the key signals. Start with the recommendation, then decide whether to optimize.",
     )
 
+    # Match % Circle Display
+    st.markdown("<div style='text-align: center; margin: 2rem 0;'>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style="display: inline-flex; flex-direction: column; align-items: center;">
+        <div style="position: relative; width: 220px; height: 220px; margin: 0 auto;">
+            <svg width="220" height="220" viewBox="0 0 220 220" style="transform: rotate(-90deg);">
+                <!-- Background circle -->
+                <circle cx="110" cy="110" r="100" fill="none" stroke="#e0e0e0" stroke-width="20"/>
+                <!-- Progress circle -->
+                <circle cx="110" cy="110" r="100" fill="none" stroke="{band_color}" stroke-width="20"
+                        stroke-dasharray="{score * 2.09} 628"
+                        stroke-linecap="round" style="transition: stroke-dasharray 0.5s;"/>
+            </svg>
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                <div style="font-size: 56px; font-weight: bold; color: #333;">{score}%</div>
+                <div style="font-size: 14px; color: #666; margin-top: 0.5rem;">{band}</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Job Title Context
+    st.markdown(f"""
+    <div style="text-align: center; margin: 1.5rem 0;">
+        <div style="font-size: 18px; font-weight: 600;">{job_title}{f" at {company}" if company else ""}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Key Signals Section
     with st.container(border=True):
-        st.markdown('<div class="apple-summary-label">Primary Recommendation</div>', unsafe_allow_html=True)
-        st.markdown(
-            f'<div class="apple-summary-title">{job_title}{f" at {company}" if company else ""}</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f'<div class="apple-section-copy"><strong>Overall Match: {score}/100 · {strength_label}</strong></div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f'<div class="apple-section-copy">{recommendation}</div>',
-            unsafe_allow_html=True,
-        )
-        st.caption(action_description)
+        st.markdown('<div class="apple-kicker">Key Signals</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">What we found in your resume vs this role.</div>', unsafe_allow_html=True)
+
+        signals_col1, signals_col2 = st.columns(2, gap="large")
+
+        with signals_col1:
+            st.markdown('<div class="apple-section-title" style="font-size: 14px;">✓ What Matches</div>', unsafe_allow_html=True)
+            if signals.get("matches"):
+                for match in signals.get("matches", []):
+                    strength_icon = "⭐" if match.get("strength") == "strong" else "•"
+                    st.caption(f"{strength_icon} {match.get('signal', 'Unknown')}")
+            else:
+                st.caption("No strong matches yet")
+
+        with signals_col2:
+            st.markdown('<div class="apple-section-title" style="font-size: 14px;">✗ What's Missing</div>', unsafe_allow_html=True)
+            if signals.get("gaps"):
+                for gap in signals.get("gaps", []):
+                    st.caption(f"• {gap.get('signal', 'Unknown')}")
+            else:
+                st.caption("No major gaps detected")
+
+    # Action Buttons
+    st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
 
     action_col1, action_col2, action_col3 = st.columns(3, gap="large")
-    active_profile_items = [item for item in list_profile_items() if item.visibility == "active"]
+
     with action_col1:
-        st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-        if st.button(primary_action, use_container_width=True, key="fit-primary-action"):
-            logger.info("Fit primary action chosen: action=%s, score=%s", primary_action, score)
-            if score >= 75:
-                st.session_state.screen = "mode"
-            elif score >= 60:
-                st.session_state.show_fit_details = True
-            else:
-                st.session_state.screen = "input"
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-    with action_col2:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        details_label = "Hide Details" if details_visible else "Show Details"
-        if st.button(details_label, use_container_width=True, key="fit-toggle-details"):
-            st.session_state.show_fit_details = not details_visible
-            logger.info("Fit details toggled: visible=%s, score=%s", not details_visible, score)
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-    with action_col3:
-        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("Try Another Job", use_container_width=True, key="fit-try-another-job"):
-            logger.info("Fit flow returned to input: score=%s", score)
+        if st.button("Back to Upload", use_container_width=True, key="fit-back"):
+            logger.info("User returned to upload from fit_report: score=%s", score)
             st.session_state.screen = "input"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if details_visible:
+    with action_col2:
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Try Another Job", use_container_width=True, key="fit-try-another"):
+            logger.info("User trying another job from fit_report: score=%s", score)
+            st.session_state.screen = "input"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with action_col3:
+        st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+        button_text = "See Details" if score < 50 else "Optimize Now"
+        if st.button(button_text, use_container_width=True, key="fit-optimize"):
+            logger.info("User proceeding to optimization: score=%s, button=%s", score, button_text)
+            st.session_state.screen = "mode"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    render_shell_end()
         score_col1, score_col2, score_col3, score_col4 = st.columns(4, gap="large")
         with score_col1:
             render_score_tile("Overall", int(report.get("overall_score", 0)), "Resume + role match")
