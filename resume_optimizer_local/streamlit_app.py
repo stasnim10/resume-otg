@@ -26,7 +26,7 @@ from json_parser import (
     parse_replacement_payload,
 )
 from profile_extractor import extract_profile_items_from_text
-from profile_matcher import rank_profile_items
+from profile_matcher import extract_key_signals, rank_profile_items
 from profile_schema import ProfileItem
 from profile_store import (
     archive_profile_item,
@@ -43,9 +43,14 @@ from profile_store import (
     update_profile_item,
     update_profile_item_verification,
     upsert_application,
+    extract_profile_basics_from_resume,
+    create_or_update_profile_from_optimization,
+    save_optimization_result,
+    get_optimization_history,
 )
 from prompt_engine import build_builder_prompt, build_optimizer_prompt
-from resume_evaluator import evaluate_resume_fit
+from resume_evaluator import calculate_match_score, evaluate_resume_fit
+from improvements_generator import generate_improvements_summary
 from review_engine import analyze_payload_against_document
 
 logging.basicConfig(
