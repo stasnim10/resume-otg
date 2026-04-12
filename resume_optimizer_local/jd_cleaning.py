@@ -140,7 +140,7 @@ def _merge_broken_lines(lines: List[str]) -> tuple[List[str], int]:
             previous = merged[-1]
             if previous and previous != "":
                 previous_ends_cleanly = bool(re.search(r"[.:;!?—-]$", previous))
-                next_continues_sentence = bool(re.match(r"^[a-z(]", line)) or bool(re.match(r"^[’']", line))
+                next_continues_sentence = bool(re.match(r"^[a-z(]", line)) or bool(re.match(r"^['']", line))
                 if not previous_ends_cleanly and next_continues_sentence:
                     merged[-1] = f"{previous} {line}"
                     merge_count += 1
@@ -195,9 +195,9 @@ def _normalize_typography(text: str) -> str:
     normalized_lines = []
     for line in text.splitlines():
         updated = re.sub(r"\s+([,.;:!?])", r"\1", line)
-        updated = re.sub(r"([A-Za-z])\s+[’']\s+([A-Za-z])", r"\1’\2", updated)
-        updated = re.sub(r"([A-Za-z])\s+[’']([A-Za-z])", r"\1’\2", updated)
-        updated = re.sub(r"([A-Za-z])[’']\s+([A-Za-z])", r"\1’\2", updated)
+        updated = re.sub(r"([A-Za-z])\s+['']\s+([A-Za-z])", r"\1'\2", updated)
+        updated = re.sub(r"([A-Za-z])\s+['']([A-Za-z])", r"\1'\2", updated)
+        updated = re.sub(r"([A-Za-z])['']\s+([A-Za-z])", r"\1'\2", updated)
         updated = re.sub(r"[ \t]{2,}", " ", updated)
         normalized_lines.append(updated.strip())
     return "\n".join(normalized_lines).strip()

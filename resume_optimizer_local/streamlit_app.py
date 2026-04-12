@@ -1877,7 +1877,7 @@ def render_profile_welcome_screen() -> None:
             st.markdown('<div class="apple-kicker">Fast Import</div>', unsafe_allow_html=True)
             st.markdown('<div class="apple-choice-title">Import from a resume or notes.</div>', unsafe_allow_html=True)
             st.markdown(
-                '<div class="apple-choice-copy">Upload an existing resume or paste detailed notes. We’ll extract reusable profile items for you to review.</div>',
+                "<div class=\"apple-choice-copy\">Upload an existing resume or paste detailed notes. We'll extract reusable profile items for you to review.</div>",
                 unsafe_allow_html=True,
             )
             st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
@@ -1916,7 +1916,7 @@ def render_profile_import_screen() -> None:
         "input",
         "Career Profile Import",
         "Import your background.",
-        "Upload a resume or paste detailed notes. We’ll turn them into reusable profile items you can confirm.",
+        "Upload a resume or paste detailed notes. We'll turn them into reusable profile items you can confirm.",
     )
 
     with st.container(border=True):
@@ -1996,7 +1996,7 @@ def render_profile_review_screen() -> None:
 
     with st.container(border=True):
         st.markdown('<div class="apple-kicker">Import Quality</div>', unsafe_allow_html=True)
-        st.markdown('<div class="apple-section-title">Here’s what we found in your source material.</div>', unsafe_allow_html=True)
+        st.markdown("<div class=\"apple-section-title\">Here is what we found in your source material.</div>", unsafe_allow_html=True)
         quality_rows = [
             ("Identity detected", basics.get("full_name", "Missing")),
             ("Contact detected", "Yes" if basics.get("email") or basics.get("phone") or basics.get("linkedin") else "Missing"),
@@ -2793,7 +2793,7 @@ def render_input_screen() -> None:
         "input",
         "Step 1 of 5",
         "Bring in your resume. Then point it at the role you want.",
-        "We’ll clean the job description, detect the signals that matter, and keep the next step simple.",
+        "We'll clean the job description, detect the signals that matter, and keep the next step simple.",
     )
 
     upload_col, jd_col = st.columns([1, 1.15], gap="large")
@@ -2817,7 +2817,7 @@ def render_input_screen() -> None:
             st.markdown(
                 """
                 <div class="apple-section-title">Paste a job description or link</div>
-                <div class="apple-section-copy">Use the full posting or a job link. We’ll turn it into a cleaner brief for the next step and surface the role signals automatically.</div>
+                <div class="apple-section-copy">Use the full posting or a job link. We'll turn it into a cleaner brief for the next step and surface the role signals automatically.</div>
                 """,
                 unsafe_allow_html=True,
             )
@@ -2838,10 +2838,10 @@ def render_input_screen() -> None:
             )
             job_description = st.session_state.get("job_description_input", job_description)
             st.markdown(
-                ‘<div class="apple-minor-copy">We’ll clean the text, detect the target role, and prepare the prompt inputs for you.</div>’,
+                "<div class=\"apple-minor-copy\">We'll clean the text, detect the target role, and prepare the prompt inputs for you.</div>",
                 unsafe_allow_html=True,
             )
-            st.markdown(‘<div class="apple-secondary">’, unsafe_allow_html=True)
+            st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
             if st.button("Process Job Description", use_container_width=True):
                 current_input = st.session_state.get("job_description_input", job_description)
                 if looks_like_url(current_input):
@@ -2861,14 +2861,14 @@ def render_input_screen() -> None:
 
     col1, col2, col3 = st.columns([0.7, 0.9, 1.1], gap="large")
     with col1:
-        st.markdown(‘<div class="apple-secondary">’, unsafe_allow_html=True)
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
         if st.button("Back", use_container_width=True):
             st.session_state.screen = "landing"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
     with col2:
         active_profile_items = [item for item in list_profile_items() if item.visibility == "active"]
-        st.markdown(‘<div class="apple-secondary">’, unsafe_allow_html=True)
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
         if st.button("Use Career Profile", use_container_width=True, disabled=not bool(job_description.strip() and active_profile_items), key="input-use-profile"):
             st.session_state.use_career_profile = True
             st.session_state.screen = "application_match"
@@ -2879,7 +2879,7 @@ def render_input_screen() -> None:
             st.session_state.resume_text
             and job_description.strip()
         )
-        st.markdown(‘<div class="apple-primary">’, unsafe_allow_html=True)
+        st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
         if st.button("Continue", use_container_width=True, disabled=not can_continue):
             st.session_state.use_career_profile = False
             st.session_state.selected_profile_item_ids = []
@@ -3045,7 +3045,7 @@ def render_fit_report_screen() -> None:
                 st.caption("No strong matches yet")
 
         with signals_col2:
-            st.markdown('<div class="apple-section-title" style="font-size: 14px;">✗ What's Missing</div>', unsafe_allow_html=True)
+            st.markdown("<div class=\"apple-section-title\" style=\"font-size: 14px;\">✗ What Missing</div>", unsafe_allow_html=True)
             if signals.get("gaps"):
                 for gap in signals.get("gaps", []):
                     st.caption(f"• {gap.get('signal', 'Unknown')}")
@@ -3169,7 +3169,7 @@ def render_builder_input_screen() -> None:
         "builder_input",
         "Step 2 of 5",
         "Build your first resume.",
-        "Tell us about yourself in plain English. We’ll shape it into a professional draft.",
+        "Tell us about yourself in plain English. We'll shape it into a professional draft.",
     )
 
     basics_col, extras_col = st.columns(2, gap="large")
