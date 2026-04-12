@@ -128,3 +128,73 @@ def rank_profile_items(
         )
     )
     return job_signals, ranked_results
+
+
+def extract_key_signals(resume_text: str, jd_text: str) -> dict[str, Any]:
+    """
+    Extract key signals for design Phase 1 Screen 3 (pre-optimization match display).
+
+    Analyzes resume vs job description to identify:
+    - Matches: Skills/keywords present in resume that are in the JD
+    - Gaps: Key skills/keywords from JD that are missing in resume
+
+    Returns: {
+        "matches": [
+            {"signal": "Supply Chain Management", "strength": "strong"},
+            ...
+        ],
+        "gaps": [
+            {"signal": "Advanced Analytics", "reason": "not_mentioned"},
+            ...
+        ]
+    }
+    """
+    # Extract keywords from both texts
+    resume_tokens = set(_tokenize(resume_text))
+    jd_tokens = set(_tokenize(jd_text))
+
+    # Get top keywords from JD (these are the must-haves)
+    jd_keyword_counts: dict[str, int] = {}
+    for token in jd_tokens:
+        jd_keyword_counts[token] = jd_keyword_counts.get(token, 0) + 1
+
+    # Sort by frequency (most important keywords appear more often)
+    sorted_jd_keywords = sorted(
+        jd_keyword_counts.items(),
+        key=lambda item: (-item[1], item[0])
+    )
+    top_jd_keywords = [keyword for keyword, _ in sorted_jd_keywords[:12]]
+
+    # Classify each keyword as match or gap
+    matches = []
+    gaps = []
+
+    for keyword in top_jd_keywords:
+        if keyword in resume_tokens:
+            # Determine strength based on frequency in resume
+            resume_count = sum(1 for token in _tokenize(resume_text) if token == keyword)
+            jd_count = jd_keyword_counts.get(keyword, 1)
+
+            # Strong if mentioned multiple times or in JD
+            if resume_count >= 2 or jd_count >= 2:
+                strength = "strong"
+            elif resume_count >= 1:
+                strength = "moderate"
+            else:
+                strength = "weak"
+
+            matches.append({
+                "signal": keyword.replace("_", " ").title(),
+                "strength": strength
+            })
+        else:
+            gaps.append({
+                "signal": keyword.replace("_", " ").title(),
+                "reason": "not_mentioned"
+            })
+
+    # Return top 2-3 of each
+    return {
+        "matches": matches[:3],
+        "gaps": gaps[:3]
+    }

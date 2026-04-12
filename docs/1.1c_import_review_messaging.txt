@@ -1,0 +1,15 @@
+SUCCESS MESSAGE
+Resume imported successfully.
+
+PRIMARY COPY
+We found items from your source material and sorted the strongest evidence first.
+Review the top 3 items to start so this feels manageable.
+
+SECONDARY COPY
+You can reveal the remaining items any time before saving.
+Only keep what you want the app to remember and reuse later.
+
+BUTTON LABELS
+View X More
+Hide X Additional Items
+Save Career Profile

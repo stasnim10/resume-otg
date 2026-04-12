@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import re
 import tempfile
 from collections import Counter
@@ -46,6 +47,12 @@ from profile_store import (
 from prompt_engine import build_builder_prompt, build_optimizer_prompt
 from resume_evaluator import evaluate_resume_fit
 from review_engine import analyze_payload_against_document
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 CAREER_STAGES = [
@@ -126,6 +133,124 @@ def format_preview_text(text: str, max_len: int = 260) -> str:
     if len(cleaned) <= max_len:
         return cleaned
     return f"{cleaned[:max_len].rstrip()}..."
+
+
+PROFILE_ITEM_PRIORITY = {
+    "experience": 0,
+    "project": 1,
+    "business": 2,
+    "leadership": 3,
+    "education": 4,
+    "certification": 5,
+    "activity": 6,
+    "volunteering": 7,
+    "award": 8,
+    "skills": 9,
+}
+
+
+def sort_profile_items_for_review(items: list[ProfileItem]) -> list[ProfileItem]:
+    """Prioritize high-signal evidence items first in the import review flow."""
+    return sorted(
+        items,
+        key=lambda item: (
+            PROFILE_ITEM_PRIORITY.get(item.item_type, 99),
+            -float(item.confidence_score or 0),
+            (item.title or "").lower(),
+            (item.organization or "").lower(),
+        ),
+    )
+
+
+def summarize_fit_recommendation(report: dict) -> tuple[int, str, str, str, str]:
+    """Map a fit score to a plain-English recommendation and action."""
+    score = int(report.get("overall_score", 0))
+    if score >= 75:
+        return (
+            score,
+            "Strong Match",
+            "You should apply. Your resume already lines up with most of the role's core signals.",
+            "Apply Now",
+            "This is a strong match.",
+        )
+    if score >= 60:
+        return (
+            score,
+            "Promising Match",
+            "You should apply after one quick enhancement. The role is within reach, but a few missing signals are still worth tightening.",
+            "Review Enhancement",
+            "One improvement would boost your chances.",
+        )
+    return (
+        score,
+        "Stretch Match",
+        "This role looks like a stretch right now. Review the biggest gaps before you spend more time here.",
+        "Skip This Role",
+        "Major gaps are still visible.",
+    )
+
+
+def build_change_examples(review_results: list[dict], limit: int = 3) -> list[dict[str, str]]:
+    """Extract concise before/after examples from replacement review data."""
+    examples: list[dict[str, str]] = []
+    for result in review_results:
+        before_text = (result.get("anchor") or "").strip()
+        after_text = (result.get("replacement_text") or "").strip()
+        label = result.get("category_label") or result.get("section_label") or "Resume update"
+        if before_text and after_text:
+            examples.append(
+                {
+                    "label": label,
+                    "before": format_preview_text(before_text, max_len=88),
+                    "after": format_preview_text(after_text, max_len=88),
+                }
+            )
+        if len(examples) >= limit:
+            break
+    return examples
+
+
+def build_optimization_metrics_summary(before_report: dict, after_report: dict) -> list[dict[str, str | int]]:
+    """Create user-facing metric summaries for the success state."""
+    before_keyword = int(before_report.get("keyword_score", 0))
+    after_keyword = int(after_report.get("keyword_score", 0))
+    before_ats = int(before_report.get("ats_score", 0))
+    after_ats = int(after_report.get("ats_score", 0))
+    before_overall = int(before_report.get("overall_score", 0))
+    after_overall = int(after_report.get("overall_score", 0))
+    before_action = int(before_report.get("action_verb_bullet_count", 0))
+    after_action = int(after_report.get("action_verb_bullet_count", 0))
+
+    return [
+        {
+            "label": "Keyword Alignment",
+            "before": before_keyword,
+            "after": after_keyword,
+            "delta": after_keyword - before_keyword,
+            "suffix": "pts",
+        },
+        {
+            "label": "ATS / Clarity",
+            "before": before_ats,
+            "after": after_ats,
+            "delta": after_ats - before_ats,
+            "suffix": "pts",
+        },
+        {
+            "label": "Action-Led Bullets",
+            "before": before_action,
+            "after": after_action,
+            "delta": after_action - before_action,
+            "suffix": "bullets",
+        },
+        {
+            "label": "Overall Fit",
+            "before": before_overall,
+            "after": after_overall,
+            "delta": after_overall - before_overall,
+            "suffix": "pts",
+        },
+    ]
 
 
 def apply_apple_theme() -> None:
@@ -1283,6 +1408,11 @@ def init_session_state() -> None:
         "baseline_fit_report": None,
         "optimized_fit_report": None,
         "resume_fit_report_signature": "",
+        "profile_review_show_all_items": False,
+        "show_fit_details": False,
+        "optimization_change_examples": [],
+        "optimization_metrics_summary": [],
+        "is_first_optimization": True,
     }
 
     for key, value in defaults.items():
@@ -1292,6 +1422,7 @@ def init_session_state() -> None:
 
 def reset_flow() -> None:
     """Reset the prototype flow to the landing page."""
+    logger.info("Flow reset requested")
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     init_session_state()
@@ -1318,6 +1449,11 @@ def save_uploaded_resume(uploaded_file) -> None:
         for paragraph in resume_text.splitlines()
         if paragraph.strip()
     ]
+    logger.info(
+        "Resume uploaded: filename=%s, paragraphs=%s",
+        uploaded_file.name,
+        len(st.session_state.resume_paragraphs),
+    )
 
 
 def analyze_payload(payload: dict) -> dict:
@@ -1440,13 +1576,6 @@ def render_landing() -> None:
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    profile_col_left, profile_col_center, profile_col_right = st.columns([1.2, 1.6, 1.2])
-    with profile_col_center:
-        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("Build Career Profile", use_container_width=True, key="landing-profile"):
-            st.session_state.screen = "profile_welcome"
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
     render_shell_end()
 
 
@@ -1535,6 +1664,13 @@ def _evaluate_current_resume_fit(force: bool = False) -> dict:
         st.session_state.resume_fit_report = report
         st.session_state.baseline_fit_report = report
         st.session_state.resume_fit_report_signature = signature
+        logger.info(
+            "Fit score calculated: overall=%s, keyword=%s, skills=%s, ats=%s",
+            int(report.get("overall_score", 0)),
+            int(report.get("keyword_score", 0)),
+            int(report.get("skill_score", 0)),
+            int(report.get("ats_score", 0)),
+        )
     return st.session_state.resume_fit_report or {}
 
 
@@ -1648,6 +1784,14 @@ def _save_current_application(status: str = "matched") -> int:
             application.id,
             [item_id for item_id in st.session_state.get("selected_profile_item_ids", []) if isinstance(item_id, int)],
         )
+    logger.info(
+        "Application saved: id=%s, job_title=%s, company=%s, status=%s, selected_items=%s",
+        application.id,
+        application.job_title,
+        application.company,
+        status,
+        len(st.session_state.get("selected_profile_item_ids", [])),
+    )
     return application.id or 0
 
 
@@ -1697,6 +1841,12 @@ def _extract_profile_from_import(uploaded_file, notes_text: str) -> tuple[str, s
         raise ValueError("Upload a source document or paste notes to build the profile.")
 
     basics, items = extract_profile_items_from_text(raw_text)
+    logger.info(
+        "Profile import extracted: source=%s, chars=%s, items=%s",
+        source_name,
+        len(raw_text),
+        len(items),
+    )
     return raw_text, source_name, basics, [item.to_dict() for item in items]
 
 
@@ -1796,11 +1946,17 @@ def render_profile_import_screen() -> None:
         st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
         if st.button("Extract Profile", use_container_width=True, key="profile-extract"):
             try:
+                logger.info(
+                    "Profile import started: has_file=%s, notes_chars=%s",
+                    bool(uploaded_source),
+                    len(notes_text.strip()),
+                )
                 raw_text, source_name, basics, item_dicts = _extract_profile_from_import(uploaded_source, notes_text)
                 st.session_state.profile_import_source_name = source_name
                 st.session_state.profile_extracted_basics = basics
                 st.session_state.profile_extracted_items = item_dicts
                 st.session_state.profile_last_source_raw_text = raw_text
+                st.session_state.profile_review_show_all_items = False
                 st.session_state.screen = "profile_review"
                 st.rerun()
             except Exception as error:
@@ -1820,8 +1976,18 @@ def render_profile_review_screen() -> None:
     )
 
     basics = st.session_state.profile_extracted_basics or {}
-    extracted_items = _profile_items_from_session()
+    extracted_items = sort_profile_items_for_review(_profile_items_from_session())
     extracted_type_counts = Counter(item.item_type for item in extracted_items)
+    show_all_items = st.session_state.get("profile_review_show_all_items", False)
+    prioritized_items = extracted_items[:3]
+    hidden_items = extracted_items[3:]
+    visible_items = extracted_items if show_all_items else prioritized_items
+    logger.info(
+        "Profile review opened: total_items=%s, initially_visible=%s, expanded=%s",
+        len(extracted_items),
+        len(visible_items),
+        show_all_items,
+    )
 
     with st.container(border=True):
         st.markdown('<div class="apple-kicker">Import Quality</div>', unsafe_allow_html=True)
@@ -1861,18 +2027,22 @@ def render_profile_review_screen() -> None:
     with st.container(border=True):
         st.markdown('<div class="apple-kicker">Extracted Items</div>', unsafe_allow_html=True)
         st.markdown(
-            f'<div class="apple-section-title">{len(extracted_items)} suggested items are ready to save.</div>',
+            f'<div class="apple-section-title">We found {len(extracted_items)} suggested items from your source material.</div>',
             unsafe_allow_html=True,
         )
         st.markdown(
-            '<div class="apple-section-copy">Refine each item before it becomes part of the profile. Keep only what you want the app to remember and reuse later.</div>',
+            '<div class="apple-section-copy">Review the strongest 3 items first so this feels manageable. You can reveal the rest whenever you want before saving.</div>',
             unsafe_allow_html=True,
         )
+        st.success("Import complete. Start by reviewing the three strongest items below.")
+        if hidden_items and not show_all_items:
+            st.caption(f"{len(hidden_items)} more items are ready when you want them.")
+
         drafted_items: list[ProfileItem] = []
         included_count = 0
-        for index, item in enumerate(extracted_items):
+        for index, item in enumerate(visible_items):
             expander_title = f"{index + 1}. {item.item_type.title()} · {item.title or 'Untitled item'}"
-            with st.expander(expander_title, expanded=index <= 2):
+            with st.expander(expander_title, expanded=True):
                 keep_item = st.checkbox(
                     "Include in career profile",
                     value=item.visibility != "archived",
@@ -1939,6 +2109,47 @@ def render_profile_review_screen() -> None:
                     included_count += 1
                     drafted_items.append(drafted_item)
 
+        for item in hidden_items if not show_all_items else []:
+            drafted_item = ProfileItem(
+                id=item.id,
+                user_id=item.user_id,
+                profile_id=item.profile_id,
+                source_id=item.source_id,
+                item_type=item.item_type,
+                title=item.title.strip(),
+                organization=item.organization.strip(),
+                location=item.location,
+                start_date=item.start_date,
+                end_date=item.end_date,
+                is_current=item.is_current,
+                description=item.description.strip(),
+                bullets=list(item.bullets),
+                skills=list(item.skills),
+                tools=list(item.tools),
+                industry_tags=list(item.industry_tags),
+                function_tags=list(item.function_tags),
+                keywords=list(item.keywords),
+                confidence_score=item.confidence_score,
+                verification_status="verified",
+                visibility=item.visibility,
+            )
+            if drafted_item.visibility != "archived" and (
+                drafted_item.title or drafted_item.description or drafted_item.bullets
+            ):
+                included_count += 1
+                drafted_items.append(drafted_item)
+
+        if hidden_items:
+            toggle_label = f"Hide {len(hidden_items)} Additional Items" if show_all_items else f"View {len(hidden_items)} More"
+            if st.button(toggle_label, use_container_width=True, key="profile-review-toggle-more"):
+                st.session_state.profile_review_show_all_items = not show_all_items
+                logger.info(
+                    "Profile review toggle clicked: expanded=%s, hidden_items=%s",
+                    not show_all_items,
+                    len(hidden_items),
+                )
+                st.rerun()
+
         st.markdown(
             f'<div class="apple-minor-copy" style="margin-top:0.75rem;">{included_count} items will be saved into the reusable profile library.</div>',
             unsafe_allow_html=True,
@@ -1990,6 +2201,13 @@ def render_profile_review_screen() -> None:
                 st.session_state.target_industry = target_industries.split(",")[0].strip()
             st.session_state.profile_last_source_id = source_id
             st.session_state.profile_extracted_items = [item.to_dict() for item in saved_items]
+            st.session_state.profile_review_show_all_items = False
+            logger.info(
+                "Career profile saved: source=%s, included_items=%s, stage=%s",
+                source_name,
+                len(saved_items),
+                career_stage,
+            )
             st.session_state.screen = "profile_dashboard"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
@@ -2433,6 +2651,7 @@ def render_application_match_screen() -> None:
         if st.button("Optimize Existing Resume", use_container_width=True, key="application-match-continue", disabled=not (selected_ids and resume_loaded)):
             st.session_state.use_career_profile = True
             _save_current_application(status="ready_to_optimize")
+            st.session_state.show_fit_details = False
             _evaluate_current_resume_fit(force=True)
             st.session_state.screen = "fit_report"
             st.rerun()
@@ -2732,6 +2951,7 @@ def render_input_screen() -> None:
         if st.button("Continue", use_container_width=True, disabled=not can_continue):
             st.session_state.use_career_profile = False
             st.session_state.selected_profile_item_ids = []
+            st.session_state.show_fit_details = False
             if looks_like_url(job_description):
                 if fetch_and_store_job_description(job_description):
                     st.rerun()
@@ -2806,18 +3026,72 @@ def _render_fit_delta_card(before_report: dict, after_report: dict) -> None:
 def render_fit_report_screen() -> None:
     """Show a free deterministic resume/job fit report before choosing run mode."""
     report = _evaluate_current_resume_fit()
+    score, strength_label, recommendation, primary_action, action_description = summarize_fit_recommendation(report)
+    job_title = get_effective_target_role(st.session_state.job_description) or "This role"
+    company = st.session_state.get("current_application_company", "").strip()
+    details_visible = st.session_state.get("show_fit_details", False)
+    logger.info(
+        "Fit report shown: score=%s, job_title=%s, company=%s, details_visible=%s",
+        score,
+        job_title,
+        company or "Unknown",
+        details_visible,
+    )
     render_shell_start()
     render_screen_intro(
         "fit_report",
         "Resume Fit Report",
-        "See the fit before you run.",
-        "A fast, honest checkpoint from Python scoring. Use it to spot gaps before spending time in Manual or API mode.",
+        "Answer the big question first: should you apply?",
+        "Start with the recommendation. Open the details only if you want the deeper evidence behind the score.",
     )
 
     with st.container(border=True):
-        st.markdown('<div class="apple-summary-label">Fit Snapshot</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="apple-summary-title">{report.get("verdict", "We need a resume and job description to score fit.")}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-summary-label">Primary Recommendation</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="apple-summary-title">{job_title}{f" at {company}" if company else ""}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="apple-section-copy"><strong>Overall Match: {score}/100 · {strength_label}</strong></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="apple-section-copy">{recommendation}</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption(action_description)
 
+    action_col1, action_col2, action_col3 = st.columns(3, gap="large")
+    active_profile_items = [item for item in list_profile_items() if item.visibility == "active"]
+    with action_col1:
+        st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+        if st.button(primary_action, use_container_width=True, key="fit-primary-action"):
+            logger.info("Fit primary action chosen: action=%s, score=%s", primary_action, score)
+            if score >= 75:
+                st.session_state.screen = "mode"
+            elif score >= 60:
+                st.session_state.show_fit_details = True
+            else:
+                st.session_state.screen = "input"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    with action_col2:
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        details_label = "Hide Details" if details_visible else "Show Details"
+        if st.button(details_label, use_container_width=True, key="fit-toggle-details"):
+            st.session_state.show_fit_details = not details_visible
+            logger.info("Fit details toggled: visible=%s, score=%s", not details_visible, score)
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    with action_col3:
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Try Another Job", use_container_width=True, key="fit-try-another-job"):
+            logger.info("Fit flow returned to input: score=%s", score)
+            st.session_state.screen = "input"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    if details_visible:
         score_col1, score_col2, score_col3, score_col4 = st.columns(4, gap="large")
         with score_col1:
             render_score_tile("Overall", int(report.get("overall_score", 0)), "Resume + role match")
@@ -2828,49 +3102,51 @@ def render_fit_report_screen() -> None:
         with score_col4:
             render_score_tile("ATS / Clarity", int(report.get("ats_score", 0)), "Structure and basics")
 
-        st.markdown(
-            build_readiness_rows(
-                [
-                    ("Resume bullets detected", str(report.get("bullet_count", 0))),
-                    ("Bullets with numbers", str(report.get("quantified_bullet_count", 0))),
-                    ("Action-led bullets", str(report.get("action_verb_bullet_count", 0))),
-                    ("Profile evidence selected", str(len(report.get("selected_evidence_titles", [])))),
-                ]
-            ),
-            unsafe_allow_html=True,
-        )
-
-    insight_col, gap_col = st.columns(2, gap="large")
-    with insight_col:
         with st.container(border=True):
-            st.markdown('<div class="apple-kicker">What Already Matches</div>', unsafe_allow_html=True)
-            st.markdown('<div class="apple-section-title">Signals the resume already shares with the job.</div>', unsafe_allow_html=True)
-            render_chip_row(report.get("matched_keywords", [])[:12] or ["No strong keyword overlap yet"])
-            matched_skills = report.get("matched_skills", [])
-            if matched_skills:
-                st.caption(f"Matched skills: {', '.join(matched_skills[:8])}")
+            st.markdown('<div class="apple-kicker">Quick Evidence</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">Why this recommendation was made.</div>', unsafe_allow_html=True)
+            st.markdown(
+                build_readiness_rows(
+                    [
+                        ("Resume bullets detected", str(report.get("bullet_count", 0))),
+                        ("Bullets with numbers", str(report.get("quantified_bullet_count", 0))),
+                        ("Action-led bullets", str(report.get("action_verb_bullet_count", 0))),
+                        ("Profile evidence selected", str(len(report.get("selected_evidence_titles", [])))),
+                    ]
+                ),
+                unsafe_allow_html=True,
+            )
 
-    with gap_col:
+        insight_col, gap_col = st.columns(2, gap="large")
+        with insight_col:
+            with st.container(border=True):
+                st.markdown('<div class="apple-kicker">What Already Matches</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-section-title">Signals the resume already shares with the job.</div>', unsafe_allow_html=True)
+                render_chip_row(report.get("matched_keywords", [])[:12] or ["No strong keyword overlap yet"])
+                matched_skills = report.get("matched_skills", [])
+                if matched_skills:
+                    st.caption(f"Matched skills: {', '.join(matched_skills[:8])}")
+
+        with gap_col:
+            with st.container(border=True):
+                st.markdown('<div class="apple-kicker">Gaps To Consider</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-section-title">Important job language that is not obvious yet.</div>', unsafe_allow_html=True)
+                render_chip_row(report.get("missing_keywords", [])[:12] or ["No major keyword gaps detected"])
+                missing_skills = report.get("missing_skills", [])
+                if missing_skills:
+                    st.caption(f"Missing skills from common skill scan: {', '.join(missing_skills[:8])}")
+
         with st.container(border=True):
-            st.markdown('<div class="apple-kicker">Gaps To Consider</div>', unsafe_allow_html=True)
-            st.markdown('<div class="apple-section-title">Important job language that is not obvious yet.</div>', unsafe_allow_html=True)
-            render_chip_row(report.get("missing_keywords", [])[:12] or ["No major keyword gaps detected"])
-            missing_skills = report.get("missing_skills", [])
-            if missing_skills:
-                st.caption(f"Missing skills from common skill scan: {', '.join(missing_skills[:8])}")
-
-    with st.container(border=True):
-        st.markdown('<div class="apple-kicker">Honest Recommendations</div>', unsafe_allow_html=True)
-        st.markdown('<div class="apple-section-title">What I would fix before export.</div>', unsafe_allow_html=True)
-        recommendations = report.get("recommendations", []) + report.get("warnings", [])
-        if recommendations:
-            for recommendation in recommendations[:8]:
-                st.markdown(f"- {recommendation}")
-        else:
-            st.markdown("No urgent structural gaps detected. Continue to optimization and make the language more role-specific.")
+            st.markdown('<div class="apple-kicker">Honest Recommendations</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">What I would fix before export.</div>', unsafe_allow_html=True)
+            recommendations = report.get("recommendations", []) + report.get("warnings", [])
+            if recommendations:
+                for recommendation_text in recommendations[:8]:
+                    st.markdown(f"- {recommendation_text}")
+            else:
+                st.markdown("No urgent structural gaps detected. Continue to optimization and make the language more role-specific.")
 
     back_col, profile_col, run_col = st.columns([0.85, 1.0, 1.15], gap="large")
-    active_profile_items = [item for item in list_profile_items() if item.visibility == "active"]
     with back_col:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
         if st.button("Back to Upload", use_container_width=True, key="fit-back-upload"):
@@ -2887,6 +3163,7 @@ def render_fit_report_screen() -> None:
     with run_col:
         st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
         if st.button("Continue to Run", use_container_width=True, key="fit-continue-run"):
+            logger.info("Fit report continued to run mode: score=%s", score)
             st.session_state.screen = "mode"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
@@ -3527,6 +3804,12 @@ def handle_validated_payload(payload: dict) -> None:
     """Store validation state and move to review."""
     baseline_report = st.session_state.baseline_fit_report or _evaluate_current_resume_fit(force=True)
     optimized_resume_text = _build_optimized_resume_text(payload)
+    replacements = collect_replacements(payload)
+    logger.info(
+        "Optimization started: replacements=%s, resume=%s",
+        len(replacements),
+        st.session_state.resume_name or "unknown",
+    )
     st.session_state.optimized_fit_report = evaluate_resume_fit(
         optimized_resume_text,
         st.session_state.job_description or "",
@@ -3539,6 +3822,20 @@ def handle_validated_payload(payload: dict) -> None:
     st.session_state.output_docx_bytes = None
     st.session_state.output_filename = None
     st.session_state.show_review_changes = False
+    st.session_state.optimization_change_examples = build_change_examples(
+        st.session_state.review_details.get("results", []),
+        limit=3,
+    )
+    st.session_state.optimization_metrics_summary = build_optimization_metrics_summary(
+        baseline_report,
+        st.session_state.optimized_fit_report or {},
+    )
+    logger.info(
+        "Optimization completed: replacements=%s, before_fit=%s, after_fit=%s",
+        len(replacements),
+        int(baseline_report.get("overall_score", 0)),
+        int((st.session_state.optimized_fit_report or {}).get("overall_score", 0)),
+    )
     st.session_state.screen = "review"
 
 
@@ -3917,6 +4214,10 @@ def render_review_screen() -> None:
     grouped_results = _group_review_results(review_results)
     baseline_report = st.session_state.baseline_fit_report or {}
     optimized_report = st.session_state.optimized_fit_report or {}
+    change_examples = st.session_state.get("optimization_change_examples", [])
+    metrics_summary = st.session_state.get("optimization_metrics_summary", [])
+    target_job_title = get_effective_target_role(st.session_state.job_description) or "your target role"
+    target_company = st.session_state.get("current_application_company", "").strip()
 
     if ready_for_export and not st.session_state.output_docx_bytes:
         try:
@@ -3933,18 +4234,21 @@ def render_review_screen() -> None:
     )
     if not st.session_state.show_review_changes:
         if ready_for_export:
-            st.success("All replacements validated successfully.")
-            st.markdown("Your resume has been optimized and is ready to download.")
+            st.success("Optimization complete. Your resume is validated and ready to download.")
         else:
             st.warning("This result needs review before export.")
             st.markdown("We validated the structured output, but some replacements still need attention before download.")
 
-        if baseline_report and optimized_report:
-            _render_fit_delta_card(baseline_report, optimized_report)
-
         with st.container(border=True):
-            st.markdown('<div class="apple-summary-label">Optimization Summary</div>', unsafe_allow_html=True)
-            st.markdown('<div class="apple-summary-title">A quick view of what changed before you export.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-summary-label">Success Snapshot</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="apple-summary-title">Optimized for {target_job_title}{f" at {target_company}" if target_company else ""}</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                '<div class="apple-section-copy">Review the most important changes first, then decide whether to inspect every edit or download right away.</div>',
+                unsafe_allow_html=True,
+            )
 
             summary_col1, summary_col2, summary_col3 = st.columns(3, gap="large")
             with summary_col1:
@@ -3982,6 +4286,32 @@ def render_review_screen() -> None:
             ]
             st.markdown(build_readiness_rows(readiness_rows), unsafe_allow_html=True)
 
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">What Changed</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">Three concrete examples from the optimized draft.</div>', unsafe_allow_html=True)
+            if change_examples:
+                for example in change_examples:
+                    st.markdown(f"**{example['label']}**")
+                    st.markdown(f"- Before: {example['before']}")
+                    st.markdown(f"- After: {example['after']}")
+            else:
+                st.markdown("Specific before/after previews are not available for this run, but the validated replacement counts above are still accurate.")
+
+        if metrics_summary:
+            metric_cols = st.columns(min(4, len(metrics_summary)), gap="large")
+            for column, metric in zip(metric_cols, metrics_summary[:4]):
+                delta = int(metric["delta"])
+                delta_text = f"{delta:+d} {metric['suffix']}"
+                with column:
+                    st.metric(
+                        str(metric["label"]),
+                        f"{metric['after']}",
+                        delta_text,
+                    )
+
+        if baseline_report and optimized_report:
+            _render_fit_delta_card(baseline_report, optimized_report)
+
         if review_warnings:
             for warning in review_warnings:
                 st.caption(warning)
@@ -3996,6 +4326,10 @@ def render_review_screen() -> None:
                     file_name=st.session_state.output_filename,
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True,
+                    on_click=lambda: logger.info(
+                        "Optimized resume downloaded: filename=%s",
+                        st.session_state.output_filename,
+                    ),
                 )
             else:
                 st.button("Download Optimized Resume (.docx)", use_container_width=True, disabled=True)
@@ -4003,15 +4337,41 @@ def render_review_screen() -> None:
         with action_col2:
             st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
             if st.button("Review Changes", use_container_width=True):
+                logger.info("User opened detailed change review")
                 st.session_state.show_review_changes = True
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
         with action_col3:
             st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
             if st.button("Start Over", use_container_width=True):
+                logger.info("User started a new optimization from success state")
                 reset_flow()
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
+
+        if st.session_state.is_first_optimization:
+            st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
+            with st.container(border=True):
+                st.markdown('<div class="apple-kicker">Level Up Your Results</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-section-title">Build your Career Profile</div>', unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="apple-section-copy">Save your experiences, education, and skills once. Then let the app personalize future optimizations with your full background.</div>',
+                    unsafe_allow_html=True,
+                )
+                profile_col1, profile_col2 = st.columns(2)
+                with profile_col1:
+                    st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+                    if st.button("Build Profile", use_container_width=True, key="success-build-profile"):
+                        st.session_state.is_first_optimization = False
+                        st.session_state.screen = "profile_welcome"
+                        st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
+                with profile_col2:
+                    st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                    if st.button("Skip for now", use_container_width=True, key="success-skip-profile"):
+                        st.session_state.is_first_optimization = False
+                        logger.info("User declined profile building prompt on first optimization")
+                    st.markdown("</div>", unsafe_allow_html=True)
 
         previous_screen = "manual" if st.session_state.execution_mode == "manual" else "api"
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
@@ -4022,6 +4382,7 @@ def render_review_screen() -> None:
         return
 
     if st.button("Back", key="review-back-button"):
+        logger.info("User returned from detailed review to success snapshot")
         st.session_state.show_review_changes = False
         st.rerun()
 
@@ -4053,6 +4414,10 @@ def render_review_screen() -> None:
                 file_name=st.session_state.output_filename,
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True,
+                on_click=lambda: logger.info(
+                    "Optimized resume downloaded from detail view: filename=%s",
+                    st.session_state.output_filename,
+                ),
             )
         else:
             st.button("Download Optimized Resume", use_container_width=True, disabled=True)
@@ -4068,6 +4433,7 @@ def render_review_screen() -> None:
 
 def main() -> None:
     """Run the Streamlit app."""
+    logger.info("Streamlit app started")
     st.set_page_config(page_title="Resume Optimizer", page_icon="📄", layout="wide")
     init_profile_db()
     init_session_state()
@@ -4088,6 +4454,11 @@ def main() -> None:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
         if st.button("Application Workspace", use_container_width=True, key="sidebar-application-workspace"):
             st.session_state.screen = "application_workspace"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Career Profile", use_container_width=True, key="sidebar-profile"):
+            st.session_state.screen = "profile_welcome"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 

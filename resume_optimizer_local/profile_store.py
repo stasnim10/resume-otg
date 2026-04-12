@@ -4,11 +4,15 @@ SQLite-backed persistence for Career Profile foundation.
 from __future__ import annotations
 
 import json
+import logging
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
 
 from profile_schema import Application, CareerProfile, ProfileItem, ProfileSource, utc_now_iso
+
+logger = logging.getLogger(__name__)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -112,6 +116,7 @@ def init_profile_db() -> None:
             """
         )
         _ensure_profile_columns(conn)
+        _ensure_redesign_columns(conn)
 
 
 def _ensure_profile_columns(conn: sqlite3.Connection) -> None:
@@ -127,6 +132,22 @@ def _ensure_profile_columns(conn: sqlite3.Connection) -> None:
     for column_name, column_type in expected_columns.items():
         if column_name not in columns:
             conn.execute(f"ALTER TABLE career_profiles ADD COLUMN {column_name} {column_type}")
+
+
+def _ensure_redesign_columns(conn: sqlite3.Connection) -> None:
+    """Apply additive migrations for redesign Phase 1 (match scores, improvements)."""
+    # Add columns to applications table for optimization tracking
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(applications)").fetchall()}
+    redesign_columns = {
+        "match_before": "INTEGER DEFAULT 0",
+        "match_after": "INTEGER DEFAULT 0",
+        "improvements": "TEXT DEFAULT '[]'",
+        "resume_used_id": "TEXT DEFAULT ''",
+        "optimized_at": "TIMESTAMP",
+    }
+    for column_name, column_type in redesign_columns.items():
+        if column_name not in columns:
+            conn.execute(f"ALTER TABLE applications ADD COLUMN {column_name} {column_type}")
 
 
 def _decode_json_list(value: str) -> list[str]:
@@ -634,3 +655,267 @@ def list_applications(user_id: str = "local-user") -> list[Application]:
         application = _application_from_row(row, list_application_profile_item_ids(row["id"]))
         applications.append(application)
     return applications
+
+
+def save_optimization_result(
+    user_id: str,
+    company_name: str,
+    job_title: str,
+    job_description: str,
+    match_before: int,
+    match_after: int,
+    improvements: list[dict],
+    resume_used_id: str = "",
+) -> int:
+    """
+    Save optimization results to applications table for history tracking.
+
+    Returns: application_id
+    """
+    init_profile_db()
+    now = utc_now_iso()
+    improvements_json = json.dumps(improvements)
+
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO applications (
+                user_id, company, job_title, job_description,
+                match_before, match_after, improvements, resume_used_id,
+                created_at, updated_at, optimized_at, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
+            """,
+            (
+                user_id,
+                company_name,
+                job_title,
+                job_description,
+                match_before,
+                match_after,
+                improvements_json,
+                resume_used_id,
+                now,
+                now,
+                now,
+            ),
+        )
+        app_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    return app_id
+
+
+def get_optimization_history(user_id: str = "local-user") -> list[dict]:
+    """
+    Get application history for dashboard display.
+
+    Returns: list of dicts with:
+    {
+        "id": int,
+        "company": str,
+        "job_title": str,
+        "match_before": int,
+        "match_after": int,
+        "created_at": str (ISO format),
+        "improvements_count": int
+    }
+    """
+    init_profile_db()
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, company, job_title, match_before, match_after,
+                   created_at, improvements
+            FROM applications
+            WHERE user_id = ? AND status = 'completed'
+            ORDER BY created_at DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
+    history = []
+    for row in rows:
+        try:
+            improvements = json.loads(row["improvements"] or "[]")
+            improvements_count = len(improvements)
+        except json.JSONDecodeError:
+            improvements_count = 0
+
+        history.append({
+            "id": row["id"],
+            "company": row["company"],
+            "job_title": row["job_title"],
+            "match_before": row["match_before"],
+            "match_after": row["match_after"],
+            "created_at": row["created_at"],
+            "improvements_count": improvements_count,
+        })
+
+    return history
+
+
+def extract_profile_basics_from_resume(resume_text: str) -> dict[str, Any]:
+    """
+    Auto-extract profile basics from resume text for pre-filling profile form.
+
+    Returns: dict with keys:
+    {
+        "name": str,
+        "email": str,
+        "phone": str,
+        "location": str,
+        "career_stage": str (one of CAREER_STAGES),
+        "industries": list[str],
+        "resume_snippet": str (first 500 chars of key experience)
+    }
+    """
+    lines = resume_text.split("\n")
+
+    # Extract name (usually first non-empty line)
+    name = ""
+    for line in lines[:10]:
+        clean_line = line.strip()
+        if clean_line and len(clean_line) < 50 and len(clean_line.split()) <= 4:
+            # Likely a name (short, few words)
+            if not any(char.isdigit() for char in clean_line):
+                name = clean_line
+                break
+
+    # Extract email
+    email = ""
+    email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', resume_text)
+    if email_match:
+        email = email_match.group(0)
+
+    # Extract phone
+    phone = ""
+    phone_match = re.search(r'(\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}', resume_text)
+    if phone_match:
+        phone = phone_match.group(0)
+
+    # Extract location (look for common US states or city patterns after city/state keywords)
+    location = ""
+    location_match = re.search(
+        r'(?:Location|City|Based|Address)[:\s]+([A-Z][a-z\s]+(?:,\s*[A-Z]{2})?)',
+        resume_text,
+        re.IGNORECASE
+    )
+    if location_match:
+        location = location_match.group(1).strip()
+
+    # Estimate career stage from years of experience
+    years_match = re.findall(
+        r'(\d+)\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|in|project)',
+        resume_text,
+        re.IGNORECASE
+    )
+    years_exp = 0
+    if years_match:
+        years_exp = max([int(m) for m in years_match])
+
+    career_stages = [
+        "Student", "Early Career", "Mid-Level", "Manager", "Executive", "Career Pivot"
+    ]
+    if years_exp < 2:
+        career_stage = "Student"
+    elif years_exp < 5:
+        career_stage = "Early Career"
+    elif years_exp < 10:
+        career_stage = "Mid-Level"
+    elif years_exp < 15:
+        career_stage = "Manager"
+    else:
+        career_stage = "Executive"
+
+    # Extract industries from company names and job titles
+    industries = set()
+    job_title_match = re.search(
+        r'(?:Title|Role|Position)[:\s]+([^\n]+)',
+        resume_text,
+        re.IGNORECASE
+    )
+    if job_title_match:
+        title = job_title_match.group(1).lower()
+        # Simple industry detection from common keywords
+        if any(word in title for word in ['engineer', 'developer', 'tech', 'software']):
+            industries.add('Technology')
+        if any(word in title for word in ['data', 'analyst', 'science']):
+            industries.add('Technology')
+        if any(word in title for word in ['consult', 'adviso']):
+            industries.add('Consulting')
+        if any(word in title for word in ['finance', 'accounting', 'cfo']):
+            industries.add('Finance')
+        if any(word in title for word in ['market', 'sales', 'business']):
+            industries.add('General Business')
+
+    if not industries:
+        industries = {'General Business'}
+
+    # Extract resume snippet (first meaningful bullet points)
+    bullet_pattern = r'[•\-\*]\s*(.{20,150})'
+    bullets = re.findall(bullet_pattern, resume_text[:2000])
+    resume_snippet = "\n".join(bullets[:3]) if bullets else ""
+
+    return {
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "location": location,
+        "career_stage": career_stage,
+        "industries": list(industries),
+        "resume_snippet": resume_snippet[:500],
+    }
+
+
+def create_or_update_profile_from_optimization(
+    user_id: str,
+    resume_text: str,
+    user_id_default: str = "local-user"
+) -> int | None:
+    """
+    Auto-populate or update user profile with extracted info from resume.
+
+    This is called after first successful optimization to suggest building a profile.
+    Pre-fills the profile form so users don't have to manually enter data.
+
+    Args:
+        user_id: User ID (defaults to "local-user")
+        resume_text: Full resume text to extract from
+        user_id_default: Default user ID if not provided
+
+    Returns:
+        Profile ID if created/updated, None if error
+    """
+    user_id_to_use = user_id or user_id_default
+
+    # Extract profile basics
+    basics = extract_profile_basics_from_resume(resume_text)
+
+    # Get or create profile
+    try:
+        profile = create_or_get_profile(user_id_to_use)
+    except Exception as e:
+        logger.error(f"Error getting/creating profile: {e}")
+        return None
+
+    # Update profile with extracted data
+    try:
+        updated_profile = save_profile_basics(
+            full_name=basics.get("name", profile.full_name),
+            email=basics.get("email", profile.email),
+            phone=basics.get("phone", profile.phone),
+            location=basics.get("location", profile.location),
+            linkedin=profile.linkedin,
+            headline=profile.headline,
+            career_stage=basics.get("career_stage", profile.career_stage),
+            summary=basics.get("resume_snippet", profile.summary)[:200],
+            target_roles=[],
+            target_industries=basics.get("industries", []),
+            preferred_locations=[basics.get("location")] if basics.get("location") else [],
+            work_authorization=profile.work_authorization,
+            user_id=user_id_to_use,
+        )
+        logger.info(f"Profile pre-filled for user {user_id_to_use}: {updated_profile.id}")
+        return updated_profile.id
+    except Exception as e:
+        logger.error(f"Error saving profile basics: {e}")
+        return None

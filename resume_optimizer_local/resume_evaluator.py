@@ -326,3 +326,21 @@ def evaluate_resume_fit(
         "verdict": verdict,
         "selected_evidence_titles": selected_evidence_titles,
     }
+
+
+def calculate_match_score(resume_text: str, jd_text: str) -> int:
+    """
+    Calculate simplified match score (0-100) for redesign Phase 1.
+
+    This wrapper calls evaluate_resume_fit() and returns just the overall_score.
+    Used for Screen 3 (pre-optimization match display) and Screen 5 (post-optimization).
+
+    Args:
+        resume_text: Plain text resume content
+        jd_text: Plain text job description
+
+    Returns:
+        int: Match score from 0-100
+    """
+    report = evaluate_resume_fit(resume_text, jd_text)
+    return report.get("overall_score", 0)

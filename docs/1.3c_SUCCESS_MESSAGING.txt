@@ -1,0 +1,18 @@
+SUCCESS TITLE
+Optimization complete. Your resume is validated and ready to download.
+
+SUCCESS HEADER
+Optimized for [Job Title] at [Company]
+
+GUIDE COPY
+Review the most important changes first, then decide whether to inspect every edit or download right away.
+
+SECTION LABELS
+Success Snapshot
+What Changed
+Improvement Report
+
+PRIMARY ACTIONS
+Download Optimized Resume (.docx)
+Review Changes
+Start Over
