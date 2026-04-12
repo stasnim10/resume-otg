@@ -2752,7 +2752,7 @@ def render_application_workspace_screen() -> None:
 
 
 def render_input_screen() -> None:
-    """Resume and job input screen."""
+    """Resume and job input screen (redesigned for simplicity)."""
     def fetch_and_store_job_description(job_input: str) -> bool:
         """Fetch, clean, and store JD text from a pasted URL."""
         try:
@@ -2833,10 +2833,10 @@ def render_input_screen() -> None:
             )
             job_description = st.session_state.get("job_description_input", job_description)
             st.markdown(
-                '<div class="apple-minor-copy">We’ll clean the text, detect the target role, and prepare the prompt inputs for you.</div>',
+                ‘<div class="apple-minor-copy">We’ll clean the text, detect the target role, and prepare the prompt inputs for you.</div>’,
                 unsafe_allow_html=True,
             )
-            st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+            st.markdown(‘<div class="apple-secondary">’, unsafe_allow_html=True)
             if st.button("Process Job Description", use_container_width=True):
                 current_input = st.session_state.get("job_description_input", job_description)
                 if looks_like_url(current_input):
@@ -2849,94 +2849,21 @@ def render_input_screen() -> None:
                     st.info("Paste a job description or job link first.")
             st.markdown("</div>", unsafe_allow_html=True)
 
-    if st.session_state.jd_source_url and not looks_like_url(st.session_state.job_description):
-        st.caption(f"Loaded from URL: {st.session_state.jd_source_url}")
-    if st.session_state.jd_cleaning_result:
-        cleaning_result = st.session_state.jd_cleaning_result
-        st.success(str(cleaning_result["confidence_message"]))
-
-    detected_role = (
-        st.session_state.jd_role_hint if st.session_state.jd_source_url else detect_role_title(job_description)
-    )
-    detected_industry = detect_industry(job_description) if job_description.strip() else ""
-
-    with st.container(border=True):
-        st.markdown(
-            """
-            <div class="apple-kicker">Role Context</div>
-            <div class="apple-section-title">We found the important context for this role.</div>
-            <div class="apple-section-copy">Use this as a quick checkpoint before continuing. The detected signals and selected tone shape the prompt you run next.</div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        context_col1, context_col2 = st.columns([1.35, 0.85], gap="large")
-        with context_col1:
-            st.markdown(
-                """
-                <div class="apple-kicker">Detected Signals</div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                build_inline_chip_row(
-                    [
-                        f"Role: {detected_role or 'Not detected yet'}",
-                        f"Industry: {detected_industry or 'Not detected yet'}",
-                    ]
-                ),
-                unsafe_allow_html=True,
-            )
-        with context_col2:
-            st.markdown(
-                """
-                <div class="apple-kicker">Tone</div>
-                <div class="apple-minor-copy">Choose your career stage.</div>
-                """,
-                unsafe_allow_html=True,
-            )
-            career_stage = st.selectbox(
-                "Career Stage",
-                CAREER_STAGES,
-                index=CAREER_STAGES.index(st.session_state.career_stage),
-                label_visibility="collapsed",
-            )
-
-        with st.expander("Advanced options", expanded=False):
-            st.markdown(
-                '<div class="apple-section-copy">Override the detected role or industry only if you want to steer the prompt more explicitly.</div>',
-                unsafe_allow_html=True,
-            )
-            target_role = st.text_input(
-                "Target Role Title Override",
-                value=st.session_state.target_role,
-                placeholder=detected_role or "Example: Product Manager Intern",
-                help="Leave blank to use the detected role title from the JD.",
-            )
-            industry_options = INDUSTRIES if st.session_state.target_industry in INDUSTRIES else [""] + INDUSTRIES[1:]
-            target_industry = st.selectbox(
-                "Industry Override",
-                industry_options,
-                index=industry_options.index(st.session_state.target_industry),
-                help="Leave blank to use the detected industry from the JD.",
-            )
-
     st.session_state.job_description = job_description
-    st.session_state.career_stage = career_stage
-    st.session_state.target_role = target_role
-    st.session_state.target_industry = target_industry
-
-    active_profile_items = [item for item in list_profile_items() if item.visibility == "active"]
+    st.session_state.career_stage = "Manager"  # Default to Manager for mode selection
+    st.session_state.target_role = ""
+    st.session_state.target_industry = ""
 
     col1, col2, col3 = st.columns([0.7, 0.9, 1.1], gap="large")
     with col1:
-        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        st.markdown(‘<div class="apple-secondary">’, unsafe_allow_html=True)
         if st.button("Back", use_container_width=True):
             st.session_state.screen = "landing"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
     with col2:
-        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        active_profile_items = [item for item in list_profile_items() if item.visibility == "active"]
+        st.markdown(‘<div class="apple-secondary">’, unsafe_allow_html=True)
         if st.button("Use Career Profile", use_container_width=True, disabled=not bool(job_description.strip() and active_profile_items), key="input-use-profile"):
             st.session_state.use_career_profile = True
             st.session_state.screen = "application_match"
@@ -2947,7 +2874,7 @@ def render_input_screen() -> None:
             st.session_state.resume_text
             and job_description.strip()
         )
-        st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+        st.markdown(‘<div class="apple-primary">’, unsafe_allow_html=True)
         if st.button("Continue", use_container_width=True, disabled=not can_continue):
             st.session_state.use_career_profile = False
             st.session_state.selected_profile_item_ids = []
