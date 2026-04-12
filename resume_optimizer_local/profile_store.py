@@ -8,7 +8,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from profile_schema import Application, CareerProfile, ProfileItem, ProfileSource, utc_now_iso
+from profile_schema import Application, CareerProfile, ProfileItem, ProfileSource, ResumeAsset, utc_now_iso
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -108,6 +108,22 @@ def init_profile_db() -> None:
                 selection_reason TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 UNIQUE(application_id, profile_item_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS resume_assets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                application_id INTEGER,
+                source_kind TEXT NOT NULL DEFAULT 'optimized_resume',
+                category TEXT NOT NULL DEFAULT 'general',
+                title TEXT NOT NULL DEFAULT '',
+                target_role TEXT NOT NULL DEFAULT '',
+                company TEXT NOT NULL DEFAULT '',
+                file_name TEXT NOT NULL DEFAULT '',
+                file_bytes BLOB NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             );
             """
         )
@@ -634,3 +650,118 @@ def list_applications(user_id: str = "local-user") -> list[Application]:
         application = _application_from_row(row, list_application_profile_item_ids(row["id"]))
         applications.append(application)
     return applications
+
+
+def save_resume_asset(
+    *,
+    source_kind: str,
+    category: str,
+    title: str,
+    target_role: str,
+    company: str,
+    file_name: str,
+    file_bytes: bytes,
+    application_id: int | None = None,
+    notes: str = "",
+    user_id: str = "local-user",
+) -> ResumeAsset:
+    """Persist a generated/exported resume asset."""
+    init_profile_db()
+    now = utc_now_iso()
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO resume_assets (
+                user_id, application_id, source_kind, category, title, target_role,
+                company, file_name, file_bytes, notes, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                application_id,
+                source_kind.strip() or "optimized_resume",
+                category.strip() or "general",
+                title.strip(),
+                target_role.strip(),
+                company.strip(),
+                file_name.strip(),
+                file_bytes,
+                notes.strip(),
+                now,
+                now,
+            ),
+        )
+        row_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        row = conn.execute("SELECT * FROM resume_assets WHERE id = ?", (row_id,)).fetchone()
+    return ResumeAsset(
+        id=row["id"],
+        user_id=row["user_id"],
+        application_id=row["application_id"],
+        source_kind=row["source_kind"],
+        category=row["category"],
+        title=row["title"],
+        target_role=row["target_role"],
+        company=row["company"],
+        file_name=row["file_name"],
+        file_bytes=row["file_bytes"] or b"",
+        notes=row["notes"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def list_resume_assets(user_id: str = "local-user") -> list[ResumeAsset]:
+    """Return saved resume assets, newest first."""
+    init_profile_db()
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM resume_assets WHERE user_id = ? ORDER BY updated_at DESC, id DESC",
+            (user_id,),
+        ).fetchall()
+    return [
+        ResumeAsset(
+            id=row["id"],
+            user_id=row["user_id"],
+            application_id=row["application_id"],
+            source_kind=row["source_kind"],
+            category=row["category"],
+            title=row["title"],
+            target_role=row["target_role"],
+            company=row["company"],
+            file_name=row["file_name"],
+            file_bytes=row["file_bytes"] or b"",
+            notes=row["notes"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+        for row in rows
+    ]
+
+
+def update_resume_asset(asset: ResumeAsset) -> None:
+    """Persist editable fields for a saved resume asset."""
+    if asset.id is None:
+        raise ValueError("Resume asset must have an id before it can be updated.")
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE resume_assets
+            SET category = ?,
+                title = ?,
+                target_role = ?,
+                company = ?,
+                notes = ?,
+                updated_at = ?
+            WHERE id = ? AND user_id = ?
+            """,
+            (
+                asset.category,
+                asset.title,
+                asset.target_role,
+                asset.company,
+                asset.notes,
+                utc_now_iso(),
+                asset.id,
+                asset.user_id,
+            ),
+        )

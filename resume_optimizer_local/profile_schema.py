@@ -107,3 +107,25 @@ class Application:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class ResumeAsset:
+    """A saved resume output tied to an application or profile workflow."""
+
+    id: int | None = None
+    user_id: str = "local-user"
+    application_id: int | None = None
+    source_kind: str = "optimized_resume"
+    category: str = "general"
+    title: str = ""
+    target_role: str = ""
+    company: str = ""
+    file_name: str = ""
+    file_bytes: bytes = b""
+    notes: str = ""
+    created_at: str = field(default_factory=utc_now_iso)
+    updated_at: str = field(default_factory=utc_now_iso)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)

@@ -5,3 +5,4 @@ anthropic
 google-genai
 beautifulsoup4
 requests
+pypdf

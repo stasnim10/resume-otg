@@ -307,6 +307,80 @@ def evaluate_resume_fit(
     else:
         verdict = "Low visible fit. Before optimizing, decide whether you have missing experience in your profile that should be surfaced."
 
+    if overall_score >= 80 and keyword_score >= 72 and skill_score >= 65:
+        apply_signal = "Strong apply"
+        apply_confidence = "High confidence"
+        improvement_priority = "Polish and tailor"
+    elif overall_score >= 62:
+        apply_signal = "Worth targeting"
+        apply_confidence = "Moderate confidence"
+        improvement_priority = "Optimize before applying"
+    elif overall_score >= 45:
+        apply_signal = "Borderline"
+        apply_confidence = "Cautious confidence"
+        improvement_priority = "Only continue if you can surface stronger relevant evidence"
+    else:
+        apply_signal = "Probably not worth the time yet"
+        apply_confidence = "Low confidence"
+        improvement_priority = "Either change target roles or add missing evidence before investing more effort"
+
+    total_gap_count = len(missing_keywords) + len(missing_skills)
+    if overall_score >= 80 and total_gap_count <= 5:
+        gap_severity = "Low"
+    elif overall_score >= 62 and total_gap_count <= 10:
+        gap_severity = "Moderate"
+    elif overall_score >= 45:
+        gap_severity = "High"
+    else:
+        gap_severity = "Critical"
+
+    if apply_signal == "Strong apply":
+        opportunity_worthiness = "Pursue now"
+        recommendation_strength = "Strong recommendation"
+    elif apply_signal == "Worth targeting":
+        opportunity_worthiness = "Pursue after revision"
+        recommendation_strength = "Good opportunity if you tighten the resume first"
+    elif apply_signal == "Borderline":
+        opportunity_worthiness = "Stretch target"
+        recommendation_strength = "Proceed only if you can surface stronger evidence"
+    else:
+        opportunity_worthiness = "Skip for now"
+        recommendation_strength = "Low recommendation"
+
+    strongest_area_name, strongest_area_score = max(
+        [
+            ("Keywords", keyword_score),
+            ("Skills", skill_score),
+            ("Bullets", bullet_score),
+            ("ATS / Clarity", ats_score),
+            ("Profile Evidence", evidence_score if selected_profile_items else 0),
+        ],
+        key=lambda item: item[1],
+    )
+    weakest_area_name, weakest_area_score = min(
+        [
+            ("Keywords", keyword_score),
+            ("Skills", skill_score),
+            ("Bullets", bullet_score),
+            ("ATS / Clarity", ats_score),
+        ],
+        key=lambda item: item[1],
+    )
+
+    focus_areas: list[str] = []
+    if weakest_area_name == "Keywords" and missing_keywords:
+        focus_areas.append(f"Surface honest evidence for: {', '.join(missing_keywords[:4])}.")
+    if weakest_area_name == "Skills" and missing_skills:
+        focus_areas.append(f"Clarify tools or hard skills such as: {', '.join(missing_skills[:4])}.")
+    if weakest_area_name == "Bullets":
+        focus_areas.append("Strengthen bullets with clearer action + measurable outcomes.")
+    if weakest_area_name == "ATS / Clarity":
+        focus_areas.append("Tighten structure, section labels, and contact basics for easier scanning.")
+    if selected_profile_items and evidence_score < 70:
+        focus_areas.append("Pull in stronger saved profile evidence before you finalize the application.")
+    if not focus_areas:
+        focus_areas.append("Stay focused on tailoring language and preserving the strongest role-specific evidence.")
+
     return {
         "overall_score": overall_score,
         "ats_score": ats_score,
@@ -324,5 +398,17 @@ def evaluate_resume_fit(
         "warnings": warnings,
         "recommendations": recommendations,
         "verdict": verdict,
+        "apply_signal": apply_signal,
+        "apply_confidence": apply_confidence,
+        "improvement_priority": improvement_priority,
+        "gap_severity": gap_severity,
+        "opportunity_worthiness": opportunity_worthiness,
+        "recommendation_strength": recommendation_strength,
+        "strongest_area": strongest_area_name,
+        "strongest_area_score": strongest_area_score,
+        "weakest_area": weakest_area_name,
+        "weakest_area_score": weakest_area_score,
+        "focus_areas": focus_areas,
+        "total_gap_count": total_gap_count,
         "selected_evidence_titles": selected_evidence_titles,
     }

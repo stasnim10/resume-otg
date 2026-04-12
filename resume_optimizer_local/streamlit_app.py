@@ -7,6 +7,7 @@ import io
 import json
 import re
 import tempfile
+import html
 from collections import Counter
 from pathlib import Path
 
@@ -36,9 +37,12 @@ from profile_store import (
     list_applications,
     list_profile_items,
     list_profile_sources,
+    list_resume_assets,
     save_profile_basics,
     save_profile_items,
     save_profile_source,
+    save_resume_asset,
+    update_resume_asset,
     update_profile_item,
     update_profile_item_verification,
     upsert_application,
@@ -289,6 +293,38 @@ def apply_apple_theme() -> None:
           pointer-events: none;
         }
 
+        .apple-journey-strip {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 0.9rem;
+          margin: -0.8rem auto 2.4rem auto;
+          max-width: 880px;
+        }
+
+        .apple-journey-pill {
+          background: rgba(255,255,255,0.72);
+          border: 1px solid var(--line);
+          border-radius: 22px;
+          padding: 1rem 1.1rem;
+          min-height: 92px;
+        }
+
+        .apple-journey-label {
+          font-size: 0.74rem;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--muted-light);
+          font-weight: 600;
+          margin-bottom: 0.45rem;
+        }
+
+        .apple-journey-value {
+          font-size: 1rem;
+          line-height: 1.5;
+          color: var(--text);
+          font-weight: 560;
+        }
+
         .apple-hero-panel,
         .apple-panel,
         .apple-card,
@@ -369,6 +405,7 @@ def apply_apple_theme() -> None:
           font-weight: 680;
           letter-spacing: -0.022em;
           margin-bottom: 0.45rem;
+          max-width: 26ch;
         }
 
         .apple-section-copy {
@@ -376,6 +413,7 @@ def apply_apple_theme() -> None:
           font-size: 1rem;
           line-height: 1.72;
           margin-bottom: 1.1rem;
+          max-width: 62ch;
         }
 
         .apple-card-note {
@@ -525,11 +563,12 @@ def apply_apple_theme() -> None:
         }
 
         .apple-summary-grid {
-          background: #ffffff;
+          background: linear-gradient(180deg, #ffffff 0%, #fcfcfe 100%);
           border: 1px solid var(--line);
-          border-radius: 24px;
-          padding: 2rem;
-          margin: 1rem 0 1.1rem 0;
+          border-radius: 28px;
+          padding: 2.15rem;
+          margin: 1rem 0 1.2rem 0;
+          box-shadow: var(--shadow-soft);
         }
 
         .apple-summary-label {
@@ -551,6 +590,13 @@ def apply_apple_theme() -> None:
 
         .apple-stat-card {
           min-height: 100%;
+          background: var(--surface-muted);
+          border: 1px solid var(--line);
+          border-radius: 20px;
+          padding: 1rem 1.05rem;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
         }
 
         .apple-stat-value {
@@ -562,11 +608,11 @@ def apply_apple_theme() -> None:
         }
 
         .apple-readiness-card {
-          background: #f5f5f7;
+          background: linear-gradient(180deg, #f9f9fb 0%, #f5f5f7 100%);
           border: 1px solid var(--line);
-          border-radius: 20px;
-          padding: 1.25rem 1.35rem;
-          margin-top: 0.8rem;
+          border-radius: 22px;
+          padding: 1.3rem 1.4rem;
+          margin-top: 0.9rem;
         }
 
         .apple-readiness-row {
@@ -593,6 +639,176 @@ def apply_apple_theme() -> None:
           text-align: right;
         }
 
+        .apple-profile-timeline {
+          position: relative;
+          margin-top: 0.75rem;
+          padding-left: 1.35rem;
+        }
+
+        .apple-profile-timeline::before {
+          content: "";
+          position: absolute;
+          left: 0.38rem;
+          top: 0.25rem;
+          bottom: 0.25rem;
+          width: 1px;
+          background: rgba(0, 0, 0, 0.09);
+        }
+
+        .apple-profile-timeline-item {
+          position: relative;
+          margin-bottom: 1.2rem;
+        }
+
+        .apple-profile-timeline-item:last-child {
+          margin-bottom: 0;
+        }
+
+        .apple-profile-timeline-dot {
+          position: absolute;
+          left: -1.36rem;
+          top: 1.25rem;
+          width: 11px;
+          height: 11px;
+          border-radius: 999px;
+          background: #ffffff;
+          border: 1.5px solid rgba(0, 0, 0, 0.18);
+          box-shadow: 0 0 0 4px #f5f5f7;
+        }
+
+        .apple-profile-date {
+          color: var(--muted-light);
+          font-size: 0.8rem;
+          letter-spacing: 0.04em;
+          font-weight: 600;
+          margin-bottom: 0.35rem;
+        }
+
+        .apple-profile-meta {
+          color: var(--muted);
+          font-size: 0.95rem;
+          line-height: 1.6;
+          margin-bottom: 0.6rem;
+        }
+
+        .apple-profile-bullets {
+          margin: 0.5rem 0 0 0;
+          padding-left: 1.1rem;
+          color: var(--text);
+        }
+
+        .apple-profile-bullets li {
+          margin-bottom: 0.42rem;
+          line-height: 1.55;
+        }
+
+        .apple-profile-header {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .apple-profile-name {
+          font-size: clamp(2rem, 3.6vw, 2.8rem);
+          line-height: 1.02;
+          letter-spacing: -0.03em;
+          font-weight: 720;
+          margin: 0;
+        }
+
+        .apple-profile-headline {
+          color: var(--muted);
+          font-size: 1.02rem;
+          line-height: 1.7;
+          max-width: 56ch;
+        }
+
+        .apple-profile-pill-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.65rem;
+        }
+
+        .apple-profile-pill {
+          display: inline-flex;
+          align-items: center;
+          padding: 0.52rem 0.88rem;
+          border-radius: 999px;
+          background: #f5f5f7;
+          border: 1px solid var(--line);
+          color: var(--text);
+          font-size: 0.9rem;
+          line-height: 1.2;
+        }
+
+        .apple-profile-summary-box {
+          margin-top: 0.35rem;
+          padding: 1.1rem 1.15rem;
+          border-radius: 20px;
+          background: linear-gradient(180deg, #fafafd 0%, #f7f7fa 100%);
+          border: 1px solid rgba(0, 0, 0, 0.05);
+          color: var(--muted);
+          line-height: 1.75;
+          font-size: 0.98rem;
+        }
+
+        .apple-signal-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.7rem;
+          margin: 0.85rem 0 0.25rem 0;
+        }
+
+        .apple-signal-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.42rem;
+          padding: 0.58rem 0.9rem;
+          border-radius: 999px;
+          border: 1px solid var(--line);
+          background: #ffffff;
+          font-size: 0.88rem;
+          line-height: 1.2;
+        }
+
+        .apple-signal-pill strong {
+          font-weight: 650;
+          color: var(--text);
+        }
+
+        .apple-edit-note {
+          color: var(--muted);
+          font-size: 0.9rem;
+          line-height: 1.6;
+          margin: 0.2rem 0 0.85rem 0;
+        }
+
+        .apple-toolbar-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.8rem;
+          margin: 0.4rem 0 1.2rem 0;
+        }
+
+        .apple-toolbar-card {
+          padding: 1rem 1.1rem;
+          border-radius: 18px;
+          background: linear-gradient(180deg, #fafafd 0%, #f5f5f8 100%);
+          border: 1px solid var(--line);
+        }
+
+        .apple-meta-band {
+          margin-top: 1rem;
+          padding-top: 1rem;
+          border-top: 1px solid var(--line);
+        }
+
+        .apple-quiet-divider {
+          height: 1px;
+          background: var(--line);
+          margin: 1rem 0 0.9rem 0;
+        }
+
         div[data-testid="stVerticalBlock"] div[data-testid="stContainer"] {
           border-radius: 32px;
         }
@@ -609,6 +825,36 @@ def apply_apple_theme() -> None:
           justify-content: space-between;
         }
 
+        div[data-testid="stTabs"] > div:first-child {
+          gap: 0.5rem;
+          padding: 0.35rem;
+          background: #ebecef;
+          border-radius: 999px;
+          width: fit-content;
+          margin-bottom: 1.35rem;
+        }
+
+        button[data-baseweb="tab"] {
+          height: 42px;
+          padding: 0 1rem !important;
+          border-radius: 999px !important;
+          background: transparent !important;
+          color: var(--muted) !important;
+          font-weight: 600 !important;
+          border: 1px solid transparent !important;
+        }
+
+        button[data-baseweb="tab"][aria-selected="true"] {
+          background: #ffffff !important;
+          color: var(--text) !important;
+          border-color: rgba(0,0,0,0.04) !important;
+          box-shadow: var(--shadow-soft);
+        }
+
+        button[data-baseweb="tab"]::after {
+          display: none !important;
+        }
+
         div[data-testid="stFileUploader"] section,
         div[data-testid="stExpander"] details,
         div[data-testid="stForm"],
@@ -617,6 +863,33 @@ def apply_apple_theme() -> None:
         .stTextArea textarea,
         .stMultiSelect > div > div {
           border-radius: 20px !important;
+        }
+
+        div[data-testid="stFileUploader"] section {
+          background: #ffffff !important;
+          border: 1px solid rgba(0,0,0,0.06) !important;
+          padding: 0.65rem !important;
+          box-shadow: none !important;
+        }
+
+        div[data-testid="stFileUploaderDropzone"] {
+          background: #f7f7fa !important;
+          border: 1px dashed rgba(0,0,0,0.12) !important;
+          border-radius: 24px !important;
+          padding: 0.3rem 0.45rem !important;
+        }
+
+        div[data-testid="stFileUploaderDropzone"] * {
+          color: var(--text) !important;
+        }
+
+        div[data-testid="stFileUploaderDropzoneInstructions"] {
+          padding: 0.55rem 0.2rem !important;
+        }
+
+        div[data-testid="stFileUploaderFile"] {
+          background: #f3f4f7 !important;
+          border-radius: 18px !important;
         }
 
         .stTextArea textarea,
@@ -697,6 +970,30 @@ def apply_apple_theme() -> None:
           color: var(--text) !important;
         }
 
+        div[data-testid="stExpander"] details {
+          background: var(--surface) !important;
+          border: 1px solid var(--line) !important;
+          padding: 0.2rem 0.4rem !important;
+        }
+
+        div[data-testid="stExpander"] summary {
+          font-weight: 600 !important;
+          color: var(--text) !important;
+        }
+
+        div[data-testid="stForm"] {
+          border: none !important;
+          padding: 0 !important;
+          background: transparent !important;
+        }
+
+        label[data-testid="stWidgetLabel"] p {
+          color: var(--text) !important;
+          font-size: 0.9rem !important;
+          font-weight: 600 !important;
+          letter-spacing: -0.01em;
+        }
+
         div[data-baseweb="notification"] {
           border-radius: 20px !important;
           border: 1px solid rgba(0,0,0,0.04) !important;
@@ -746,6 +1043,30 @@ def apply_apple_theme() -> None:
 
           .apple-step:hover {
             background: rgba(255,255,255,0.04);
+          }
+
+          .apple-journey-pill {
+            background: rgba(255,255,255,0.04);
+            border-color: rgba(255,255,255,0.08);
+          }
+
+          .apple-summary-grid,
+          .apple-readiness-card,
+          .apple-stat-card,
+          .apple-profile-summary-box,
+          .apple-signal-pill,
+          .apple-toolbar-card {
+            background: var(--surface-muted);
+            border-color: var(--line);
+          }
+
+          div[data-testid="stTabs"] > div:first-child {
+            background: #23242a;
+          }
+
+          button[data-baseweb="tab"][aria-selected="true"] {
+            background: #34353c !important;
+            border-color: rgba(255,255,255,0.06) !important;
           }
 
           .apple-chip,
@@ -860,6 +1181,16 @@ def apply_apple_theme() -> None:
             overflow-x: auto;
           }
 
+          .apple-journey-strip {
+            grid-template-columns: 1fr;
+            margin-top: -0.4rem;
+          }
+
+          div[data-testid="stTabs"] > div:first-child {
+            width: 100%;
+            overflow-x: auto;
+          }
+
           .apple-landing-grid {
             grid-template-columns: 1fr;
           }
@@ -967,15 +1298,138 @@ def render_progress_stepper(current_key: str) -> None:
     st.markdown(f'<div class="apple-stepper">{"".join(steps_html)}</div>', unsafe_allow_html=True)
 
 
-def render_screen_intro(step_key: str, eyebrow: str, title: str, subtitle: str) -> None:
+def _build_journey_status_line(step_key: str) -> str:
+    """Summarize where the user is in the guided workflow."""
+    canonical_key = FLOW_STEP_ALIASES.get(step_key, step_key)
+    has_resume = bool(st.session_state.resume_name)
+    has_jd = bool(st.session_state.job_description.strip())
+    has_profile_selection = bool(st.session_state.get("selected_profile_item_ids"))
+    has_fit_report = bool(st.session_state.resume_fit_report)
+    has_validated_output = bool(st.session_state.validated_payload)
+
+    if canonical_key == "input":
+        parts = [
+            "Resume loaded" if has_resume else "Resume not loaded yet",
+            "Job description ready" if has_jd else "Add a target job",
+        ]
+        return " · ".join(parts)
+    if canonical_key == "mode":
+        parts = [
+            "Fit checked" if has_fit_report else "Fit check optional",
+            "Profile evidence linked" if has_profile_selection else "No profile evidence selected",
+        ]
+        return " · ".join(parts)
+    if canonical_key == "review":
+        return "Validated output ready for review" if has_validated_output else "Waiting for structured output"
+    if canonical_key == "complete":
+        return "Download the strongest finished version and save it for reuse."
+    return ""
+
+
+def _build_journey_panel(step_key: str) -> str:
+    """Render a compact completed/current/next summary beneath the stepper."""
+    canonical_key = FLOW_STEP_ALIASES.get(step_key, step_key)
+
+    has_resume = bool(st.session_state.resume_name)
+    has_jd = bool(st.session_state.job_description.strip())
+    has_profile_selection = bool(st.session_state.get("selected_profile_item_ids"))
+    has_fit_report = bool(st.session_state.resume_fit_report)
+    has_validated_output = bool(st.session_state.validated_payload)
+    has_download = bool(st.session_state.output_docx_bytes or st.session_state.builder_output_docx_bytes)
+
+    if _is_builder_flow_screen(st.session_state.screen):
+        completed = []
+        if st.session_state.builder_full_name.strip():
+            completed.append("Builder basics captured")
+        if st.session_state.builder_prompt:
+            completed.append("Draft prompt prepared")
+        if st.session_state.builder_payload:
+            completed.append("Structured draft validated")
+        completed_text = " · ".join(completed) if completed else "No completed milestones yet"
+
+        if canonical_key == "input":
+            current_focus = "Capture the core background that should shape the first draft."
+            next_step = "Generate the builder prompt and choose how you want to run it."
+        elif canonical_key == "mode":
+            current_focus = "Choose manual copy-paste or API generation for the first draft."
+            next_step = "Bring back the structured draft so you can review and save it."
+        elif canonical_key == "review":
+            current_focus = "Review the draft structure, save strong signals to profile, and generate the first .docx."
+            next_step = "Download the resume or keep the profile memory for future applications."
+        else:
+            current_focus = "Start the builder flow from profile or quick-start inputs."
+            next_step = "Move into the first draft workflow."
+    else:
+        completed = []
+        if has_resume:
+            completed.append("Resume loaded")
+        if has_jd:
+            completed.append("Job description cleaned")
+        if has_fit_report:
+            completed.append("Fit report ready")
+        if has_profile_selection:
+            completed.append("Profile evidence linked")
+        if has_validated_output:
+            completed.append("Structured output validated")
+        if has_download:
+            completed.append("Export ready")
+        completed_text = " · ".join(completed) if completed else "No completed milestones yet"
+
+        if canonical_key == "input":
+            current_focus = "Add the resume and target job so the app can understand the opportunity."
+            next_step = "Check fit, connect profile evidence if needed, then choose how to run the optimization."
+        elif canonical_key == "mode":
+            current_focus = "Choose the best run path for this role: manual, API, or profile-assisted drafting."
+            next_step = "Generate or validate the structured output so you can review changes."
+        elif canonical_key == "review":
+            current_focus = "Review quality, check the fit improvement, and decide whether the result is strong enough to export."
+            next_step = "Download the best version and save it into your reusable workspace."
+        elif canonical_key == "complete":
+            current_focus = "Reuse, download, or carry this version into the next application."
+            next_step = "Return to the workspace to start the next target faster."
+        else:
+            current_focus = "Choose how you want to start the next application."
+            next_step = "Move into upload or profile setup."
+
+    return f"""
+    <div class="apple-journey-strip">
+      <div class="apple-journey-pill">
+        <div class="apple-journey-label">Completed</div>
+        <div class="apple-journey-value">{completed_text}</div>
+      </div>
+      <div class="apple-journey-pill">
+        <div class="apple-journey-label">Current Focus</div>
+        <div class="apple-journey-value">{current_focus}</div>
+      </div>
+      <div class="apple-journey-pill">
+        <div class="apple-journey-label">Next Step</div>
+        <div class="apple-journey-value">{next_step}</div>
+      </div>
+    </div>
+    """
+
+
+def render_screen_intro(
+    step_key: str,
+    eyebrow: str,
+    title: str,
+    subtitle: str,
+    *,
+    show_journey: bool = True,
+    show_status_line: bool = True,
+) -> None:
     """Render a calm screen header with progress."""
     render_progress_stepper(step_key)
+    if show_journey:
+        st.markdown(_build_journey_panel(step_key), unsafe_allow_html=True)
+    journey_line = _build_journey_status_line(step_key)
     st.markdown(
         f"""
         <div class="apple-hero">
           <div class="apple-eyebrow">{eyebrow}</div>
           <div class="apple-page-title">{title}</div>
           <p class="apple-subtitle">{subtitle}</p>
+          {f'<div class="apple-minor-copy" style="margin-top:0.85rem;">{journey_line}</div>' if (journey_line and show_status_line) else ''}
         </div>
         """,
         unsafe_allow_html=True,
@@ -1260,6 +1714,9 @@ def init_session_state() -> None:
         "builder_validation_summary": None,
         "builder_output_docx_bytes": None,
         "builder_output_filename": None,
+        "builder_profile_saved": False,
+        "builder_profile_saved_source_id": None,
+        "builder_profile_save_dismissed": False,
         "jd_source_url": "",
         "jd_cleaning_result": None,
         "show_review_changes": False,
@@ -1269,6 +1726,12 @@ def init_session_state() -> None:
         "custom_api_model": "mistral",
         "custom_api_key": "",
         "profile_import_notes": "",
+        "profile_import_personal": "",
+        "profile_import_experience": "",
+        "profile_import_education": "",
+        "profile_import_projects": "",
+        "profile_import_skills": "",
+        "profile_import_additional": "",
         "profile_import_source_name": "",
         "profile_extracted_basics": {},
         "profile_extracted_items": [],
@@ -1277,6 +1740,7 @@ def init_session_state() -> None:
         "use_career_profile": False,
         "selected_profile_item_ids": [],
         "profile_job_signals": {},
+        "last_saved_resume_asset_id": None,
         "current_application_id": None,
         "current_application_company": "",
         "resume_fit_report": None,
@@ -1299,8 +1763,11 @@ def reset_flow() -> None:
 
 def save_uploaded_resume(uploaded_file) -> None:
     """Store uploaded resume data and extracted plain text in session state."""
-    resume_bytes = uploaded_file.getvalue()
+    _load_resume_bytes_into_session(uploaded_file.getvalue(), uploaded_file.name)
 
+
+def _load_resume_bytes_into_session(resume_bytes: bytes, resume_name: str) -> None:
+    """Hydrate resume bytes into the same session fields used by uploaded resumes."""
     with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_file:
         temp_file.write(resume_bytes)
         temp_path = temp_file.name
@@ -1310,7 +1777,7 @@ def save_uploaded_resume(uploaded_file) -> None:
     finally:
         Path(temp_path).unlink(missing_ok=True)
 
-    st.session_state.resume_name = uploaded_file.name
+    st.session_state.resume_name = resume_name
     st.session_state.resume_bytes = resume_bytes
     st.session_state.resume_text = resume_text
     st.session_state.resume_paragraphs = [
@@ -1318,6 +1785,45 @@ def save_uploaded_resume(uploaded_file) -> None:
         for paragraph in resume_text.splitlines()
         if paragraph.strip()
     ]
+
+
+def _load_resume_asset_into_session(asset) -> None:
+    """Use a saved resume asset as the base document for a new optimization run."""
+    _load_resume_bytes_into_session(asset.file_bytes, asset.file_name)
+
+    if asset.application_id:
+        _load_application_into_session(asset.application_id)
+    else:
+        st.session_state.current_application_id = None
+        st.session_state.current_application_company = asset.company or ""
+        st.session_state.job_description = ""
+        st.session_state.pending_job_description_input = ""
+        st.session_state.jd_source_url = ""
+        st.session_state.jd_cleaning_result = None
+        st.session_state.jd_role_hint = ""
+        st.session_state.target_industry = ""
+        st.session_state.selected_profile_item_ids = []
+        st.session_state.use_career_profile = False
+        st.session_state.target_role = asset.target_role or ""
+
+    # Clear stale execution state so the next run starts cleanly from this resume.
+    st.session_state.generated_prompt = None
+    st.session_state.api_prompt_customized = False
+    st.session_state.api_prompt_override = ""
+    st.session_state.validated_payload = None
+    st.session_state.validation_summary = None
+    st.session_state.output_docx_bytes = None
+    st.session_state.output_filename = None
+    st.session_state.last_error = None
+    st.session_state.review_details = None
+    st.session_state.show_review_changes = False
+    st.session_state.resume_fit_report = None
+    st.session_state.baseline_fit_report = None
+    st.session_state.optimized_fit_report = None
+    st.session_state.builder_payload = None
+    st.session_state.builder_validation_summary = None
+    st.session_state.builder_output_docx_bytes = None
+    st.session_state.builder_output_filename = None
 
 
 def analyze_payload(payload: dict) -> dict:
@@ -1385,15 +1891,72 @@ def ensure_export_file_ready() -> None:
 
 
 def render_landing() -> None:
-    """Landing page."""
+    """First-touch onboarding entry screen."""
     render_shell_start()
     st.markdown(
         """
         <div class="apple-hero-panel">
           <div class="apple-hero">
             <div class="apple-eyebrow">Resume Optimizer</div>
-            <h1>Make resume tailoring feel beautifully simple.</h1>
-            <p>Start with your draft, aim it at the role you want, and move through a guided flow that feels calm, clear, and polished from start to download.</p>
+            <h1>Start with your career profile, or jump straight into the work.</h1>
+            <p>Build a reusable profile that powers future applications, or jump straight to resume building if you want immediate value first.</p>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col1, col2 = st.columns(2, gap="large")
+    with col1:
+        st.markdown(
+            """
+            <div class="apple-landing-card featured">
+              <div>
+                <div class="apple-kicker">Recommended</div>
+                <div class="apple-landing-card-title">Build Career Profile</div>
+                <div class="apple-landing-card-copy">Create your reusable source of truth once, then use it to tailor resumes, generate fresh drafts, and guide future applications.</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="apple-landing-actions apple-primary">', unsafe_allow_html=True)
+        if st.button("Build Career Profile", use_container_width=True, key="landing-profile-primary"):
+            st.session_state.screen = "profile_welcome"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(
+            """
+            <div class="apple-landing-card">
+              <div>
+                <div class="apple-kicker">Quick Start</div>
+                <div class="apple-landing-card-title">Jump Straight to Resume Building</div>
+                <div class="apple-landing-card-copy">Go directly to the resume tools. You can optimize an existing resume or build a fresh one, then decide later what should be saved into your profile.</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="apple-landing-actions apple-secondary">', unsafe_allow_html=True)
+        if st.button("Jump Straight to Resume Building", use_container_width=True, key="landing-skip"):
+            st.session_state.screen = "quickstart"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    render_shell_end()
+
+
+def render_quickstart_screen() -> None:
+    """Secondary entry screen for users who skip profile onboarding."""
+    render_shell_start()
+    st.markdown(
+        """
+        <div class="apple-hero-panel">
+          <div class="apple-hero">
+            <div class="apple-eyebrow">Quick Start</div>
+            <h1>Choose the fastest way to get moving.</h1>
+            <p>Jump into editing the resume you already have, or build a fresh resume now and decide later whether to save that information into your profile.</p>
           </div>
         </div>
         """,
@@ -1407,7 +1970,7 @@ def render_landing() -> None:
             <div class="apple-landing-card featured">
               <div>
                 <div class="apple-kicker">Most Popular</div>
-                <div class="apple-landing-card-title">Optimize an existing resume</div>
+                <div class="apple-landing-card-title">Optimize Existing Resume</div>
                 <div class="apple-landing-card-copy">Refine the resume you already have for a specific role, then review the final changes before you export it.</div>
               </div>
             </div>
@@ -1415,7 +1978,7 @@ def render_landing() -> None:
             unsafe_allow_html=True,
         )
         st.markdown('<div class="apple-landing-actions apple-primary">', unsafe_allow_html=True)
-        if st.button("Start Optimizing", use_container_width=True, key="landing-optimize"):
+        if st.button("Start Optimizing", use_container_width=True, key="quickstart-optimize"):
             st.session_state.screen = "input"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
@@ -1425,26 +1988,26 @@ def render_landing() -> None:
             """
             <div class="apple-landing-card">
               <div>
-                <div class="apple-kicker">Builder Path</div>
-                <div class="apple-landing-card-title">Build your first resume</div>
-                <div class="apple-landing-card-copy">Start with a plain-English brain dump and shape it into a clean first draft with more guidance built in.</div>
+                <div class="apple-kicker">Fresh Build</div>
+                <div class="apple-landing-card-title">Build a Fresh Resume</div>
+                <div class="apple-landing-card-copy">Start with a plain-English brain dump and shape it into a clean draft. You’ll be able to save what you enter into your profile later.</div>
               </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
         st.markdown('<div class="apple-landing-actions apple-secondary">', unsafe_allow_html=True)
-        if st.button("Build First Resume", use_container_width=True, key="landing-builder"):
+        if st.button("Build a Fresh Resume", use_container_width=True, key="quickstart-builder"):
             st.session_state.career_stage = "Student"
             st.session_state.screen = "builder_input"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    profile_col_left, profile_col_center, profile_col_right = st.columns([1.2, 1.6, 1.2])
-    with profile_col_center:
+    back_col, _, _ = st.columns([1, 1.5, 1.5])
+    with back_col:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("Build Career Profile", use_container_width=True, key="landing-profile"):
-            st.session_state.screen = "profile_welcome"
+        if st.button("Back", use_container_width=True, key="quickstart-back"):
+            st.session_state.screen = "landing"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
     render_shell_end()
@@ -1465,6 +2028,267 @@ def _split_line_input(value: str) -> list[str]:
     return [line.strip() for line in value.splitlines() if line.strip()]
 
 
+def _build_profile_review_preview(item: ProfileItem) -> tuple[str, str]:
+    """Return a compact subtitle and preview line for section preview cards."""
+    subtitle_parts = [item.item_type.title()]
+    if item.organization:
+        subtitle_parts.append(item.organization)
+    if item.location:
+        subtitle_parts.append(item.location)
+    if item.start_date or item.end_date:
+        if item.start_date and item.end_date:
+            subtitle_parts.append(f"{item.start_date} - {item.end_date}")
+        elif item.start_date:
+            subtitle_parts.append(item.start_date)
+        elif item.end_date:
+            subtitle_parts.append(item.end_date)
+    elif item.is_current:
+        subtitle_parts.append("Current")
+    subtitle = " | ".join(subtitle_parts)
+
+    if item.item_type == "skills":
+        preview_source = ", ".join(item.skills[:6] or item.keywords[:6])
+    elif item.bullets:
+        preview_source = item.bullets[0]
+    else:
+        preview_source = item.description or item.organization or "Review this item before saving."
+    return subtitle, format_preview_text(preview_source, max_len=120)
+
+
+def render_profile_preview_cards(items: list[ProfileItem], max_cards: int = 3) -> None:
+    """Render compact preview cards for extracted profile items."""
+    if not items:
+        return
+    preview_items = items[:max_cards]
+    columns = st.columns(len(preview_items), gap="large")
+    for column, item in zip(columns, preview_items):
+        subtitle, preview = _build_profile_review_preview(item)
+        with column:
+            with st.container(border=True):
+                st.markdown(
+                    f'<div class="apple-kicker" style="margin-bottom:0.55rem;">{subtitle}</div>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="apple-section-title" style="font-size:1.1rem; margin-bottom:0.5rem;">{item.title or "Untitled item"}</div>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="apple-minor-copy">{preview}</div>',
+                    unsafe_allow_html=True,
+                )
+
+
+def _save_profile_review_result(
+    *,
+    basics_snapshot: dict,
+    drafted_items: list[ProfileItem],
+    full_name: str,
+    email: str,
+    phone: str,
+    location: str,
+    linkedin: str,
+    headline: str,
+    career_stage: str,
+    summary: str,
+    target_roles: str,
+    target_industries: str,
+    preferred_locations: str,
+    work_authorization: str,
+) -> list[ProfileItem]:
+    """Persist reviewed profile basics, source, and items from the import-review flow."""
+    profile = save_profile_basics(
+        full_name=full_name,
+        email=email,
+        phone=phone,
+        location=location,
+        linkedin=linkedin,
+        headline=headline,
+        career_stage=career_stage,
+        summary=summary,
+        target_roles=[part.strip() for part in target_roles.split(",")],
+        target_industries=[part.strip() for part in target_industries.split(",")],
+        preferred_locations=[part.strip() for part in preferred_locations.split(",")],
+        work_authorization=work_authorization,
+    )
+    source_name = st.session_state.profile_import_source_name or "Imported Notes"
+    source_type = _detect_profile_source_type(source_name)
+    source_id = save_profile_source(
+        source_type=source_type,
+        source_name=source_name,
+        raw_text=st.session_state.get("profile_last_source_raw_text", ""),
+        parsed_payload={"basics": basics_snapshot, "item_count": len(drafted_items)},
+    )
+    for item in drafted_items:
+        item.profile_id = profile.id
+        item.source_id = source_id
+        item.verification_status = "verified"
+    saved_items = save_profile_items(drafted_items, replace_existing_for_source=source_id)
+    st.session_state.career_stage = career_stage
+    if target_roles.strip():
+        st.session_state.target_role = target_roles.split(",")[0].strip()
+    if target_industries.strip():
+        st.session_state.target_industry = target_industries.split(",")[0].strip()
+    st.session_state.profile_last_source_id = source_id
+    st.session_state.profile_extracted_items = [item.to_dict() for item in saved_items]
+    return saved_items
+
+
+def _save_builder_payload_to_profile(payload: dict) -> int:
+    """Promote a validated fresh-resume draft into the persistent career profile."""
+    basics = payload.get("basics", {}) or {}
+    profile = create_or_get_profile()
+
+    full_name = (basics.get("full_name") or st.session_state.builder_full_name or profile.full_name).strip()
+    email = (basics.get("email") or profile.email).strip()
+    phone = (basics.get("phone") or profile.phone).strip()
+    location = (basics.get("location") or profile.location).strip()
+    linkedin = (basics.get("linkedin") or profile.linkedin).strip()
+
+    summary = (payload.get("summary") or profile.summary).strip()
+    target_roles = _split_csv_input(st.session_state.target_role) or profile.target_roles
+    target_industries = profile.target_industries
+    preferred_locations = profile.preferred_locations or ([location] if location else [])
+
+    updated_profile = save_profile_basics(
+        full_name=full_name,
+        email=email,
+        phone=phone,
+        location=location,
+        linkedin=linkedin,
+        headline=profile.headline,
+        career_stage=st.session_state.career_stage or profile.career_stage,
+        summary=summary,
+        target_roles=target_roles,
+        target_industries=target_industries,
+        preferred_locations=preferred_locations,
+        work_authorization=profile.work_authorization,
+    )
+
+    source_payload = {
+        "mode": "fresh_resume_builder",
+        "target_role": st.session_state.target_role,
+        "career_stage": st.session_state.career_stage,
+        "payload": payload,
+    }
+    source_id = save_profile_source(
+        source_type="fresh_resume_builder",
+        source_name=f"Fresh Resume Draft · {full_name or 'Candidate'}",
+        raw_text="\n\n".join(
+            part
+            for part in [
+                st.session_state.builder_contact_info.strip(),
+                st.session_state.builder_education.strip(),
+                st.session_state.builder_experience_dump.strip(),
+                st.session_state.builder_activities.strip(),
+                st.session_state.builder_skills.strip(),
+                st.session_state.builder_job_description.strip(),
+            ]
+            if part
+        ),
+        parsed_payload=source_payload,
+    )
+
+    items: list[ProfileItem] = []
+    for education_item in payload.get("education", []):
+        degree_parts = [education_item.get("degree", "").strip(), education_item.get("graduation_date", "").strip()]
+        education_summary = " | ".join(part for part in degree_parts if part)
+        items.append(
+            ProfileItem(
+                profile_id=updated_profile.id,
+                source_id=source_id,
+                item_type="education",
+                title=(education_item.get("school") or "").strip(),
+                organization=(education_item.get("school") or "").strip(),
+                description=education_summary,
+                bullets=[detail.strip() for detail in education_item.get("details", []) if detail.strip()],
+                keywords=_split_csv_input(" ".join(degree_parts + education_item.get("details", [])))[:12],
+                verification_status="verified",
+            )
+        )
+
+    for experience_item in payload.get("experience", []):
+        items.append(
+            ProfileItem(
+                profile_id=updated_profile.id,
+                source_id=source_id,
+                item_type="experience",
+                title=(experience_item.get("title") or "").strip(),
+                organization=(experience_item.get("organization") or "").strip(),
+                location=(experience_item.get("location") or "").strip(),
+                description=(experience_item.get("dates") or "").strip(),
+                bullets=[bullet.strip() for bullet in experience_item.get("bullets", []) if bullet.strip()],
+                keywords=_split_csv_input(
+                    ", ".join(
+                        part
+                        for part in [
+                            experience_item.get("title", ""),
+                            experience_item.get("organization", ""),
+                            experience_item.get("location", ""),
+                        ]
+                        if part
+                    )
+                )[:12],
+                verification_status="verified",
+            )
+        )
+
+    for project_item in payload.get("projects", []):
+        items.append(
+            ProfileItem(
+                profile_id=updated_profile.id,
+                source_id=source_id,
+                item_type="project",
+                title=(project_item.get("name") or "").strip(),
+                description="Project or leadership experience captured from the fresh resume flow.",
+                bullets=[detail.strip() for detail in project_item.get("details", []) if detail.strip()],
+                keywords=_split_csv_input(", ".join(project_item.get("details", [])))[:12],
+                verification_status="verified",
+            )
+        )
+
+    skills = [skill.strip() for skill in payload.get("skills", []) if skill.strip()]
+    if skills:
+        items.append(
+            ProfileItem(
+                profile_id=updated_profile.id,
+                source_id=source_id,
+                item_type="skills",
+                title="Core Skills",
+                description="Skill bank captured from a validated fresh resume draft.",
+                skills=skills,
+                keywords=skills[:12],
+                verification_status="verified",
+            )
+        )
+
+    save_profile_items(items, replace_existing_for_source=source_id)
+    st.session_state.builder_profile_saved = True
+    st.session_state.builder_profile_saved_source_id = source_id
+    st.session_state.builder_profile_save_dismissed = False
+    return source_id
+
+
+def _build_builder_profile_memory_rows(payload: dict, stats: dict) -> list[tuple[str, str]]:
+    """Summarize what will be preserved if the user saves this draft to profile."""
+    basics = payload.get("basics", {}) or {}
+    contact_fields = [
+        basics.get("full_name", "").strip(),
+        basics.get("email", "").strip(),
+        basics.get("phone", "").strip(),
+        basics.get("location", "").strip(),
+        basics.get("linkedin", "").strip(),
+    ]
+    captured_basics = sum(1 for value in contact_fields if value)
+    return [
+        ("Basics captured", f"{captured_basics}/5"),
+        ("Education", str(stats.get("education_items", 0))),
+        ("Experience", str(stats.get("experience_items", 0))),
+        ("Projects", str(stats.get("project_items", 0))),
+        ("Skills", str(stats.get("skills_items", 0))),
+    ]
+
+
 def _get_selected_profile_items() -> list[ProfileItem]:
     """Resolve selected profile item ids from session state."""
     selected_ids = set(st.session_state.get("selected_profile_item_ids", []))
@@ -1472,6 +2296,215 @@ def _get_selected_profile_items() -> list[ProfileItem]:
         return []
     items_by_id = {item.id: item for item in list_profile_items() if item.visibility == "active"}
     return [items_by_id[item_id] for item_id in st.session_state.get("selected_profile_item_ids", []) if item_id in items_by_id]
+
+
+def _profile_item_meta_line(item: ProfileItem) -> str:
+    """Build a compact metadata line for profile display cards."""
+    parts: list[str] = []
+    if item.organization:
+        parts.append(item.organization)
+    if item.location:
+        parts.append(item.location)
+    if item.start_date and item.end_date:
+        parts.append(f"{item.start_date} - {item.end_date}")
+    elif item.start_date:
+        parts.append(item.start_date)
+    elif item.end_date:
+        parts.append(item.end_date)
+    elif item.is_current:
+        parts.append("Current")
+    return " · ".join(part for part in parts if part)
+
+
+def _render_profile_display_cards(
+    items: list[ProfileItem],
+    *,
+    empty_message: str,
+    item_label: str,
+    key_prefix: str,
+) -> None:
+    """Render clean, readable profile cards with optional editing expanders."""
+    if not items:
+        st.markdown(f'<div class="apple-minor-copy">{empty_message}</div>', unsafe_allow_html=True)
+        return
+
+    for item in items:
+        with st.container(border=True):
+            meta_line = _profile_item_meta_line(item)
+            if meta_line:
+                st.markdown(f'<div class="apple-kicker">{meta_line}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="apple-section-title">{item.title or f"Untitled {item_label}"}</div>', unsafe_allow_html=True)
+            if item.description:
+                st.markdown(f'<div class="apple-section-copy">{item.description}</div>', unsafe_allow_html=True)
+            if item.skills:
+                render_chip_row(item.skills[:12])
+            elif item.bullets:
+                preview_bullets = item.bullets[:4]
+                for bullet in preview_bullets:
+                    st.markdown(f"- {bullet}")
+
+            with st.expander("Quick edit", expanded=False):
+                st.markdown('<div class="apple-edit-note">Make small corrections here without leaving the main profile view.</div>', unsafe_allow_html=True)
+                with st.form(key=f"{key_prefix}-{item.id}"):
+                    col1, col2 = st.columns(2, gap="large")
+                    with col1:
+                        edited_type = st.selectbox(
+                            "Type",
+                            PROFILE_ITEM_TYPES,
+                            index=PROFILE_ITEM_TYPES.index(item.item_type) if item.item_type in PROFILE_ITEM_TYPES else 0,
+                            key=f"{key_prefix}-type-{item.id}",
+                        )
+                        edited_title = st.text_input("Title", value=item.title, key=f"{key_prefix}-title-{item.id}")
+                    with col2:
+                        edited_org = st.text_input("Organization", value=item.organization, key=f"{key_prefix}-org-{item.id}")
+                        edited_location = st.text_input("Location", value=item.location, key=f"{key_prefix}-location-{item.id}")
+                    edited_description = st.text_area("Summary", value=item.description, height=100, key=f"{key_prefix}-desc-{item.id}")
+                    edited_bullets = st.text_area("Details / Bullets", value="\n".join(item.bullets), height=140, key=f"{key_prefix}-bullets-{item.id}")
+                    edited_skills = st.text_input("Skills", value=", ".join(item.skills or item.keywords), key=f"{key_prefix}-skills-{item.id}")
+                    row1, row2, row3 = st.columns(3, gap="large")
+                    with row1:
+                        save_pressed = st.form_submit_button("Save changes", use_container_width=True)
+                    with row2:
+                        verify_pressed = st.form_submit_button("Mark reviewed", use_container_width=True)
+                    with row3:
+                        archive_pressed = st.form_submit_button("Hide", use_container_width=True)
+                if save_pressed or verify_pressed:
+                    update_profile_item(
+                        ProfileItem(
+                            id=item.id,
+                            user_id=item.user_id,
+                            profile_id=item.profile_id,
+                            source_id=item.source_id,
+                            item_type=edited_type,
+                            title=edited_title.strip(),
+                            organization=edited_org.strip(),
+                            location=edited_location.strip(),
+                            start_date=item.start_date,
+                            end_date=item.end_date,
+                            is_current=item.is_current,
+                            description=edited_description.strip(),
+                            bullets=_split_line_input(edited_bullets),
+                            skills=_split_csv_input(edited_skills),
+                            keywords=_split_csv_input(edited_skills)[:12] or item.keywords,
+                            confidence_score=item.confidence_score,
+                            verification_status="verified" if verify_pressed else item.verification_status,
+                            visibility=item.visibility,
+                            created_at=item.created_at,
+                            updated_at=item.updated_at,
+                        )
+                    )
+                    if verify_pressed and item.id is not None:
+                        update_profile_item_verification(item.id, "verified")
+                    st.rerun()
+                if archive_pressed and item.id is not None:
+                    archive_profile_item(item.id)
+                    st.rerun()
+
+
+def _render_profile_timeline_section(
+    items: list[ProfileItem],
+    *,
+    empty_message: str,
+    item_label: str,
+    key_prefix: str,
+) -> None:
+    """Render a timeline-style profile section closer to editorial profile products."""
+    if not items:
+        st.markdown(f'<div class="apple-minor-copy">{empty_message}</div>', unsafe_allow_html=True)
+        return
+
+    st.markdown('<div class="apple-profile-timeline">', unsafe_allow_html=True)
+    for item in items:
+        date_line = ""
+        if item.start_date and item.end_date:
+            date_line = f"{item.start_date} to {item.end_date}"
+        elif item.start_date:
+            date_line = item.start_date
+        elif item.end_date:
+            date_line = item.end_date
+        elif item.is_current:
+            date_line = "Current"
+
+        meta_line = " · ".join(part for part in [item.organization, item.location] if part)
+
+        st.markdown('<div class="apple-profile-timeline-item">', unsafe_allow_html=True)
+        st.markdown('<div class="apple-profile-timeline-dot"></div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            if date_line:
+                st.markdown(f'<div class="apple-profile-date">{date_line}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="apple-section-title">{item.title or f"Untitled {item_label}"}</div>', unsafe_allow_html=True)
+            if meta_line:
+                st.markdown(f'<div class="apple-profile-meta">{meta_line}</div>', unsafe_allow_html=True)
+            if item.description:
+                st.markdown(f'<div class="apple-section-copy">{item.description}</div>', unsafe_allow_html=True)
+            if item.bullets:
+                bullet_items = "".join(f"<li>{html.escape(bullet)}</li>" for bullet in item.bullets[:4] if bullet.strip())
+                if bullet_items:
+                    st.markdown(f'<ul class="apple-profile-bullets">{bullet_items}</ul>', unsafe_allow_html=True)
+            if item.skills:
+                render_chip_row(item.skills[:10])
+
+            with st.expander("Quick edit", expanded=False):
+                st.markdown('<div class="apple-edit-note">Adjust dates, wording, or supporting bullets without breaking the clean timeline view.</div>', unsafe_allow_html=True)
+                with st.form(key=f"{key_prefix}-{item.id}"):
+                    col1, col2 = st.columns(2, gap="large")
+                    with col1:
+                        edited_type = st.selectbox(
+                            "Type",
+                            PROFILE_ITEM_TYPES,
+                            index=PROFILE_ITEM_TYPES.index(item.item_type) if item.item_type in PROFILE_ITEM_TYPES else 0,
+                            key=f"{key_prefix}-type-{item.id}",
+                        )
+                        edited_title = st.text_input("Title", value=item.title, key=f"{key_prefix}-title-{item.id}")
+                        edited_start_date = st.text_input("Start Date", value=item.start_date, key=f"{key_prefix}-start-{item.id}")
+                    with col2:
+                        edited_org = st.text_input("Organization", value=item.organization, key=f"{key_prefix}-org-{item.id}")
+                        edited_location = st.text_input("Location", value=item.location, key=f"{key_prefix}-location-{item.id}")
+                        edited_end_date = st.text_input("End Date", value=item.end_date, key=f"{key_prefix}-end-{item.id}")
+                    edited_is_current = st.checkbox("This is current / ongoing", value=item.is_current, key=f"{key_prefix}-current-{item.id}")
+                    edited_description = st.text_area("Summary", value=item.description, height=100, key=f"{key_prefix}-desc-{item.id}")
+                    edited_bullets = st.text_area("Details / Bullets", value="\n".join(item.bullets), height=140, key=f"{key_prefix}-bullets-{item.id}")
+                    edited_skills = st.text_input("Skills", value=", ".join(item.skills or item.keywords), key=f"{key_prefix}-skills-{item.id}")
+                    row1, row2, row3 = st.columns(3, gap="large")
+                    with row1:
+                        save_pressed = st.form_submit_button("Save changes", use_container_width=True)
+                    with row2:
+                        verify_pressed = st.form_submit_button("Mark reviewed", use_container_width=True)
+                    with row3:
+                        archive_pressed = st.form_submit_button("Hide", use_container_width=True)
+                if save_pressed or verify_pressed:
+                    update_profile_item(
+                        ProfileItem(
+                            id=item.id,
+                            user_id=item.user_id,
+                            profile_id=item.profile_id,
+                            source_id=item.source_id,
+                            item_type=edited_type,
+                            title=edited_title.strip(),
+                            organization=edited_org.strip(),
+                            location=edited_location.strip(),
+                            start_date=edited_start_date.strip(),
+                            end_date=edited_end_date.strip(),
+                            is_current=edited_is_current,
+                            description=edited_description.strip(),
+                            bullets=_split_line_input(edited_bullets),
+                            skills=_split_csv_input(edited_skills),
+                            keywords=_split_csv_input(edited_skills)[:12] or item.keywords,
+                            confidence_score=item.confidence_score,
+                            verification_status="verified" if verify_pressed else item.verification_status,
+                            visibility=item.visibility,
+                            created_at=item.created_at,
+                            updated_at=item.updated_at,
+                        )
+                    )
+                    if verify_pressed and item.id is not None:
+                        update_profile_item_verification(item.id, "verified")
+                    st.rerun()
+                if archive_pressed and item.id is not None:
+                    archive_profile_item(item.id)
+                    st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def _build_profile_context(items: list[ProfileItem]) -> str:
@@ -1651,6 +2684,172 @@ def _save_current_application(status: str = "matched") -> int:
     return application.id or 0
 
 
+def _infer_resume_category(target_role: str, target_industry: str) -> str:
+    """Infer a lightweight category for saved resume assets."""
+    if target_role.strip():
+        return target_role.strip()
+    if target_industry.strip():
+        return target_industry.strip()
+    return "general"
+
+
+def _infer_workspace_tags(*values: str) -> list[str]:
+    """Infer richer, human-readable tags from role/category text."""
+    text = " ".join(value.strip().lower() for value in values if value).strip()
+    if not text:
+        return []
+
+    tag_rules = [
+        ("Internship", ["intern", "internship"]),
+        ("Full-time", ["full time", "full-time"]),
+        ("MBA", ["mba", "master of business administration"]),
+        ("Early Career", ["student", "entry", "early career", "new grad", "graduate"]),
+        ("Leadership", ["manager", "lead", "director", "head of"]),
+        ("Consulting", ["consult", "strategy"]),
+        ("Operations", ["operations", "supply chain", "logistics", "procurement"]),
+        ("Finance", ["finance", "fp&a", "financial", "accounting"]),
+        ("Marketing", ["marketing", "growth", "brand"]),
+        ("Product", ["product manager", "product management"]),
+        ("Software", ["software", "engineer", "developer", "data scientist"]),
+        ("Pivot", ["transition", "pivot", "career change"]),
+    ]
+    tags: list[str] = []
+    for tag, needles in tag_rules:
+        if any(needle in text for needle in needles):
+            tags.append(tag)
+    return tags[:4]
+
+
+def _derive_resume_asset_tags(asset) -> list[str]:
+    """Create lightweight reusable tags for library display."""
+    tags: list[str] = []
+    if asset.source_kind:
+        tags.append(asset.source_kind.replace("_", " ").title())
+    if asset.category and asset.category.lower() not in {tag.lower() for tag in tags}:
+        tags.append(asset.category)
+    if asset.company:
+        tags.append(asset.company)
+    role = asset.target_role.lower()
+    if "intern" in role:
+        tags.append("Internship")
+    elif any(token in role for token in ["manager", "lead", "director"]):
+        tags.append("Leadership")
+    elif role:
+        tags.append("Role-specific")
+    for inferred_tag in _infer_workspace_tags(asset.target_role, asset.category, asset.notes):
+        if inferred_tag.lower() not in {tag.lower() for tag in tags}:
+            tags.append(inferred_tag)
+    return tags[:5]
+
+
+def _asset_reuse_copy(asset) -> str:
+    """Explain when a saved resume is most useful to reuse."""
+    role = asset.target_role.strip()
+    company = asset.company.strip()
+    category = asset.category.strip()
+    source = asset.source_kind.replace("_", " ").title()
+
+    if role and company:
+        return f"Best reused when you want a fast restart for a {role} application at {company}."
+    if role:
+        return f"Best reused when you want a head start for another {role} opportunity."
+    if category:
+        return f"Best reused when you need a version tailored to {category} roles."
+    return f"Best reused when you want to revisit a previously saved {source.lower()} version."
+
+
+def _sort_resume_assets(assets: list, sort_mode: str) -> list:
+    """Keep resume library ordering predictable and user-friendly."""
+    if sort_mode == "Oldest updated":
+        return sorted(assets, key=lambda asset: ((asset.updated_at or ""), (asset.id or 0)))
+    if sort_mode == "Role A-Z":
+        return sorted(assets, key=lambda asset: ((asset.target_role or "").lower(), -(asset.id or 0)))
+    if sort_mode == "Company A-Z":
+        return sorted(assets, key=lambda asset: ((asset.company or "").lower(), -(asset.id or 0)))
+    if sort_mode == "Category A-Z":
+        return sorted(assets, key=lambda asset: ((asset.category or "").lower(), -(asset.id or 0)))
+    return sorted(assets, key=lambda asset: ((asset.updated_at or ""), (asset.id or 0)), reverse=True)
+
+
+def _format_application_status(status: str) -> tuple[str, str]:
+    """Map internal application statuses to cleaner workspace language."""
+    mapping = {
+        "draft": ("Draft", "Just started"),
+        "ready_to_optimize": ("Ready to optimize", "Resume + target loaded"),
+        "ready_to_draft": ("Ready to draft", "Profile evidence selected"),
+        "matched": ("Profile matched", "Evidence chosen for this role"),
+        "saved_resume": ("Resume saved", "Optimized version stored"),
+        "saved_builder_resume": ("Fresh resume saved", "Builder version stored"),
+    }
+    return mapping.get(status, (status.replace("_", " ").title(), "In progress"))
+
+
+def _derive_application_tags(application) -> list[str]:
+    """Create lightweight tags so saved job workspaces scan faster."""
+    tags: list[str] = []
+    if application.status:
+        tags.append(application.status.replace("_", " ").title())
+    if application.company:
+        tags.append(application.company)
+    if application.industry and application.industry.lower() not in {tag.lower() for tag in tags}:
+        tags.append(application.industry)
+    if application.job_title and "intern" in application.job_title.lower():
+        tags.append("Internship")
+    elif application.job_title and any(token in application.job_title.lower() for token in ["manager", "lead", "director"]):
+        tags.append("Leadership")
+    for inferred_tag in _infer_workspace_tags(application.job_title, application.industry, application.role_family):
+        if inferred_tag.lower() not in {tag.lower() for tag in tags}:
+            tags.append(inferred_tag)
+    if application.selected_profile_item_ids:
+        tags.append(f"{len(application.selected_profile_item_ids)} evidence items")
+    return tags[:5]
+
+
+def _application_next_move(application) -> tuple[str, str]:
+    """Turn internal workspace state into a clearer user-facing next step."""
+    if application.status == "ready_to_optimize":
+        return ("Optimize this resume", "Resume and target are ready for job-specific tailoring.")
+    if application.status == "ready_to_draft":
+        return ("Create a fresh draft", "Profile evidence is already selected for this role.")
+    if application.status in {"saved_resume", "saved_builder_resume"}:
+        return ("Reuse a saved version", "A finished resume exists for this target and can be reused as a starting point.")
+    if application.selected_profile_item_ids:
+        return ("Review or refresh evidence", "Evidence is selected, so you can continue tailoring or build a new draft.")
+    return ("Finish setup", "Add evidence or return to the job setup flow to continue.")
+
+
+def _save_current_resume_asset(
+    *,
+    source_kind: str,
+    title: str,
+    file_name: str,
+    file_bytes: bytes,
+    notes: str = "",
+) -> int:
+    """Persist the current generated resume into the resume library."""
+    target_role = st.session_state.target_role or get_effective_target_role(st.session_state.job_description or "")
+    target_industry = st.session_state.target_industry or get_effective_industry(st.session_state.job_description or "")
+    company = st.session_state.get("current_application_company", "")
+    application_id = None
+    if st.session_state.job_description.strip():
+        application_id = _save_current_application(
+            status="saved_resume" if source_kind == "optimized_resume" else "saved_builder_resume"
+        )
+    asset = save_resume_asset(
+        application_id=application_id or None,
+        source_kind=source_kind,
+        category=_infer_resume_category(target_role, target_industry),
+        title=title,
+        target_role=target_role,
+        company=company,
+        file_name=file_name,
+        file_bytes=file_bytes,
+        notes=notes,
+    )
+    st.session_state.last_saved_resume_asset_id = asset.id
+    return asset.id or 0
+
+
 def _load_application_into_session(application_id: int) -> None:
     """Load a saved application into the current Streamlit session."""
     application = get_application(application_id)
@@ -1665,6 +2864,41 @@ def _load_application_into_session(application_id: int) -> None:
     st.session_state.jd_source_url = application.job_url
     st.session_state.selected_profile_item_ids = application.selected_profile_item_ids
     st.session_state.use_career_profile = bool(application.selected_profile_item_ids)
+
+
+def _extract_pdf_text(file_bytes: bytes) -> str:
+    """Extract text from a PDF upload using pypdf."""
+    try:
+        from pypdf import PdfReader
+    except ImportError as error:
+        raise ValueError(
+            "PDF import needs the `pypdf` package. Install dependencies again with "
+            "`python3 -m pip install -r requirements.txt` and retry the upload."
+        ) from error
+
+    reader = PdfReader(io.BytesIO(file_bytes))
+    pages: list[str] = []
+    for page in reader.pages:
+        page_text = page.extract_text() or ""
+        if page_text.strip():
+            pages.append(page_text.strip())
+
+    raw_text = "\n\n".join(pages)
+    if not raw_text.strip():
+        raise ValueError("We could not extract readable text from that PDF. Try a different export or paste the text manually.")
+    return raw_text
+
+
+def _detect_profile_source_type(source_name: str) -> str:
+    """Map uploaded source names to a user-facing source type."""
+    suffix = Path(source_name).suffix.lower()
+    if suffix == ".pdf":
+        return "profile_pdf"
+    if suffix == ".docx":
+        return "resume"
+    if suffix in {".txt", ".md"}:
+        return "notes"
+    return "manual_notes"
 
 
 def _extract_profile_from_import(uploaded_file, notes_text: str) -> tuple[str, str, dict, list[dict]]:
@@ -1684,10 +2918,12 @@ def _extract_profile_from_import(uploaded_file, notes_text: str) -> tuple[str, s
                 raw_text_parts.append(extract_text(temp_path))
             finally:
                 Path(temp_path).unlink(missing_ok=True)
+        elif suffix == ".pdf":
+            raw_text_parts.append(_extract_pdf_text(file_bytes))
         elif suffix in {".txt", ".md"}:
             raw_text_parts.append(file_bytes.decode("utf-8", errors="ignore"))
         else:
-            raise ValueError("For now, profile import supports .docx, .txt, or pasted notes.")
+            raise ValueError("For profile import, use .pdf, .docx, .txt, .md, or pasted notes.")
 
     if notes_text.strip():
         raw_text_parts.append(notes_text.strip())
@@ -1698,6 +2934,24 @@ def _extract_profile_from_import(uploaded_file, notes_text: str) -> tuple[str, s
 
     basics, items = extract_profile_items_from_text(raw_text)
     return raw_text, source_name, basics, [item.to_dict() for item in items]
+
+
+def _build_profile_import_notes() -> str:
+    """Combine sectioned profile notes into one extraction-friendly text block."""
+    section_map = [
+        ("Personal background", st.session_state.profile_import_personal),
+        ("Work experience", st.session_state.profile_import_experience),
+        ("Education and certifications", st.session_state.profile_import_education),
+        ("Projects and leadership", st.session_state.profile_import_projects),
+        ("Skills and tools", st.session_state.profile_import_skills),
+        ("Additional context", st.session_state.profile_import_additional),
+    ]
+    blocks = [f"{label}\n{value.strip()}" for label, value in section_map if str(value).strip()]
+    combined = "\n\n".join(blocks)
+    if not combined and st.session_state.profile_import_notes.strip():
+        combined = st.session_state.profile_import_notes.strip()
+    st.session_state.profile_import_notes = combined
+    return combined
 
 
 def render_profile_welcome_screen() -> None:
@@ -1722,7 +2976,7 @@ def render_profile_welcome_screen() -> None:
             st.markdown('<div class="apple-kicker">Fast Import</div>', unsafe_allow_html=True)
             st.markdown('<div class="apple-choice-title">Import from a resume or notes.</div>', unsafe_allow_html=True)
             st.markdown(
-                '<div class="apple-choice-copy">Upload an existing resume or paste detailed notes. We’ll extract reusable profile items for you to review.</div>',
+                '<div class="apple-choice-copy">Upload a LinkedIn PDF, an existing resume, or paste detailed notes. We’ll extract reusable profile items for you to review.</div>',
                 unsafe_allow_html=True,
             )
             st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
@@ -1760,31 +3014,122 @@ def render_profile_import_screen() -> None:
     render_screen_intro(
         "input",
         "Career Profile Import",
-        "Import your background.",
-        "Upload a resume or paste detailed notes. We’ll turn them into reusable profile items you can confirm.",
+        "Build your profile from what you already have.",
+        "Start with a LinkedIn PDF, a resume, or pasted career notes. We’ll turn them into reusable profile sections you can review and edit.",
+        show_journey=False,
+        show_status_line=False,
     )
 
     with st.container(border=True):
         st.markdown('<div class="apple-kicker">Source Material</div>', unsafe_allow_html=True)
-        st.markdown('<div class="apple-section-title">Add what you already have.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">Choose the easiest starting point.</div>', unsafe_allow_html=True)
         st.markdown(
-            '<div class="apple-section-copy">Use a .docx resume, a plain-text export, or detailed notes from LinkedIn, old resumes, projects, certifications, or activities.</div>',
+            '<div class="apple-section-copy">Upload a LinkedIn PDF or resume, then add any missing details in the sections below. When you continue, we will extract everything into an editable profile preview.</div>',
             unsafe_allow_html=True,
         )
-        uploaded_source = st.file_uploader(
-            "Upload source file",
-            type=["docx", "txt", "md"],
-            help="For now, profile import supports .docx, .txt, and .md files.",
-            key="profile-import-file",
-        )
-        notes_text = st.text_area(
-            "Notes",
-            value=st.session_state.profile_import_notes,
-            height=220,
-            placeholder="Paste LinkedIn text, old resume content, project notes, certifications, activities, or any other career history here.",
-        )
-        st.session_state.profile_import_notes = notes_text
 
+        top_left, top_right = st.columns([1.2, 1], gap="large")
+        with top_left:
+            st.markdown('<div class="apple-kicker" style="margin-top:0.4rem;">Upload source file</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="apple-minor-copy" style="margin-bottom:0.85rem;">Best for LinkedIn PDF exports, old resumes, and master profile documents you already have.</div>',
+                unsafe_allow_html=True,
+            )
+            uploaded_source = st.file_uploader(
+                "Upload source file",
+                type=["pdf", "docx", "txt", "md"],
+                help="Profile import supports LinkedIn/profile PDFs, .docx resumes, .txt files, and .md files.",
+                key="profile-import-file",
+                label_visibility="collapsed",
+            )
+            if uploaded_source is not None:
+                st.markdown(
+                    f'<div class="apple-minor-copy" style="margin-top:0.65rem;"><strong>{uploaded_source.name}</strong> is ready. Add any missing context below, then extract the preview.</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    '<div class="apple-minor-copy" style="margin-top:0.65rem;">No file selected yet. You can still continue with notes only.</div>',
+                    unsafe_allow_html=True,
+                )
+
+        with top_right:
+            st.markdown('<div class="apple-kicker" style="margin-top:0.4rem;">What happens next</div>', unsafe_allow_html=True)
+            st.markdown(
+                """
+                <div class="apple-minor-copy">
+                  1. Upload a file, add notes, or do both.<br/>
+                  2. Click <strong>Extract and Preview Profile</strong>.<br/>
+                  3. Review the imported personal info, education, experience, projects, and skills before saving.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('<div class="apple-quiet-divider"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-kicker">Add missing details</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="apple-section-copy" style="margin-bottom:1.15rem;">Use these sections to add anything your uploaded file does not capture cleanly. This keeps the profile import easy to review later.</div>',
+            unsafe_allow_html=True,
+        )
+
+        notes_left, notes_right = st.columns(2, gap="large")
+        with notes_left:
+            st.text_area(
+                "Personal summary or headline",
+                key="profile_import_personal",
+                height=120,
+                placeholder="Headline, location, contact context, portfolio, LinkedIn, or a short summary of who you are.",
+            )
+            st.text_area(
+                "Work experience",
+                key="profile_import_experience",
+                height=180,
+                placeholder="Jobs, internships, businesses, freelance work, promotions, leadership responsibilities, and bullet highlights.",
+            )
+            st.text_area(
+                "Education and certifications",
+                key="profile_import_education",
+                height=150,
+                placeholder="Schools, degrees, dates, coursework, GPA, scholarships, certifications, or licenses.",
+            )
+        with notes_right:
+            st.text_area(
+                "Projects and leadership",
+                key="profile_import_projects",
+                height=150,
+                placeholder="Clubs, case competitions, volunteer work, side projects, research, founder work, awards, or community leadership.",
+            )
+            st.text_area(
+                "Skills and tools",
+                key="profile_import_skills",
+                height=120,
+                placeholder="Tools, software, languages, technical skills, platforms, methods, and domain knowledge.",
+            )
+            st.text_area(
+                "Additional context",
+                key="profile_import_additional",
+                height=120,
+                placeholder="Anything else you want the app to remember for future resumes and applications.",
+            )
+
+        st.markdown('<div class="apple-meta-band"></div>', unsafe_allow_html=True)
+        helper_left, helper_right = st.columns(2, gap="large")
+        with helper_left:
+            st.markdown('<div class="apple-kicker">Works Well With</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="apple-minor-copy">LinkedIn PDF exports, current resumes, old resumes, portfolio summaries, and copied profile text.</div>',
+                unsafe_allow_html=True,
+            )
+        with helper_right:
+            st.markdown('<div class="apple-kicker">Good To Add Here</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="apple-minor-copy">Businesses, certifications, club leadership, side work, research, volunteer work, and anything you want reusable later.</div>',
+                unsafe_allow_html=True,
+            )
+
+    notes_text = _build_profile_import_notes()
+    can_extract = uploaded_source is not None or bool(notes_text.strip())
     col1, col2 = st.columns(2, gap="large")
     with col1:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
@@ -1794,7 +3139,7 @@ def render_profile_import_screen() -> None:
         st.markdown("</div>", unsafe_allow_html=True)
     with col2:
         st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-        if st.button("Extract Profile", use_container_width=True, key="profile-extract"):
+        if st.button("Extract and Preview Profile", use_container_width=True, key="profile-extract", disabled=not can_extract):
             try:
                 raw_text, source_name, basics, item_dicts = _extract_profile_from_import(uploaded_source, notes_text)
                 st.session_state.profile_import_source_name = source_name
@@ -1817,26 +3162,31 @@ def render_profile_review_screen() -> None:
         "Career Profile Review",
         "Review your extracted profile.",
         "Confirm the imported details before saving them as your reusable career profile.",
+        show_journey=False,
+        show_status_line=False,
     )
 
     basics = st.session_state.profile_extracted_basics or {}
     extracted_items = _profile_items_from_session()
     extracted_type_counts = Counter(item.item_type for item in extracted_items)
-
-    with st.container(border=True):
-        st.markdown('<div class="apple-kicker">Import Quality</div>', unsafe_allow_html=True)
-        st.markdown('<div class="apple-section-title">Here’s what we found in your source material.</div>', unsafe_allow_html=True)
-        quality_rows = [
-            ("Identity detected", basics.get("full_name", "Missing")),
-            ("Contact detected", "Yes" if basics.get("email") or basics.get("phone") or basics.get("linkedin") else "Missing"),
-            ("Evidence items", str(len(extracted_items))),
-            ("Largest category", extracted_type_counts.most_common(1)[0][0].title() if extracted_type_counts else "None yet"),
-        ]
-        st.markdown(build_readiness_rows(quality_rows), unsafe_allow_html=True)
+    review_groups = [
+        ("Experience", ["experience", "business", "volunteering"]),
+        ("Education", ["education", "certification"]),
+        ("Projects & Leadership", ["project", "leadership", "activity", "award"]),
+        ("Skills", ["skills"]),
+    ]
 
     with st.container(border=True):
         st.markdown('<div class="apple-kicker">Profile Basics</div>', unsafe_allow_html=True)
-        st.markdown('<div class="apple-section-title">Refine the top-level profile.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">Confirm the essentials first.</div>', unsafe_allow_html=True)
+        source_name = st.session_state.profile_import_source_name or "Imported source"
+        source_summary = [
+            ("Imported from", source_name),
+            ("Detected name", basics.get("full_name", "Missing")),
+            ("Detected contact", "Yes" if basics.get("email") or basics.get("phone") or basics.get("linkedin") else "Missing"),
+            ("Suggested items", str(len(extracted_items))),
+        ]
+        st.markdown(build_readiness_rows(source_summary), unsafe_allow_html=True)
         identity_col1, identity_col2 = st.columns(2, gap="large")
         with identity_col1:
             full_name = st.text_input("Full Name", value=basics.get("full_name", ""), placeholder="Example: Jane Doe")
@@ -1861,90 +3211,223 @@ def render_profile_review_screen() -> None:
     with st.container(border=True):
         st.markdown('<div class="apple-kicker">Extracted Items</div>', unsafe_allow_html=True)
         st.markdown(
-            f'<div class="apple-section-title">{len(extracted_items)} suggested items are ready to save.</div>',
+            f'<div class="apple-section-title">Review the suggested items section by section.</div>',
             unsafe_allow_html=True,
         )
         st.markdown(
-            '<div class="apple-section-copy">Refine each item before it becomes part of the profile. Keep only what you want the app to remember and reuse later.</div>',
+            f'<div class="apple-section-copy">{len(extracted_items)} items were detected. Keep the pieces that should become part of your long-term profile, and leave out anything noisy or irrelevant.</div>',
             unsafe_allow_html=True,
         )
+        grouped_indexes: list[tuple[str, list[int]]] = []
+        for section_label, item_types in review_groups:
+            section_indexes = [index for index, item in enumerate(extracted_items) if item.item_type in item_types]
+            if section_indexes:
+                grouped_indexes.append((section_label, section_indexes))
+
         drafted_items: list[ProfileItem] = []
         included_count = 0
-        for index, item in enumerate(extracted_items):
-            expander_title = f"{index + 1}. {item.item_type.title()} · {item.title or 'Untitled item'}"
-            with st.expander(expander_title, expanded=index <= 2):
-                keep_item = st.checkbox(
-                    "Include in career profile",
-                    value=item.visibility != "archived",
-                    key=f"profile-review-keep-{index}",
-                )
-                title_col, org_col = st.columns(2, gap="large")
-                with title_col:
-                    item_type = st.selectbox(
-                        "Item Type",
-                        PROFILE_ITEM_TYPES,
-                        index=PROFILE_ITEM_TYPES.index(item.item_type) if item.item_type in PROFILE_ITEM_TYPES else 0,
-                        key=f"profile-review-type-{index}",
+        if grouped_indexes:
+            tabs = st.tabs([f"{section_label} ({len(indexes)})" for section_label, indexes in grouped_indexes])
+            for tab, (section_label, indexes) in zip(tabs, grouped_indexes):
+                with tab:
+                    section_guidance = {
+                        "Experience": "Keep the roles, businesses, and volunteering entries you want the app to reuse when tailoring future applications.",
+                        "Education": "Keep clean school, degree, and certification records so the profile stays easy to trust and reuse.",
+                        "Projects & Leadership": "This is the right place for leadership, awards, activities, side work, and project-based evidence that strengthens future applications.",
+                        "Skills": "Trim this down to the skills you actually want the system to remember and surface later.",
+                    }
+                    section_item_types = sorted({extracted_items[index].item_type.title() for index in indexes})
+                    st.markdown(
+                        f'<div class="apple-section-title" style="margin-bottom:0.35rem;">{section_label}</div>',
+                        unsafe_allow_html=True,
                     )
-                    title = st.text_input(
-                        "Title",
-                        value=item.title,
-                        placeholder="Example: Operations Analyst Intern",
-                        key=f"profile-review-title-{index}",
+                    st.markdown(
+                        f'<div class="apple-minor-copy" style="margin-bottom:0.6rem;">{section_guidance.get(section_label, f"Review the extracted {section_label.lower()} items below and keep only what should become reusable profile memory.")}</div>',
+                        unsafe_allow_html=True,
                     )
-                with org_col:
-                    organization = st.text_input(
-                        "Organization",
-                        value=item.organization,
-                        placeholder="Example: Amazon or Simon Business School",
-                        key=f"profile-review-organization-{index}",
-                    )
-                    confidence_label = f"{int(item.confidence_score * 100)}% extracted confidence"
-                    st.markdown(f'<div class="apple-minor-copy">{confidence_label}</div>', unsafe_allow_html=True)
+                    action_col1, action_col2, action_col3 = st.columns([1, 1, 2.4], gap="small")
+                    with action_col1:
+                        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                        if st.button("Keep all", use_container_width=True, key=f"profile-review-keep-all-{section_label}"):
+                            for index in indexes:
+                                st.session_state[f"profile-review-keep-{index}"] = True
+                            st.rerun()
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    with action_col2:
+                        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                        if st.button("Skip section", use_container_width=True, key=f"profile-review-skip-all-{section_label}"):
+                            for index in indexes:
+                                st.session_state[f"profile-review-keep-{index}"] = False
+                            st.rerun()
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    with action_col3:
+                        kept_now = sum(1 for index in indexes if st.session_state.get(f"profile-review-keep-{index}", extracted_items[index].visibility != "archived"))
+                        st.markdown(
+                            f'<div class="apple-minor-copy" style="margin-top:0.55rem; text-align:right;">{kept_now} of {len(indexes)} items currently selected</div>',
+                            unsafe_allow_html=True,
+                        )
+                    for order_in_section, index in enumerate(indexes):
+                        item = extracted_items[index]
+                        expander_title = f"{order_in_section + 1}. {item.title or 'Untitled item'}"
+                        with st.expander(expander_title, expanded=order_in_section == 0):
+                            keep_item = st.checkbox(
+                                "Include in career profile",
+                                value=item.visibility != "archived",
+                                key=f"profile-review-keep-{index}",
+                            )
+                            title_col, org_col = st.columns(2, gap="large")
+                            with title_col:
+                                item_type = st.selectbox(
+                                    "Item Type",
+                                    PROFILE_ITEM_TYPES,
+                                    index=PROFILE_ITEM_TYPES.index(item.item_type) if item.item_type in PROFILE_ITEM_TYPES else 0,
+                                    key=f"profile-review-type-{index}",
+                                )
+                                title = st.text_input(
+                                    "Title",
+                                    value=item.title,
+                                    placeholder="Example: Operations Analyst Intern",
+                                    key=f"profile-review-title-{index}",
+                                )
+                            with org_col:
+                                organization = st.text_input(
+                                    "Organization",
+                                    value=item.organization,
+                                    placeholder="Example: Amazon or Simon Business School",
+                                    key=f"profile-review-organization-{index}",
+                                )
+                                confidence_label = f"{int(item.confidence_score * 100)}% extracted confidence"
+                                st.markdown(f'<div class="apple-minor-copy">{confidence_label}</div>', unsafe_allow_html=True)
 
-                description = st.text_area(
-                    "Description",
-                    value=item.description,
-                    height=120,
-                    placeholder="What did you do and why does it matter?",
-                    key=f"profile-review-description-{index}",
-                )
-                bullets_text = st.text_area(
-                    "Achievement Bullets",
-                    value="\n".join(item.bullets),
-                    height=120,
-                    placeholder="One bullet per line.",
-                    key=f"profile-review-bullets-{index}",
-                )
-                skills_text = st.text_input(
-                    "Skills / Keywords",
-                    value=", ".join(item.skills or item.keywords),
-                    placeholder="SQL, Tableau, stakeholder management",
-                    key=f"profile-review-skills-{index}",
-                )
+                            meta_col1, meta_col2 = st.columns(2, gap="large")
+                            with meta_col1:
+                                edited_location = st.text_input(
+                                    "Location",
+                                    value=item.location,
+                                    placeholder="Example: New York, NY",
+                                    key=f"profile-review-location-{index}",
+                                )
+                                edited_start_date = st.text_input(
+                                    "Start Date",
+                                    value=item.start_date,
+                                    placeholder="Example: Jan 2024",
+                                    key=f"profile-review-start-date-{index}",
+                                )
+                            with meta_col2:
+                                inferred_current = item.is_current or (item.end_date.lower() == "present" if item.end_date else False)
+                                edited_end_date = st.text_input(
+                                    "End Date",
+                                    value=item.end_date,
+                                    placeholder="Example: Present or Jun 2025",
+                                    key=f"profile-review-end-date-{index}",
+                                )
+                                edited_is_current = st.checkbox(
+                                    "This is current / ongoing",
+                                    value=inferred_current,
+                                    key=f"profile-review-current-{index}",
+                                )
 
-                drafted_item = ProfileItem(
-                    item_type=item_type,
-                    title=title.strip(),
-                    organization=organization.strip(),
-                    description=description.strip(),
-                    bullets=_split_line_input(bullets_text),
-                    skills=_split_csv_input(skills_text),
-                    keywords=_split_csv_input(skills_text)[:12] or item.keywords,
-                    confidence_score=item.confidence_score,
-                    verification_status="verified",
-                    visibility="active" if keep_item else "archived",
-                )
-                if keep_item and (drafted_item.title or drafted_item.description or drafted_item.bullets):
-                    included_count += 1
-                    drafted_items.append(drafted_item)
+                            if item.item_type == "skills":
+                                st.markdown(
+                                    '<div class="apple-minor-copy" style="margin-bottom:0.45rem;">This section works best as a clean skill bank rather than a long paragraph.</div>',
+                                    unsafe_allow_html=True,
+                                )
+                                description = st.text_area(
+                                    "Skill Notes",
+                                    value=item.description,
+                                    height=90,
+                                    placeholder="Optional context about these skills.",
+                                    key=f"profile-review-description-{index}",
+                                )
+                                bullets_text = st.text_area(
+                                    "Optional Supporting Bullets",
+                                    value="\n".join(item.bullets),
+                                    height=90,
+                                    placeholder="Optional evidence bullets, one per line.",
+                                    key=f"profile-review-bullets-{index}",
+                                )
+                                skills_text = st.text_input(
+                                    "Skills",
+                                    value=", ".join(item.skills or item.keywords),
+                                    placeholder="SQL, Tableau, stakeholder management",
+                                    key=f"profile-review-skills-{index}",
+                                )
+                                parsed_skills = _split_csv_input(skills_text)
+                                if parsed_skills:
+                                    render_chip_row(parsed_skills[:12])
+                            else:
+                                description_label = "Description"
+                                description_placeholder = "What did you do and why does it matter?"
+                                bullets_label = "Achievement Bullets"
+                                bullets_placeholder = "One bullet per line."
+                                if item.item_type == "education":
+                                    description_label = "Education Details"
+                                    description_placeholder = "Degree, focus area, GPA, honors, or academic context."
+                                    bullets_label = "Highlights"
+                                    bullets_placeholder = "Relevant coursework, honors, certifications, or campus achievements."
+                                elif item.item_type in {"experience", "business", "volunteering"}:
+                                    description_label = "Role Snapshot"
+                                    description_placeholder = "A short summary of the work, scope, and impact."
+                                    bullets_label = "Impact Bullets"
+                                    bullets_placeholder = "One impact-oriented bullet per line."
+                                elif item.item_type in {"project", "leadership", "activity", "award", "certification"}:
+                                    description_label = "Context"
+                                    description_placeholder = "Why this matters and what it shows about you."
+                                    bullets_label = "Supporting Points"
+                                    bullets_placeholder = "Outcomes, responsibilities, or proof points."
+
+                                description = st.text_area(
+                                    description_label,
+                                    value=item.description,
+                                    height=120,
+                                    placeholder=description_placeholder,
+                                    key=f"profile-review-description-{index}",
+                                )
+                                bullets_text = st.text_area(
+                                    bullets_label,
+                                    value="\n".join(item.bullets),
+                                    height=120,
+                                    placeholder=bullets_placeholder,
+                                    key=f"profile-review-bullets-{index}",
+                                )
+                                skills_text = st.text_input(
+                                    "Skills / Keywords",
+                                    value=", ".join(item.skills or item.keywords),
+                                    placeholder="SQL, Tableau, stakeholder management",
+                                    key=f"profile-review-skills-{index}",
+                                )
+
+                            drafted_item = ProfileItem(
+                                item_type=item_type,
+                                title=title.strip(),
+                                organization=organization.strip(),
+                                location=edited_location.strip(),
+                                start_date=edited_start_date.strip(),
+                                end_date=edited_end_date.strip(),
+                                is_current=edited_is_current,
+                                description=description.strip(),
+                                bullets=_split_line_input(bullets_text),
+                                skills=_split_csv_input(skills_text),
+                                keywords=_split_csv_input(skills_text)[:12] or item.keywords,
+                                confidence_score=item.confidence_score,
+                                verification_status="verified",
+                                visibility="active" if keep_item else "archived",
+                            )
+                            if keep_item and (drafted_item.title or drafted_item.description or drafted_item.bullets):
+                                included_count += 1
+                                drafted_items.append(drafted_item)
+        else:
+            st.markdown(
+                '<div class="apple-minor-copy" style="margin-top:0.75rem;">No reusable items were detected from this import yet. You can go back, add more source material, and try again.</div>',
+                unsafe_allow_html=True,
+            )
 
         st.markdown(
             f'<div class="apple-minor-copy" style="margin-top:0.75rem;">{included_count} items will be saved into the reusable profile library.</div>',
             unsafe_allow_html=True,
         )
 
-    col1, col2 = st.columns(2, gap="large")
+    col1, col2, col3 = st.columns(3, gap="large")
     with col1:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
         if st.button("Back", use_container_width=True, key="profile-review-back"):
@@ -1954,7 +3437,9 @@ def render_profile_review_screen() -> None:
     with col2:
         st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
         if st.button("Save Career Profile", use_container_width=True, key="profile-save"):
-            profile = save_profile_basics(
+            _save_profile_review_result(
+                basics_snapshot=basics,
+                drafted_items=drafted_items,
                 full_name=full_name,
                 email=email,
                 phone=phone,
@@ -1963,41 +3448,44 @@ def render_profile_review_screen() -> None:
                 headline=headline,
                 career_stage=career_stage,
                 summary=summary,
-                target_roles=[part.strip() for part in target_roles.split(",")],
-                target_industries=[part.strip() for part in target_industries.split(",")],
-                preferred_locations=[part.strip() for part in preferred_locations.split(",")],
+                target_roles=target_roles,
+                target_industries=target_industries,
+                preferred_locations=preferred_locations,
                 work_authorization=work_authorization,
             )
-            source_type = "manual_notes"
-            source_name = st.session_state.profile_import_source_name or "Imported Notes"
-            if source_name and source_name != "Manual Notes":
-                source_type = "resume"
-            source_id = save_profile_source(
-                source_type=source_type,
-                source_name=source_name,
-                raw_text=st.session_state.get("profile_last_source_raw_text", ""),
-                parsed_payload={"basics": basics, "item_count": len(drafted_items)},
-            )
-            for item in drafted_items:
-                item.profile_id = profile.id
-                item.source_id = source_id
-                item.verification_status = "verified"
-            saved_items = save_profile_items(drafted_items, replace_existing_for_source=source_id)
-            st.session_state.career_stage = career_stage
-            if target_roles.strip():
-                st.session_state.target_role = target_roles.split(",")[0].strip()
-            if target_industries.strip():
-                st.session_state.target_industry = target_industries.split(",")[0].strip()
-            st.session_state.profile_last_source_id = source_id
-            st.session_state.profile_extracted_items = [item.to_dict() for item in saved_items]
             st.session_state.screen = "profile_dashboard"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    with col3:
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Save and Continue", use_container_width=True, key="profile-save-continue"):
+            _save_profile_review_result(
+                basics_snapshot=basics,
+                drafted_items=drafted_items,
+                full_name=full_name,
+                email=email,
+                phone=phone,
+                location=location,
+                linkedin=linkedin,
+                headline=headline,
+                career_stage=career_stage,
+                summary=summary,
+                target_roles=target_roles,
+                target_industries=target_industries,
+                preferred_locations=preferred_locations,
+                work_authorization=work_authorization,
+            )
+            if st.session_state.job_description.strip():
+                st.session_state.screen = "application_match"
+            else:
+                st.session_state.screen = "quickstart"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
     render_shell_end()
 
 
 def render_profile_dashboard_screen() -> None:
-    """Persistent profile dashboard."""
+    """Simplified, section-based profile dashboard."""
     render_shell_start()
     profile = create_or_get_profile()
     sources = list_profile_sources()
@@ -2005,121 +3493,249 @@ def render_profile_dashboard_screen() -> None:
     active_items = [item for item in items if item.visibility == "active"]
     archived_items = [item for item in items if item.visibility == "archived"]
     verification_total = sum(1 for item in active_items if item.verification_status == "verified")
-    item_type_counts = Counter(item.item_type for item in active_items)
-    top_types = item_type_counts.most_common(3)
+
+    grouped_items: dict[str, list[ProfileItem]] = {}
+    for item in active_items:
+        grouped_items.setdefault(item.item_type, []).append(item)
+
+    education_items = grouped_items.get("education", [])
+    experience_items = grouped_items.get("experience", []) + grouped_items.get("business", []) + grouped_items.get("volunteering", [])
+    project_items = grouped_items.get("project", []) + grouped_items.get("leadership", []) + grouped_items.get("activity", []) + grouped_items.get("award", []) + grouped_items.get("certification", [])
+    skill_items = grouped_items.get("skills", [])
+
+    collected_skills: list[str] = []
+    for item in active_items:
+        for skill in item.skills:
+            if skill and skill not in collected_skills:
+                collected_skills.append(skill)
 
     render_screen_intro(
         "complete",
-        "Career Profile Dashboard",
+        "Career Profile",
         "Your career profile.",
-        "This is your reusable source of truth for future applications and resume generation.",
+        "Keep this simple, readable, and up to date. The app uses it as the source of truth for future applications and profile-driven resume generation.",
     )
 
     with st.container(border=True):
-        st.markdown('<div class="apple-kicker">Profile Overview</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="apple-section-title">{profile.full_name or "Set up your profile identity."}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-profile-header">', unsafe_allow_html=True)
+        st.markdown(f'<div class="apple-profile-name">{profile.full_name or "Set up your profile."}</div>', unsafe_allow_html=True)
         st.markdown(
-            f'<div class="apple-section-copy">{profile.headline or "Add a headline and preferences so the app understands how to position you."}</div>',
+            f'<div class="apple-profile-headline">{profile.headline or "Add a clear headline so the app understands how to position you across future applications."}</div>',
             unsafe_allow_html=True,
         )
-
-        summary_stats = [
-            ("Active items", str(len(active_items)), "Reusable evidence"),
-            ("Verified items", str(verification_total), "Ready to reuse"),
-            ("Source files", str(len(sources)), "Imported materials"),
+        profile_pills = [
+            value
+            for value in [
+                profile.location,
+                profile.email,
+                profile.phone,
+                profile.linkedin,
+            ]
+            if value
         ]
-        st.markdown('<div class="apple-summary-grid">', unsafe_allow_html=True)
-        overview_cols = st.columns(3, gap="large")
-        for col, (label, value, caption) in zip(overview_cols, summary_stats):
-            with col:
-                st.markdown('<div class="apple-stat-card">', unsafe_allow_html=True)
-                st.markdown(f'<div class="apple-stat-label">{label}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="apple-stat-value">{value}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="apple-stat-caption">{caption}</div>', unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        if profile_pills:
+            pill_markup = "".join(f'<div class="apple-profile-pill">{html.escape(value)}</div>' for value in profile_pills)
+            st.markdown(f'<div class="apple-profile-pill-row">{pill_markup}</div>', unsafe_allow_html=True)
+        if profile.summary:
+            st.markdown(f'<div class="apple-profile-summary-box">{html.escape(profile.summary)}</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    identity_col, targets_col = st.columns(2, gap="large")
-    with identity_col:
-        with st.container(border=True):
-            st.markdown('<div class="apple-kicker">Identity</div>', unsafe_allow_html=True)
-            st.markdown('<div class="apple-section-title">Who you are.</div>', unsafe_allow_html=True)
-            st.markdown('<div class="apple-section-copy">These details are used when the app creates profile-driven drafts and application materials.</div>', unsafe_allow_html=True)
-            with st.form("profile-identity-form"):
-                full_name = st.text_input("Full Name", value=profile.full_name, placeholder="Example: Jane Doe")
-                email = st.text_input("Email", value=profile.email, placeholder="jane@example.com")
-                phone = st.text_input("Phone", value=profile.phone, placeholder="(555) 555-5555")
-                location = st.text_input("Location", value=profile.location, placeholder="New York, NY")
-                linkedin = st.text_input("LinkedIn", value=profile.linkedin, placeholder="linkedin.com/in/janedoe")
-                headline = st.text_input("Headline", value=profile.headline, placeholder="Supply Chain Analyst | Operations | Analytics")
-                summary = st.text_area("Summary", value=profile.summary, height=120, placeholder="A concise career summary.")
-                st.markdown(build_readiness_rows([
-                    ("Email", profile.email or "Missing"),
-                    ("Phone", profile.phone or "Missing"),
-                    ("LinkedIn", profile.linkedin or "Missing"),
-                ]), unsafe_allow_html=True)
-                st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-                identity_saved = st.form_submit_button("Save Identity", use_container_width=True)
+        toolbar_col1, toolbar_col2, toolbar_col3 = st.columns(3, gap="large")
+        with toolbar_col1:
+            with st.container(border=True):
+                st.markdown('<div class="apple-kicker">Next Best Move</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-section-title">Refresh or extend your profile.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-minor-copy">Import a newer resume, LinkedIn PDF, or profile notes when your story changes.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                if st.button("Import or Refresh Profile", use_container_width=True, key="profile-dashboard-import-source-top"):
+                    st.session_state.screen = "profile_import"
+                    st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
-
-            if identity_saved:
-                save_profile_basics(
-                    full_name=full_name,
-                    email=email,
-                    phone=phone,
-                    location=location,
-                    linkedin=linkedin,
-                    headline=headline,
-                    career_stage=profile.career_stage,
-                    summary=summary,
-                    target_roles=profile.target_roles,
-                    target_industries=profile.target_industries,
-                    preferred_locations=profile.preferred_locations,
-                    work_authorization=profile.work_authorization,
+        with toolbar_col2:
+            with st.container(border=True):
+                st.markdown('<div class="apple-kicker">Workspace</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-section-title">Use this profile on live applications.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-minor-copy">Open the saved-job workspace to match evidence, reuse resumes, and continue where you left off.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                if st.button("Open Application Workspace", use_container_width=True, key="profile-dashboard-open-workspace-top"):
+                    st.session_state.screen = "application_workspace"
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+        with toolbar_col3:
+            with st.container(border=True):
+                st.markdown('<div class="apple-kicker">Profile Health</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-section-title">How complete is the reusable profile?</div>', unsafe_allow_html=True)
+                st.markdown(
+                    build_readiness_rows(
+                        [
+                            ("Imported sources", str(len(sources))),
+                            ("Active items", str(len(active_items))),
+                            ("Reviewed items", str(verification_total)),
+                        ]
+                    ),
+                    unsafe_allow_html=True,
                 )
-                st.rerun()
 
-    with targets_col:
+        overview_cols = st.columns(4, gap="large")
+        overview_stats = [
+            ("Experience", str(len(experience_items)), "Roles and operating history"),
+            ("Education", str(len(education_items)), "Schools and programs"),
+            ("Projects", str(len(project_items)), "Leadership, projects, activities"),
+            ("Skills", str(len(collected_skills)), "Reusable capabilities"),
+        ]
+        for col, (label, value, caption) in zip(overview_cols, overview_stats):
+            with col:
+                render_score_tile(label, int(value), caption)
+
+    personal_tab, education_tab, experience_tab, projects_tab, skills_tab, preferences_tab, sources_tab = st.tabs(
+        ["Personal", "Education", "Work Experience", "Projects & Leadership", "Skills", "Preferences", "Imports & History"]
+    )
+
+    with personal_tab:
         with st.container(border=True):
-            st.markdown('<div class="apple-kicker">Targets & Preferences</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-kicker">Personal</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">Your profile at a glance.</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="apple-section-copy">This is the identity layer the app will reuse when it writes profile-driven resumes, matches evidence, and stores future application context.</div>',
+                unsafe_allow_html=True,
+            )
+            glance_col1, glance_col2 = st.columns(2, gap="large")
+            with glance_col1:
+                st.markdown(
+                    build_readiness_rows(
+                        [
+                            ("Headline", profile.headline or "Not set"),
+                            ("Career stage", profile.career_stage or "Not set"),
+                            ("Work authorization", profile.work_authorization or "Not set"),
+                        ]
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with glance_col2:
+                st.markdown(
+                    build_readiness_rows(
+                        [
+                            ("Target roles", ", ".join(profile.target_roles) if profile.target_roles else "Not set"),
+                            ("Target industries", ", ".join(profile.target_industries) if profile.target_industries else "Not set"),
+                            ("Preferred locations", ", ".join(profile.preferred_locations) if profile.preferred_locations else "Not set"),
+                        ]
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+            with st.expander("Edit personal details", expanded=False):
+                with st.form("profile-personal-form"):
+                    col1, col2 = st.columns(2, gap="large")
+                    with col1:
+                        full_name = st.text_input("Full Name", value=profile.full_name, placeholder="Example: Jane Doe")
+                        email = st.text_input("Email", value=profile.email, placeholder="jane@example.com")
+                        phone = st.text_input("Phone", value=profile.phone, placeholder="(555) 555-5555")
+                    with col2:
+                        location = st.text_input("Location", value=profile.location, placeholder="New York, NY")
+                        linkedin = st.text_input("LinkedIn", value=profile.linkedin, placeholder="linkedin.com/in/janedoe")
+                        headline = st.text_input("Headline", value=profile.headline, placeholder="Supply Chain Analyst | Operations | Analytics")
+                    summary = st.text_area("Summary", value=profile.summary, height=140, placeholder="A short, readable summary of your background and strengths.")
+                    st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+                    save_personal = st.form_submit_button("Save Personal Profile", use_container_width=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                if save_personal:
+                    save_profile_basics(
+                        full_name=full_name,
+                        email=email,
+                        phone=phone,
+                        location=location,
+                        linkedin=linkedin,
+                        headline=headline,
+                        career_stage=profile.career_stage,
+                        summary=summary,
+                        target_roles=profile.target_roles,
+                        target_industries=profile.target_industries,
+                        preferred_locations=profile.preferred_locations,
+                        work_authorization=profile.work_authorization,
+                    )
+                    st.rerun()
+
+    with education_tab:
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Education</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">Your academic foundation.</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="apple-section-copy">Read this like a timeline of the schools, programs, and credentials that shape your foundation.</div>',
+                unsafe_allow_html=True,
+            )
+            _render_profile_timeline_section(
+                education_items,
+                empty_message="No education entries yet. Import a profile source or add academic history into your profile imports.",
+                item_label="education entry",
+                key_prefix="profile-education",
+            )
+
+    with experience_tab:
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Work Experience</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">What you have done professionally.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-copy">A timeline of the roles, businesses, and operating work that should shape future tailored resumes.</div>', unsafe_allow_html=True)
+            _render_profile_timeline_section(
+                experience_items,
+                empty_message="No experience entries yet. Import a resume, LinkedIn PDF, or profile notes to populate this section.",
+                item_label="work entry",
+                key_prefix="profile-experience",
+            )
+
+    with projects_tab:
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Projects & Leadership</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">Everything that strengthens the story beyond formal jobs.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-copy">A story-driven timeline of projects, leadership, activities, awards, and certifications that make your profile richer and more memorable.</div>', unsafe_allow_html=True)
+            _render_profile_timeline_section(
+                project_items,
+                empty_message="No project or leadership entries yet. Import profile material or save a fresh resume draft into your profile to populate this section.",
+                item_label="project or leadership entry",
+                key_prefix="profile-projects",
+            )
+
+    with skills_tab:
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Skills</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">Capabilities the app can reuse.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-copy">This is your reusable skill bank, collected from imports and manually edited profile entries.</div>', unsafe_allow_html=True)
+            if collected_skills:
+                render_chip_row(collected_skills)
+            else:
+                st.markdown('<div class="apple-minor-copy">No skill tags yet. Skills will appear here as you import and edit profile entries.</div>', unsafe_allow_html=True)
+
+            _render_profile_display_cards(
+                skill_items,
+                empty_message="No skill groups yet. Skills will appear here as you import and edit profile entries.",
+                item_label="skill group",
+                key_prefix="profile-skills",
+            )
+
+    with preferences_tab:
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Preferences</div>', unsafe_allow_html=True)
             st.markdown('<div class="apple-section-title">How you want to be positioned.</div>', unsafe_allow_html=True)
-            st.markdown('<div class="apple-section-copy">These preferences help the matching and drafting system choose the strongest direction for each application.</div>', unsafe_allow_html=True)
-            with st.form("profile-targets-form"):
+            st.markdown('<div class="apple-section-copy">These preferences steer matching, profile-driven drafting, and the direction of future tailored resumes.</div>', unsafe_allow_html=True)
+            with st.form("profile-preferences-form"):
                 career_stage = st.selectbox(
                     "Career Stage",
                     CAREER_STAGES,
                     index=CAREER_STAGES.index(profile.career_stage) if profile.career_stage in CAREER_STAGES else 0,
                 )
-                work_authorization = st.text_input(
-                    "Work Authorization",
-                    value=profile.work_authorization,
-                    placeholder="OPT, U.S. Citizen, No sponsorship needed",
-                )
-                target_roles = st.text_input(
-                    "Target Roles",
-                    value=", ".join(profile.target_roles),
-                    placeholder="Operations Analyst, Supply Chain Analyst",
-                )
-                target_industries = st.text_input(
-                    "Target Industries",
-                    value=", ".join(profile.target_industries),
-                    placeholder="Supply Chain / Operations, Technology",
-                )
-                preferred_locations = st.text_input(
-                    "Preferred Locations",
-                    value=", ".join(profile.preferred_locations),
-                    placeholder="New York, Boston, Remote",
-                )
+                work_authorization = st.text_input("Work Authorization", value=profile.work_authorization, placeholder="OPT, U.S. Citizen, No sponsorship needed")
+                target_roles = st.text_input("Target Roles", value=", ".join(profile.target_roles), placeholder="Operations Analyst, Supply Chain Analyst")
+                target_industries = st.text_input("Target Industries", value=", ".join(profile.target_industries), placeholder="Supply Chain / Operations, Technology")
+                preferred_locations = st.text_input("Preferred Locations", value=", ".join(profile.preferred_locations), placeholder="New York, Boston, Remote")
                 st.markdown(build_readiness_rows([
                     ("Career stage", profile.career_stage or "Not set"),
                     ("Target roles", ", ".join(profile.target_roles) if profile.target_roles else "Missing"),
                     ("Preferred locations", ", ".join(profile.preferred_locations) if profile.preferred_locations else "Missing"),
                 ]), unsafe_allow_html=True)
                 st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-                targets_saved = st.form_submit_button("Save Targets", use_container_width=True)
+                save_preferences = st.form_submit_button("Save Preferences", use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
-
-            if targets_saved:
+            if save_preferences:
                 save_profile_basics(
                     full_name=profile.full_name,
                     email=profile.email,
@@ -2136,153 +3752,51 @@ def render_profile_dashboard_screen() -> None:
                 )
                 st.rerun()
 
-    with st.container(border=True):
-        st.markdown('<div class="apple-kicker">Source Documents</div>', unsafe_allow_html=True)
-        st.markdown('<div class="apple-section-title">What your profile was built from.</div>', unsafe_allow_html=True)
-        if not sources:
-            st.markdown('<div class="apple-minor-copy">No source documents yet. Import a resume or notes to start building your profile memory.</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="apple-section-copy">These materials helped create and expand your reusable evidence library.</div>', unsafe_allow_html=True)
-            for source in sources[:8]:
-                with st.container(border=True):
-                    source_rows = [
-                        ("Type", source.source_type.replace("_", " ").title()),
-                        ("Name", source.source_name or "Untitled source"),
-                        ("Status", source.parsed_status.title()),
+    with sources_tab:
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Imports & History</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">Where this profile came from.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-copy">Most people will only check this occasionally. It is here when you want to review imported profile sources, restore hidden items, or understand how the profile was built over time.</div>', unsafe_allow_html=True)
+            st.markdown(
+                build_readiness_rows(
+                    [
+                        ("Imported sources", str(len(sources))),
+                        ("Active profile items", str(len(active_items))),
+                        ("Verified items", str(verification_total)),
+                        ("Hidden items", str(len(archived_items))),
                     ]
-                    st.markdown(f"**{source.source_name or 'Untitled source'}**")
-                    st.markdown(build_readiness_rows(source_rows), unsafe_allow_html=True)
-
-    with st.container(border=True):
-        st.markdown('<div class="apple-kicker">Profile Library</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="apple-section-title">{len(active_items)} active evidence items</div>', unsafe_allow_html=True)
-        source_names = ", ".join(source.source_name for source in sources[:4]) if sources else "No imported sources yet"
-        st.markdown(f'<div class="apple-section-copy">Recent sources: {source_names}</div>', unsafe_allow_html=True)
-        if active_items:
-            summary_stats = [
-                ("Verified items", str(verification_total), "Ready to reuse"),
-                ("Source files", str(len(sources)), "Imported materials"),
-                ("Top category", top_types[0][0].title() if top_types else "None yet", f"{top_types[0][1]} items" if top_types else "Add your first item"),
-            ]
-            st.markdown('<div class="apple-summary-grid">', unsafe_allow_html=True)
-            stat_cols = st.columns(3, gap="large")
-            for col, (label, value, caption) in zip(stat_cols, summary_stats):
-                with col:
-                    st.markdown('<div class="apple-stat-card">', unsafe_allow_html=True)
-                    st.markdown(f'<div class="apple-stat-label">{label}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="apple-stat-value">{value}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="apple-stat-caption">{caption}</div>', unsafe_allow_html=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            if top_types:
-                st.markdown(
-                    f'<div class="apple-minor-copy" style="margin-top:0.75rem;">Your strongest saved categories right now: {", ".join(f"{name.title()} ({count})" for name, count in top_types)}.</div>',
-                    unsafe_allow_html=True,
-                )
-        if not active_items:
-            st.markdown('<div class="apple-minor-copy">Import a resume or notes to start building your reusable experience bank.</div>', unsafe_allow_html=True)
-        else:
-            grouped_items: dict[str, list[ProfileItem]] = {}
-            for item in active_items:
-                grouped_items.setdefault(item.item_type, []).append(item)
-
-            for group_name, group_items in grouped_items.items():
-                with st.expander(f"{group_name.title()} · {len(group_items)} items", expanded=group_name in {"experience", "project"}):
-                    for index, item in enumerate(group_items, start=1):
+                ),
+                unsafe_allow_html=True,
+            )
+            source_action_col1, source_action_col2 = st.columns(2, gap="large")
+            with source_action_col1:
+                st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                if st.button("Import New Source", use_container_width=True, key="profile-history-import-source"):
+                    st.session_state.screen = "profile_import"
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+            with source_action_col2:
+                st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                if st.button("Return to Profile Overview", use_container_width=True, key="profile-history-overview"):
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+            with st.expander("View imported sources", expanded=False):
+                if not sources:
+                    st.markdown('<div class="apple-minor-copy">No imported sources yet. Bring in a PDF, DOCX, or notes to begin building your long-term profile memory.</div>', unsafe_allow_html=True)
+                else:
+                    for source in sources[:12]:
                         with st.container(border=True):
-                            st.markdown(f"**{index}. {item.title or 'Untitled item'}**")
-                            st.markdown(f'<div class="apple-minor-copy">{item.organization or "Organization not specified"} · {item.verification_status.title()}</div>', unsafe_allow_html=True)
-                            with st.form(key=f"profile-edit-form-{item.id}"):
-                                meta_col1, meta_col2 = st.columns(2, gap="large")
-                                with meta_col1:
-                                    edited_type = st.selectbox(
-                                        "Item Type",
-                                        PROFILE_ITEM_TYPES,
-                                        index=PROFILE_ITEM_TYPES.index(item.item_type) if item.item_type in PROFILE_ITEM_TYPES else 0,
-                                        key=f"profile-edit-type-{item.id}",
-                                    )
-                                    edited_title = st.text_input(
-                                        "Title",
-                                        value=item.title,
-                                        placeholder="Role, project, certification, or activity name",
-                                        key=f"profile-edit-title-{item.id}",
-                                    )
-                                with meta_col2:
-                                    edited_org = st.text_input(
-                                        "Organization",
-                                        value=item.organization,
-                                        placeholder="Company, school, club, or organization",
-                                        key=f"profile-edit-org-{item.id}",
-                                    )
-                                    edited_location = st.text_input(
-                                        "Location",
-                                        value=item.location,
-                                        placeholder="Optional location",
-                                        key=f"profile-edit-location-{item.id}",
-                                    )
+                            st.markdown(f"**{source.source_name or 'Untitled source'}**")
+                            st.markdown(build_readiness_rows([
+                                ("Type", source.source_type.replace("_", " ").title()),
+                                ("Status", source.parsed_status.title()),
+                                ("Created", source.created_at[:10] if source.created_at else "Unknown"),
+                            ]), unsafe_allow_html=True)
 
-                                edited_description = st.text_area(
-                                    "Description",
-                                    value=item.description,
-                                    height=100,
-                                    placeholder="What happened here and why does it matter?",
-                                    key=f"profile-edit-description-{item.id}",
-                                )
-                                edited_bullets = st.text_area(
-                                    "Achievement Bullets",
-                                    value="\n".join(item.bullets),
-                                    height=120,
-                                    placeholder="One bullet per line.",
-                                    key=f"profile-edit-bullets-{item.id}",
-                                )
-                                edited_skills = st.text_input(
-                                    "Skills / Keywords",
-                                    value=", ".join(item.skills or item.keywords),
-                                    placeholder="SQL, operations, leadership, Tableau",
-                                    key=f"profile-edit-skills-{item.id}",
-                                )
-
-                                action_col1, action_col2, action_col3 = st.columns([1, 1, 1], gap="large")
-                                with action_col1:
-                                    save_pressed = st.form_submit_button("Save Changes", use_container_width=True)
-                                with action_col2:
-                                    verify_pressed = st.form_submit_button("Verify", use_container_width=True)
-                                with action_col3:
-                                    archive_pressed = st.form_submit_button("Archive", use_container_width=True)
-
-                            if save_pressed or verify_pressed:
-                                updated_item = ProfileItem(
-                                    id=item.id,
-                                    user_id=item.user_id,
-                                    profile_id=item.profile_id,
-                                    source_id=item.source_id,
-                                    item_type=edited_type,
-                                    title=edited_title.strip(),
-                                    organization=edited_org.strip(),
-                                    location=edited_location.strip(),
-                                    description=edited_description.strip(),
-                                    bullets=_split_line_input(edited_bullets),
-                                    skills=_split_csv_input(edited_skills),
-                                    keywords=_split_csv_input(edited_skills)[:12] or item.keywords,
-                                    confidence_score=item.confidence_score,
-                                    verification_status="verified" if verify_pressed else item.verification_status,
-                                    visibility=item.visibility,
-                                    created_at=item.created_at,
-                                    updated_at=item.updated_at,
-                                )
-                                update_profile_item(updated_item)
-                                if verify_pressed and item.verification_status != "verified":
-                                    update_profile_item_verification(item.id, "verified")
-                                st.rerun()
-
-                            if archive_pressed:
-                                archive_profile_item(item.id)
-                                st.rerun()
-
-            if archived_items:
-                with st.expander(f"Archived Items · {len(archived_items)}", expanded=False):
-                    st.markdown('<div class="apple-minor-copy">Archived items stay in memory but are not used as active profile evidence.</div>', unsafe_allow_html=True)
+            with st.expander(f"Restore hidden profile items ({len(archived_items)})", expanded=False):
+                if not archived_items:
+                    st.markdown('<div class="apple-minor-copy">Nothing is hidden right now.</div>', unsafe_allow_html=True)
+                else:
                     for item in archived_items:
                         row_col1, row_col2 = st.columns([4, 1], gap="large")
                         with row_col1:
@@ -2452,6 +3966,9 @@ def render_application_workspace_screen() -> None:
     """Saved jobs / application workspaces."""
     render_shell_start()
     applications = list_applications()
+    resume_assets = list_resume_assets()
+    status_counts = Counter(application.status for application in applications)
+    companies = sorted({application.company for application in applications if application.company})
     render_screen_intro(
         "application_match",
         "Application Workspace",
@@ -2468,21 +3985,189 @@ def render_application_workspace_screen() -> None:
         )
         if not applications:
             st.markdown('<div class="apple-minor-copy">No saved applications yet. Paste a job description, use your Career Profile, and choose evidence to create the first workspace.</div>', unsafe_allow_html=True)
+        else:
+            workspace_rows = [
+                ("Draft", str(status_counts.get("draft", 0))),
+                ("Ready to optimize", str(status_counts.get("ready_to_optimize", 0))),
+                ("Ready to draft", str(status_counts.get("ready_to_draft", 0))),
+                ("Resumes saved", str(status_counts.get("saved_resume", 0) + status_counts.get("saved_builder_resume", 0))),
+            ]
+            st.markdown(build_readiness_rows(workspace_rows), unsafe_allow_html=True)
 
-    for application in applications:
+    if applications:
+        latest_application = applications[0]
+        latest_label, latest_hint = _format_application_status(latest_application.status)
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Continue Where You Left Off</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="apple-section-title">{latest_application.job_title or "Untitled target role"}{f" at {latest_application.company}" if latest_application.company else ""}</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(f'<div class="apple-minor-copy">{latest_hint}</div>', unsafe_allow_html=True)
+            st.markdown(
+                build_readiness_rows(
+                    [
+                        ("Status", latest_label),
+                        ("Industry", latest_application.industry or "Not detected"),
+                        ("Selected evidence", str(len(latest_application.selected_profile_item_ids))),
+                    ]
+                ),
+                unsafe_allow_html=True,
+            )
+            continue_col1, continue_col2 = st.columns(2, gap="large")
+            with continue_col1:
+                st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+                if st.button("Open Latest Application", use_container_width=True, key="workspace-open-latest"):
+                    _load_application_into_session(latest_application.id)
+                    st.session_state.screen = "application_match"
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+            with continue_col2:
+                st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                if st.button("Go to Resume Library", use_container_width=True, key="workspace-go-library-top"):
+                    st.session_state.screen = "resume_library"
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Application Filters</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">Focus on the right saved target.</div>', unsafe_allow_html=True)
+        filter_col1, filter_col2, filter_col3 = st.columns(3, gap="large")
+        with filter_col1:
+            selected_status = st.selectbox(
+                "Status",
+                [
+                    "All",
+                    "Draft",
+                    "Ready to optimize",
+                    "Ready to draft",
+                    "Profile matched",
+                    "Resume saved",
+                    "Fresh resume saved",
+                ],
+                index=0,
+                key="application-workspace-status-filter",
+            )
+        with filter_col2:
+            selected_company = st.selectbox(
+                "Company",
+                ["All"] + companies,
+                index=0,
+                key="application-workspace-company-filter",
+            )
+        with filter_col3:
+            application_search = st.text_input(
+                "Search",
+                value=st.session_state.get("application-workspace-search", ""),
+                placeholder="Role, company, industry, job text",
+                key="application-workspace-search",
+            )
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Resume Library</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="apple-section-title">{len(resume_assets)} saved resume assets</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="apple-section-copy">These are your saved generated resumes. Each one keeps a category, source type, and optional application link for future reuse.</div>',
+            unsafe_allow_html=True,
+        )
+        if not resume_assets:
+            st.markdown('<div class="apple-minor-copy">No saved resumes yet. Save an optimized resume or fresh builder resume to start your library.</div>', unsafe_allow_html=True)
+        else:
+            preview_assets = resume_assets[:3]
+            for asset in preview_assets:
+                with st.container(border=True):
+                    st.markdown(f'<div class="apple-section-title">{asset.title or asset.file_name}</div>', unsafe_allow_html=True)
+                    render_chip_row(_derive_resume_asset_tags(asset))
+                    st.markdown(
+                        build_readiness_rows(
+                            [
+                                ("Category", asset.category or "General"),
+                                ("Source", asset.source_kind.replace("_", " ").title()),
+                                ("Target role", asset.target_role or "Not set"),
+                                ("Company", asset.company or "Not set"),
+                            ]
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(f'<div class="apple-minor-copy">Saved: {asset.updated_at}</div>', unsafe_allow_html=True)
+                    st.download_button(
+                        "Download Saved Resume",
+                        data=io.BytesIO(asset.file_bytes),
+                        file_name=asset.file_name,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key=f"resume-asset-download-{asset.id}",
+                    )
+                    st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+                    if st.button("Use as Starting Point", use_container_width=True, key=f"workspace-resume-asset-use-{asset.id}"):
+                        _load_resume_asset_into_session(asset)
+                        st.session_state.screen = "input"
+                        st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
+            if len(resume_assets) > len(preview_assets):
+                st.markdown(
+                    f'<div class="apple-minor-copy">Showing {len(preview_assets)} of {len(resume_assets)} saved resumes here. Open the full library to browse every version.</div>',
+                    unsafe_allow_html=True,
+                )
+
+    filtered_applications = applications
+    if selected_status != "All":
+        normalized_status = selected_status.lower().replace(" ", "_")
+        filtered_applications = [
+            application
+            for application in filtered_applications
+            if _format_application_status(application.status)[0].lower() == selected_status.lower()
+            or application.status == normalized_status
+        ]
+    if selected_company != "All":
+        filtered_applications = [application for application in filtered_applications if application.company == selected_company]
+    if application_search.strip():
+        query = application_search.strip().lower()
+        filtered_applications = [
+            application
+            for application in filtered_applications
+            if query in " ".join(
+                [
+                    application.job_title,
+                    application.company,
+                    application.industry,
+                    application.role_family,
+                    application.job_description,
+                    application.status,
+                ]
+            ).lower()
+        ]
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Applications In View</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="apple-section-title">{len(filtered_applications)} saved targets match the current filters</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="apple-section-copy">Each saved target remembers the job brief, selected profile evidence, and where you left off so you can pick up work without rebuilding context.</div>',
+            unsafe_allow_html=True,
+        )
+        if not filtered_applications:
+            st.markdown('<div class="apple-minor-copy">No saved applications match the current filters yet.</div>', unsafe_allow_html=True)
+
+    for application in filtered_applications:
         with st.container(border=True):
             title = application.job_title or "Untitled target role"
             company_suffix = f" at {application.company}" if application.company else ""
+            status_label, status_hint = _format_application_status(application.status)
+            next_move_label, next_move_copy = _application_next_move(application)
             st.markdown('<div class="apple-kicker">Saved Application</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="apple-section-title">{title}{company_suffix}</div>', unsafe_allow_html=True)
+            render_chip_row(_derive_application_tags(application))
             rows = [
                 ("Company", application.company or "Not set"),
                 ("Industry", application.industry or "Not detected"),
-                ("Status", application.status.replace("_", " ").title()),
+                ("Status", status_label),
                 ("Selected evidence", str(len(application.selected_profile_item_ids))),
+                ("Best next move", next_move_label),
                 ("Updated", application.updated_at),
             ]
             st.markdown(build_readiness_rows(rows), unsafe_allow_html=True)
+            st.markdown(f'<div class="apple-minor-copy">{status_hint}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="apple-minor-copy">{next_move_copy}</div>', unsafe_allow_html=True)
             preview = " ".join(application.job_description.split())[:320]
             if preview:
                 st.markdown(f'<div class="apple-section-copy">{preview}{"..." if len(preview) == 320 else ""}</div>', unsafe_allow_html=True)
@@ -2525,7 +4210,264 @@ def render_application_workspace_screen() -> None:
         st.markdown("</div>", unsafe_allow_html=True)
     with col3:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("Home", use_container_width=True, key="application-workspace-home"):
+        if st.button("Resume Library", use_container_width=True, key="application-workspace-library"):
+            st.session_state.screen = "resume_library"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+    if st.button("Home", use_container_width=True, key="application-workspace-home"):
+        st.session_state.screen = "landing"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+    render_shell_end()
+
+
+def render_resume_library_screen() -> None:
+    """Dedicated library for saved resume assets."""
+    render_shell_start()
+    assets = list_resume_assets()
+    companies = sorted({asset.company for asset in assets if asset.company})
+    source_counts = Counter(asset.source_kind for asset in assets)
+    use_case_tags = sorted(
+        {
+            tag
+            for asset in assets
+            for tag in _infer_workspace_tags(asset.target_role, asset.category, asset.notes)
+        }
+    )
+    render_screen_intro(
+        "complete",
+        "Resume Library",
+        "Your saved resumes.",
+        "Browse the resumes you have saved, filter by category, update labels and notes, and download them again whenever you need them.",
+    )
+
+    categories = sorted({asset.category for asset in assets if asset.category})
+    source_kinds = sorted({asset.source_kind for asset in assets if asset.source_kind})
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Library Filters</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">Find the right saved version fast.</div>', unsafe_allow_html=True)
+        filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4, gap="large")
+        with filter_col1:
+            selected_category = st.selectbox(
+                "Category",
+                ["All"] + categories,
+                index=0,
+                key="resume-library-category",
+            )
+        with filter_col2:
+            selected_source = st.selectbox(
+                "Source Type",
+                ["All"] + [kind.replace("_", " ").title() for kind in source_kinds],
+                index=0,
+                key="resume-library-source",
+            )
+        with filter_col3:
+            selected_company = st.selectbox(
+                "Company",
+                ["All"] + companies,
+                index=0,
+                key="resume-library-company",
+            )
+        with filter_col4:
+            selected_use_case = st.selectbox(
+                "Use Case",
+                ["All"] + use_case_tags,
+                index=0,
+                key="resume-library-use-case",
+            )
+        sort_col, _ = st.columns([0.55, 1.45], gap="large")
+        with sort_col:
+            sort_mode = st.selectbox(
+                "Sort By",
+                ["Recently updated", "Oldest updated", "Role A-Z", "Company A-Z", "Category A-Z"],
+                index=0,
+                key="resume-library-sort",
+            )
+        with _:
+            search_query = st.text_input(
+                "Search",
+                value=st.session_state.get("resume-library-search", ""),
+                placeholder="Role, company, title, notes",
+                key="resume-library-search",
+            )
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Library Snapshot</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">How your saved resume shelf is shaping up.</div>', unsafe_allow_html=True)
+        snapshot_rows = [
+            ("Saved resumes", str(len(assets))),
+            ("Optimized versions", str(source_counts.get("optimized_resume", 0))),
+            ("Fresh builds", str(source_counts.get("fresh_resume", 0))),
+            ("Linked to applications", str(sum(1 for asset in assets if asset.application_id))),
+        ]
+        st.markdown(build_readiness_rows(snapshot_rows), unsafe_allow_html=True)
+
+    filtered_assets = assets
+    if selected_category != "All":
+        filtered_assets = [asset for asset in filtered_assets if asset.category == selected_category]
+    if selected_source != "All":
+        normalized_source = selected_source.lower().replace(" ", "_")
+        filtered_assets = [asset for asset in filtered_assets if asset.source_kind == normalized_source]
+    if selected_company != "All":
+        filtered_assets = [asset for asset in filtered_assets if asset.company == selected_company]
+    if selected_use_case != "All":
+        filtered_assets = [
+            asset
+            for asset in filtered_assets
+            if selected_use_case in _infer_workspace_tags(asset.target_role, asset.category, asset.notes)
+        ]
+    if search_query.strip():
+        query = search_query.strip().lower()
+        filtered_assets = [
+            asset
+            for asset in filtered_assets
+            if query in " ".join(
+                [
+                    asset.title,
+                    asset.file_name,
+                    asset.target_role,
+                    asset.company,
+                    asset.category,
+                    asset.notes,
+                    asset.source_kind,
+                ]
+            ).lower()
+        ]
+    filtered_assets = _sort_resume_assets(filtered_assets, sort_mode)
+
+    if filtered_assets:
+        featured_asset = filtered_assets[0]
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Recommended Starting Point</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="apple-section-title">{featured_asset.title or featured_asset.file_name}</div>', unsafe_allow_html=True)
+            render_chip_row(_derive_resume_asset_tags(featured_asset))
+            st.markdown(
+                f'<div class="apple-section-copy">{featured_asset.notes or _asset_reuse_copy(featured_asset)}</div>',
+                unsafe_allow_html=True,
+            )
+            starter_col1, starter_col2 = st.columns(2, gap="large")
+            with starter_col1:
+                st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+                if st.button("Use This Version", use_container_width=True, key=f"resume-library-featured-use-{featured_asset.id}"):
+                    _load_resume_asset_into_session(featured_asset)
+                    st.session_state.screen = "input"
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+            with starter_col2:
+                st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                if st.button("Open Workspace Context", use_container_width=True, key=f"resume-library-featured-workspace-{featured_asset.id}", disabled=not bool(featured_asset.application_id)):
+                    if featured_asset.application_id:
+                        _load_resume_asset_into_session(featured_asset)
+                        st.session_state.screen = "application_workspace"
+                        st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Saved Assets</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="apple-section-title">{len(filtered_assets)} resumes in view</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="apple-section-copy">Treat this as your reusable resume shelf. Rename versions, refine categories, keep notes about when to reuse each one, and reopen the right version without rebuilding context.</div>',
+            unsafe_allow_html=True,
+        )
+        if not filtered_assets:
+            st.markdown('<div class="apple-minor-copy">No resume assets match the current filters yet.</div>', unsafe_allow_html=True)
+        for asset in filtered_assets:
+            with st.container(border=True):
+                st.markdown(f'<div class="apple-section-title">{asset.title or asset.file_name}</div>', unsafe_allow_html=True)
+                render_chip_row(_derive_resume_asset_tags(asset))
+                st.markdown(
+                    build_readiness_rows(
+                        [
+                            ("Category", asset.category or "General"),
+                            ("Source", asset.source_kind.replace("_", " ").title()),
+                            ("Target role", asset.target_role or "Not set"),
+                            ("Company", asset.company or "Not set"),
+                        ]
+                    ),
+                    unsafe_allow_html=True,
+                )
+                with st.expander("Edit Resume Details", expanded=False):
+                    with st.form(f"resume-asset-form-{asset.id}"):
+                        edited_title = st.text_input("Title", value=asset.title, placeholder="Resume name")
+                        edited_category = st.text_input("Category", value=asset.category, placeholder="Operations Analyst")
+                        edited_target_role = st.text_input("Target Role", value=asset.target_role, placeholder="Operations Analyst")
+                        edited_company = st.text_input("Company", value=asset.company, placeholder="Amazon")
+                        edited_notes = st.text_area("Notes", value=asset.notes, height=100, placeholder="When should you reuse this version?")
+                        if st.form_submit_button("Save Resume Details", use_container_width=True):
+                            update_resume_asset(
+                                asset.__class__(
+                                    id=asset.id,
+                                    user_id=asset.user_id,
+                                    application_id=asset.application_id,
+                                    source_kind=asset.source_kind,
+                                    category=edited_category.strip() or asset.category,
+                                    title=edited_title.strip() or asset.title,
+                                    target_role=edited_target_role.strip(),
+                                    company=edited_company.strip(),
+                                    file_name=asset.file_name,
+                                    file_bytes=asset.file_bytes,
+                                    notes=edited_notes.strip(),
+                                    created_at=asset.created_at,
+                                    updated_at=asset.updated_at,
+                                )
+                            )
+                            st.rerun()
+                if asset.notes:
+                    st.markdown(f'<div class="apple-minor-copy">{asset.notes}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="apple-minor-copy">{_asset_reuse_copy(asset)}</div>', unsafe_allow_html=True)
+                if asset.application_id:
+                    st.markdown(
+                        '<div class="apple-minor-copy">Linked to a saved application workspace, so you can reopen the exact job context later.</div>',
+                        unsafe_allow_html=True,
+                    )
+                download_col1, download_col2 = st.columns(2, gap="large")
+                with download_col1:
+                    st.markdown(f'<div class="apple-minor-copy">Saved: {asset.updated_at}</div>', unsafe_allow_html=True)
+                with download_col2:
+                    st.download_button(
+                        "Download Resume",
+                        data=io.BytesIO(asset.file_bytes),
+                        file_name=asset.file_name,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key=f"resume-library-download-{asset.id}",
+                    )
+                action_col1, action_col2 = st.columns(2, gap="large")
+                with action_col1:
+                    st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+                    if st.button("Use as Starting Point", use_container_width=True, key=f"resume-library-use-{asset.id}"):
+                        _load_resume_asset_into_session(asset)
+                        st.session_state.screen = "input"
+                        st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
+                with action_col2:
+                    st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                    if st.button("Open in Workspace", use_container_width=True, key=f"resume-library-workspace-open-{asset.id}", disabled=not bool(asset.application_id)):
+                        if asset.application_id:
+                            _load_resume_asset_into_session(asset)
+                            st.session_state.screen = "application_workspace"
+                            st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+    nav_col1, nav_col2, nav_col3 = st.columns(3, gap="large")
+    with nav_col1:
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Back to Workspace", use_container_width=True, key="resume-library-workspace"):
+            st.session_state.screen = "application_workspace"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    with nav_col2:
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Back to Profile", use_container_width=True, key="resume-library-profile"):
+            st.session_state.screen = "profile_dashboard"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    with nav_col3:
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Home", use_container_width=True, key="resume-library-home"):
             st.session_state.screen = "landing"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
@@ -2759,6 +4701,9 @@ def _render_fit_delta_card(before_report: dict, after_report: dict) -> None:
     before_score = int(before_report.get("overall_score", 0))
     after_score = int(after_report.get("overall_score", 0))
     delta = after_score - before_score
+    percent_delta = 0 if before_score == 0 else round((delta / before_score) * 100)
+    before_signal = before_report.get("opportunity_worthiness", before_report.get("apply_signal", "Not rated"))
+    after_signal = after_report.get("opportunity_worthiness", after_report.get("apply_signal", "Not rated"))
 
     if delta > 0:
         title = f"Estimated fit improved by {delta} point{'s' if delta != 1 else ''}."
@@ -2786,9 +4731,9 @@ def _render_fit_delta_card(before_report: dict, after_report: dict) -> None:
             render_score_tile("Change", delta, "Point movement")
         with score_col4:
             render_score_tile(
-                "Keyword Gain",
-                int(after_report.get("keyword_score", 0)) - int(before_report.get("keyword_score", 0)),
-                "Job-language movement",
+                "Improvement %",
+                percent_delta,
+                "Overall movement",
             )
 
         readiness_rows = [
@@ -2796,11 +4741,16 @@ def _render_fit_delta_card(before_report: dict, after_report: dict) -> None:
             ("Skill score", f"{before_report.get('skill_score', 0)} → {after_report.get('skill_score', 0)}"),
             ("ATS / clarity", f"{before_report.get('ats_score', 0)} → {after_report.get('ats_score', 0)}"),
             ("New matched keywords", ", ".join(new_keyword_matches[:6]) if new_keyword_matches else "No new keyword wins yet"),
+            ("Opportunity", f"{before_signal} → {after_signal}"),
+            ("Apply signal", after_report.get("apply_signal", "No decision yet")),
+            ("Gap severity", after_report.get("gap_severity", "Unknown")),
         ]
         st.markdown(build_readiness_rows(readiness_rows), unsafe_allow_html=True)
 
         if delta <= 0:
             st.caption("Honest take: this revision may still need stronger evidence or sharper job-language alignment before it is truly better.")
+        else:
+            st.caption("Best-case interpretation: the revised version is surfacing stronger job language, but you should still review the remaining gaps before you export.")
 
 
 def render_fit_report_screen() -> None:
@@ -2817,6 +4767,16 @@ def render_fit_report_screen() -> None:
     with st.container(border=True):
         st.markdown('<div class="apple-summary-label">Fit Snapshot</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="apple-summary-title">{report.get("verdict", "We need a resume and job description to score fit.")}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div class="apple-signal-row">
+              <div class="apple-signal-pill"><strong>Opportunity</strong> {html.escape(report.get("opportunity_worthiness", "No decision yet"))}</div>
+              <div class="apple-signal-pill"><strong>Confidence</strong> {html.escape(report.get("apply_confidence", "Unknown"))}</div>
+              <div class="apple-signal-pill"><strong>Gap severity</strong> {html.escape(report.get("gap_severity", "Unknown"))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         score_col1, score_col2, score_col3, score_col4 = st.columns(4, gap="large")
         with score_col1:
@@ -2831,6 +4791,11 @@ def render_fit_report_screen() -> None:
         st.markdown(
             build_readiness_rows(
                 [
+                    ("Opportunity", report.get("opportunity_worthiness", "No decision yet")),
+                    ("Apply signal", report.get("apply_signal", "No decision yet")),
+                    ("Confidence", report.get("apply_confidence", "Unknown")),
+                    ("Gap severity", report.get("gap_severity", "Unknown")),
+                    ("Best next move", report.get("improvement_priority", "Review the gaps below")),
                     ("Resume bullets detected", str(report.get("bullet_count", 0))),
                     ("Bullets with numbers", str(report.get("quantified_bullet_count", 0))),
                     ("Action-led bullets", str(report.get("action_verb_bullet_count", 0))),
@@ -2839,6 +4804,40 @@ def render_fit_report_screen() -> None:
             ),
             unsafe_allow_html=True,
         )
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Honest Career Signal</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">Should you spend time on this application?</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="apple-section-copy">{report.get("opportunity_worthiness", "No decision yet")} · {report.get("apply_signal", "No decision yet")} · {report.get("apply_confidence", "Unknown")}. {report.get("recommendation_strength", "")}</div>',
+            unsafe_allow_html=True,
+        )
+        decision_rows = [
+            ("Overall fit", str(report.get("overall_score", 0))),
+            ("Gap severity", report.get("gap_severity", "Unknown")),
+            ("Keyword overlap", str(len(report.get("matched_keywords", [])))),
+            ("Missing skills", str(len(report.get("missing_skills", [])))),
+            ("Profile evidence", ", ".join(report.get("selected_evidence_titles", [])[:3]) or "None selected"),
+        ]
+        st.markdown(build_readiness_rows(decision_rows), unsafe_allow_html=True)
+
+    detail_col1, detail_col2 = st.columns(2, gap="large")
+    with detail_col1:
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Strongest Area</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="apple-section-title">{report.get("strongest_area", "Unknown")}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="apple-section-copy">This is the part of the current resume that is carrying the application most clearly right now. Score: {report.get("strongest_area_score", 0)}.</div>',
+                unsafe_allow_html=True,
+            )
+    with detail_col2:
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Weakest Area</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="apple-section-title">{report.get("weakest_area", "Unknown")}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="apple-section-copy">This is the area that most needs improvement before the application feels stronger. Score: {report.get("weakest_area_score", 0)}.</div>',
+                unsafe_allow_html=True,
+            )
 
     insight_col, gap_col = st.columns(2, gap="large")
     with insight_col:
@@ -2862,11 +4861,17 @@ def render_fit_report_screen() -> None:
     with st.container(border=True):
         st.markdown('<div class="apple-kicker">Honest Recommendations</div>', unsafe_allow_html=True)
         st.markdown('<div class="apple-section-title">What I would fix before export.</div>', unsafe_allow_html=True)
+        focus_areas = report.get("focus_areas", [])
+        if focus_areas:
+            st.markdown('<div class="apple-section-copy">Focus in this order so the next revision earns the biggest quality gain:</div>', unsafe_allow_html=True)
+            for recommendation in focus_areas[:4]:
+                st.markdown(f"- {recommendation}")
         recommendations = report.get("recommendations", []) + report.get("warnings", [])
         if recommendations:
+            st.markdown('<div class="apple-section-copy" style="margin-top:0.85rem;">Additional clean-up suggestions:</div>', unsafe_allow_html=True)
             for recommendation in recommendations[:8]:
                 st.markdown(f"- {recommendation}")
-        else:
+        if not focus_areas and not recommendations:
             st.markdown("No urgent structural gaps detected. Continue to optimization and make the language more role-specific.")
 
     back_col, profile_col, run_col = st.columns([0.85, 1.0, 1.15], gap="large")
@@ -3007,6 +5012,9 @@ def render_builder_input_screen() -> None:
                 target_role=target_role,
             )
             st.session_state.builder_execution_mode = None
+            st.session_state.builder_profile_saved = False
+            st.session_state.builder_profile_saved_source_id = None
+            st.session_state.builder_profile_save_dismissed = False
             st.session_state.screen = "builder_stub"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
@@ -3120,6 +5128,9 @@ def render_builder_stub_screen() -> None:
                     st.session_state.builder_validation_summary = build_builder_validation_summary(payload)
                     st.session_state.builder_output_docx_bytes = None
                     st.session_state.builder_output_filename = None
+                    st.session_state.builder_profile_saved = False
+                    st.session_state.builder_profile_saved_source_id = None
+                    st.session_state.builder_profile_save_dismissed = False
                     st.session_state.screen = "builder_review"
                     st.rerun()
                 except Exception as error:
@@ -3239,6 +5250,9 @@ def render_builder_stub_screen() -> None:
                     st.session_state.builder_validation_summary = build_builder_validation_summary(payload)
                     st.session_state.builder_output_docx_bytes = None
                     st.session_state.builder_output_filename = None
+                    st.session_state.builder_profile_saved = False
+                    st.session_state.builder_profile_saved_source_id = None
+                    st.session_state.builder_profile_save_dismissed = False
                     st.session_state.screen = "builder_review"
                     st.rerun()
                 except Exception as error:
@@ -3278,6 +5292,7 @@ def render_builder_review_screen() -> None:
     summary = st.session_state.builder_validation_summary or {}
     stats = summary.get("stats", {})
     basics = payload.get("basics", {})
+    memory_rows = _build_builder_profile_memory_rows(payload, stats)
 
     render_shell_start()
     render_screen_intro(
@@ -3365,6 +5380,84 @@ def render_builder_review_screen() -> None:
         st.json(payload)
     st.markdown("</div>", unsafe_allow_html=True)
 
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Save For Future Jobs</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">Keep this draft as reusable profile memory.</div>', unsafe_allow_html=True)
+        if st.session_state.builder_profile_saved:
+            st.markdown(
+                '<div class="apple-section-copy">Saved. The strongest basics, experience, projects, and skills from this draft are now part of your reusable career profile, so future applications can start from a much smarter foundation.</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                build_readiness_rows(
+                    [
+                        ("Status", "Saved to profile"),
+                        ("Career stage", st.session_state.career_stage or "Not set"),
+                        ("Target role", st.session_state.target_role or "Not set"),
+                        ("Imported blocks", f"{sum(stats.get(key, 0) for key in ['education_items', 'experience_items', 'project_items', 'skills_items'])}"),
+                    ]
+                ),
+                unsafe_allow_html=True,
+            )
+            saved_col1, saved_col2 = st.columns(2, gap="large")
+            with saved_col1:
+                st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+                if st.button("Open Career Profile", use_container_width=True, key="builder-open-profile-after-save"):
+                    st.session_state.screen = "profile_dashboard"
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+            with saved_col2:
+                st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                if st.button("Keep Building Resume", use_container_width=True, key="builder-continue-after-save"):
+                    st.session_state.builder_profile_save_dismissed = False
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+        elif st.session_state.builder_profile_save_dismissed:
+            st.markdown(
+                '<div class="apple-section-copy">You can keep moving for now. If this draft feels like a good representation of your background, save it once and the app can reuse the strongest parts for future roles.</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(build_readiness_rows(memory_rows), unsafe_allow_html=True)
+            reopen_col1, reopen_col2 = st.columns(2, gap="large")
+            with reopen_col1:
+                st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+                if st.button("Save to Profile Now", use_container_width=True, key="builder-save-to-profile-reopen"):
+                    try:
+                        _save_builder_payload_to_profile(payload)
+                        st.success("This draft has been added to your career profile.")
+                        st.rerun()
+                    except Exception as error:
+                        st.error(str(error))
+                st.markdown("</div>", unsafe_allow_html=True)
+            with reopen_col2:
+                st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                if st.button("Keep It One-Off", use_container_width=True, key="builder-keep-one-off"):
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(
+                '<div class="apple-section-copy">Save this once and future applications can reuse the strongest parts of this draft instead of making you type everything again. This is the easiest way to turn a one-off draft into a long-term career profile.</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(build_readiness_rows(memory_rows), unsafe_allow_html=True)
+            profile_cta_col1, profile_cta_col2 = st.columns(2, gap="large")
+            with profile_cta_col1:
+                st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+                if st.button("Yes, Save to Profile", use_container_width=True, key="builder-save-to-profile"):
+                    try:
+                        _save_builder_payload_to_profile(payload)
+                        st.success("This draft has been added to your career profile.")
+                        st.rerun()
+                    except Exception as error:
+                        st.error(str(error))
+                st.markdown("</div>", unsafe_allow_html=True)
+            with profile_cta_col2:
+                st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+                if st.button("Not Now", use_container_width=True, key="builder-skip-save-profile"):
+                    st.session_state.builder_profile_save_dismissed = True
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+
     col1, col2 = st.columns(2)
     with col1:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
@@ -3385,15 +5478,29 @@ def render_builder_review_screen() -> None:
         st.markdown("</div>", unsafe_allow_html=True)
 
     if st.session_state.builder_output_docx_bytes and st.session_state.builder_output_filename:
-        st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-        st.download_button(
-            "Download First Resume (.docx)",
-            data=io.BytesIO(st.session_state.builder_output_docx_bytes),
-            file_name=st.session_state.builder_output_filename,
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True,
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
+        asset_col1, asset_col2 = st.columns(2, gap="large")
+        with asset_col1:
+            st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+            st.download_button(
+                "Download First Resume (.docx)",
+                data=io.BytesIO(st.session_state.builder_output_docx_bytes),
+                file_name=st.session_state.builder_output_filename,
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+        with asset_col2:
+            st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+            if st.button("Save to Resume Library", use_container_width=True, key="builder-save-library"):
+                _save_current_resume_asset(
+                    source_kind="fresh_resume",
+                    title=st.session_state.builder_full_name.strip() or "Fresh Resume Draft",
+                    file_name=st.session_state.builder_output_filename,
+                    file_bytes=st.session_state.builder_output_docx_bytes,
+                    notes="Generated from the fresh-resume builder flow.",
+                )
+                st.success("Saved to your resume library.")
+            st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
     if st.button("Back to Landing", use_container_width=True, key="builder-review-landing"):
@@ -4002,13 +6109,36 @@ def render_review_screen() -> None:
             st.markdown("</div>", unsafe_allow_html=True)
         with action_col2:
             st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-            if st.button("Review Changes", use_container_width=True):
-                st.session_state.show_review_changes = True
-                st.rerun()
+            if ready_for_export and st.session_state.output_docx_bytes and st.session_state.output_filename:
+                if st.button("Save to Resume Library", use_container_width=True, key="review-save-library"):
+                    _save_current_resume_asset(
+                        source_kind="optimized_resume",
+                        title=st.session_state.output_filename.replace(".docx", ""),
+                        file_name=st.session_state.output_filename,
+                        file_bytes=st.session_state.output_docx_bytes,
+                        notes="Saved from the optimized resume review flow.",
+                    )
+                    st.success("Saved to your resume library.")
+            else:
+                if st.button("Review Changes", use_container_width=True):
+                    st.session_state.show_review_changes = True
+                    st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
         with action_col3:
             st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-            if st.button("Start Over", use_container_width=True):
+            if ready_for_export and st.session_state.output_docx_bytes and st.session_state.output_filename:
+                if st.button("Review Changes", use_container_width=True, key="review-changes-when-ready"):
+                    st.session_state.show_review_changes = True
+                    st.rerun()
+            else:
+                if st.button("Start Over", use_container_width=True):
+                    reset_flow()
+                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        if ready_for_export and st.session_state.output_docx_bytes and st.session_state.output_filename:
+            st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+            if st.button("Start Over", use_container_width=True, key="review-start-over-when-ready"):
                 reset_flow()
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -4090,10 +6220,17 @@ def main() -> None:
             st.session_state.screen = "application_workspace"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Resume Library", use_container_width=True, key="sidebar-resume-library"):
+            st.session_state.screen = "resume_library"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     screen = st.session_state.screen
     if screen == "landing":
         render_landing()
+    elif screen == "quickstart":
+        render_quickstart_screen()
     elif screen == "profile_welcome":
         render_profile_welcome_screen()
     elif screen == "profile_import":
@@ -4106,6 +6243,8 @@ def main() -> None:
         render_application_match_screen()
     elif screen == "application_workspace":
         render_application_workspace_screen()
+    elif screen == "resume_library":
+        render_resume_library_screen()
     elif screen == "input":
         render_input_screen()
     elif screen == "fit_report":
