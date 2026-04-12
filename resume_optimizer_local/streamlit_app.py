@@ -3672,34 +3672,13 @@ def render_builder_review_screen() -> None:
 
 
 def render_mode_screen() -> None:
-    """Execution mode selection screen."""
+    """Execution mode selection screen (redesigned - API is default)."""
     render_shell_start()
     render_screen_intro(
         "mode",
         "Step 3 of 5",
-        "Choose the path that feels right for you.",
-        "Every option uses the same prompt logic and the same review flow. The difference is how hands-on you want to be.",
-    )
-
-    st.markdown(
-        """
-        <style>
-        [data-testid="stVerticalBlockBorderWrapper"] {
-            min-height: 420px;
-        }
-
-        [data-testid="stVerticalBlockBorderWrapper"] > div,
-        [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"] {
-            min-height: 100%;
-            height: 100%;
-        }
-
-        .apple-choice-copy {
-            min-height: 8.8rem;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
+        "Choose your path to optimization.",
+        "Both paths use the same powerful prompt and validation flow. Pick the one that fits your workflow.",
     )
 
     selected_profile_items = _get_selected_profile_items()
@@ -3719,73 +3698,61 @@ def render_mode_screen() -> None:
                 unsafe_allow_html=True,
             )
 
-    manual_col, api_col, local_col = st.columns(3, gap="large")
-    with manual_col:
-        with st.container(border=True):
-            st.markdown(
-                """
-                <div class="apple-kicker">Manual</div>
-                <div class="apple-choice-title">Copy the prompt and use your favorite AI.</div>
-                <div class="apple-choice-copy">Great if you want total control, prefer free tools, or want to compare outputs across ChatGPT, Claude, Gemini, or something else.</div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-            if st.button("Choose Manual Mode", use_container_width=True):
-                st.session_state.execution_mode = "manual"
-                st.session_state.generated_prompt = _build_optimizer_prompt_from_state()
-                st.session_state.api_prompt_customized = False
-                st.session_state.api_prompt_override = st.session_state.generated_prompt or ""
-                st.session_state.screen = "manual"
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+    # API Mode - Primary (Recommended)
+    with st.container(border=True):
+        st.markdown(
+            """
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <div class="apple-kicker">🚀 RECOMMENDED</div>
+            </div>
+            <div class="apple-choice-title">Let the app run it (Automatic)</div>
+            <div class="apple-section-copy">We'll handle the optimization end-to-end. Provide your API key, and we'll generate, run, validate, and have you ready to download in 30 seconds with no copy-paste.</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
+        if st.button("Use API Mode →", use_container_width=True, key="mode-api"):
+            logger.info("User selected API mode")
+            st.session_state.execution_mode = "api"
+            st.session_state.generated_prompt = _build_optimizer_prompt_from_state()
+            st.session_state.api_prompt_customized = False
+            st.session_state.api_prompt_override = st.session_state.generated_prompt or ""
+            st.session_state.screen = "api"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    with api_col:
-        with st.container(border=True):
-            st.markdown(
-                """
-                <div class="apple-kicker">Automatic</div>
-                <div class="apple-choice-title">Let the app run the optimization for you.</div>
-                <div class="apple-choice-copy">Use your own provider key, get the same validated review flow automatically, and move from prompt to export with much less friction.</div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-            if st.button("Choose API Mode", use_container_width=True):
-                st.session_state.execution_mode = "api"
-                st.session_state.generated_prompt = _build_optimizer_prompt_from_state()
-                st.session_state.api_prompt_customized = False
-                st.session_state.api_prompt_override = st.session_state.generated_prompt or ""
-                st.session_state.screen = "api"
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center; color: #999; font-size: 12px;'>OR</div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
 
-    with local_col:
-        with st.container(border=True):
-            st.markdown(
-                """
-                <div class="apple-kicker">Advanced</div>
-                <div class="apple-choice-title">Use a local model or custom endpoint.</div>
-                <div class="apple-choice-copy">Ideal for demos, Ollama, or self-hosted setups that still need the same validation and export safeguards.</div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-            if st.button("Use Local / Custom", use_container_width=True):
-                st.session_state.execution_mode = "api"
-                st.session_state.selected_provider = "Local Model / Custom Endpoint"
-                st.session_state.generated_prompt = _build_optimizer_prompt_from_state()
-                st.session_state.api_prompt_customized = False
-                st.session_state.api_prompt_override = st.session_state.generated_prompt or ""
-                st.session_state.screen = "api"
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+    # Manual Mode - Secondary
+    with st.container(border=True):
+        st.markdown(
+            """
+            <div class="apple-kicker">Manual Control</div>
+            <div class="apple-choice-title">I want to manage the optimization</div>
+            <div class="apple-section-copy">Copy the prompt, paste it into ChatGPT/Claude/Gemini/your choice, get the result, and bring it back. Great if you want to compare outputs or use free tools.</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Use Manual Mode →", use_container_width=True, key="mode-manual"):
+            logger.info("User selected manual mode")
+            st.session_state.execution_mode = "manual"
+            st.session_state.generated_prompt = _build_optimizer_prompt_from_state()
+            st.session_state.api_prompt_customized = False
+            st.session_state.api_prompt_override = st.session_state.generated_prompt or ""
+            st.session_state.screen = "manual"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    back_col, _, _ = st.columns([1, 2, 2])
+    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+
+    back_col = st.columns([1])[0]
     with back_col:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("Back", use_container_width=True):
-            st.session_state.screen = "application_match" if st.session_state.get("use_career_profile") else "input"
+        if st.button("Back", use_container_width=True, key="mode-back"):
+            st.session_state.screen = "fit_report"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
     render_shell_end()
