@@ -52,6 +52,7 @@ from prompt_engine import build_builder_prompt, build_optimizer_prompt
 from resume_evaluator import calculate_match_score, evaluate_resume_fit
 from improvements_generator import generate_improvements_summary
 from review_engine import analyze_payload_against_document
+from optimization_history_ui import render_optimization_history_screen
 
 logging.basicConfig(
     level=logging.INFO,
@@ -3788,11 +3789,39 @@ def handle_validated_payload(payload: dict) -> None:
         baseline_report,
         st.session_state.optimized_fit_report or {},
     )
+
+    # Calculate match scores and save optimization result for history
+    match_score_before = int(baseline_report.get("overall_score", 0))
+    match_score_after = int((st.session_state.optimized_fit_report or {}).get("overall_score", 0))
+
+    # Generate improvements summary
+    improvements = generate_improvements_summary(
+        replacements_for_analysis=payload.get("replacements", []) if isinstance(payload, dict) else [],
+        jd_text=st.session_state.job_description or "",
+        max_improvements=5,
+        min_impact="high"
+    )
+
+    # Save to optimization history database
+    try:
+        save_optimization_result(
+            user_id="local-user",
+            company_name=st.session_state.get("current_application_company", "").strip() or "Untitled Company",
+            job_title=st.session_state.get("current_target_role", "").strip() or "Untitled Role",
+            job_description=st.session_state.job_description or "",
+            match_before=match_score_before,
+            match_after=match_score_after,
+            improvements=improvements,
+            resume_used_id="",
+        )
+    except Exception as e:
+        logger.warning("Failed to save optimization result: %s", str(e))
+
     logger.info(
         "Optimization completed: replacements=%s, before_fit=%s, after_fit=%s",
         len(replacements),
-        int(baseline_report.get("overall_score", 0)),
-        int((st.session_state.optimized_fit_report or {}).get("overall_score", 0)),
+        match_score_before,
+        match_score_after,
     )
     st.session_state.screen = "review"
 
@@ -4415,6 +4444,11 @@ def main() -> None:
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("📊 Your Optimizations", use_container_width=True, key="sidebar-optimization-history"):
+            st.session_state.screen = "optimization_history"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
         if st.button("Career Profile", use_container_width=True, key="sidebar-profile"):
             st.session_state.screen = "profile_welcome"
             st.rerun()
@@ -4435,6 +4469,8 @@ def main() -> None:
         render_application_match_screen()
     elif screen == "application_workspace":
         render_application_workspace_screen()
+    elif screen == "optimization_history":
+        render_optimization_history_screen()
     elif screen == "input":
         render_input_screen()
     elif screen == "fit_report":
