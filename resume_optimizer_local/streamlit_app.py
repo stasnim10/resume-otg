@@ -3077,6 +3077,9 @@ def render_fit_report_screen() -> None:
         st.markdown("</div>", unsafe_allow_html=True)
 
     render_shell_end()
+
+
+def render_builder_input_screen() -> None:
     """Student-friendly first-resume intake flow."""
     render_shell_start()
     render_screen_intro(
