@@ -1,6 +1,6 @@
 """
-Handle .docx file operations: extraction and deterministic replacement
-Word-style Find & Replace that preserves formatting
+Handle .docx and .pdf file operations: extraction and deterministic replacement
+Word-style Find & Replace that preserves formatting for .docx
 """
 import io
 
@@ -9,20 +9,61 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, Inches
 from typing import List, Tuple, Dict, Any
 
+try:
+    import PyPDF2
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
+
+def extract_text_from_pdf(pdf_path: str) -> str:
+    """
+    Extract plain text from PDF file.
+
+    Args:
+        pdf_path: Path to PDF file
+
+    Returns:
+        Full plain text from document
+
+    Raises:
+        ImportError: If PyPDF2 is not installed
+        RuntimeError: If PDF extraction fails
+    """
+    if not PDF_AVAILABLE:
+        raise ImportError("PyPDF2 is required for PDF support. Install with: pip install PyPDF2")
+
+    try:
+        text_parts = []
+        with open(pdf_path, 'rb') as f:
+            pdf_reader = PyPDF2.PdfReader(f)
+            for page_num in range(len(pdf_reader.pages)):
+                page = pdf_reader.pages[page_num]
+                text = page.extract_text()
+                if text:
+                    text_parts.append(text)
+        return "\n".join(text_parts)
+    except Exception as e:
+        raise RuntimeError(f"Failed to extract text from PDF: {str(e)}")
+
 
 def extract_text(doc_path: str) -> str:
     """
-    Extract plain text from .docx file.
-    
+    Extract plain text from .docx or .pdf file.
+
     Args:
-        doc_path: Path to .docx file
-        
+        doc_path: Path to .docx or .pdf file
+
     Returns:
         Full plain text from document
     """
-    doc = Document(doc_path)
-    text = "\n".join([para.text for para in doc.paragraphs])
-    return text
+    if doc_path.lower().endswith('.pdf'):
+        return extract_text_from_pdf(doc_path)
+    else:
+        # Default to .docx handling
+        doc = Document(doc_path)
+        text = "\n".join([para.text for para in doc.paragraphs])
+        return text
 
 
 def replace_paragraph_text(para, replacement: str) -> bool:

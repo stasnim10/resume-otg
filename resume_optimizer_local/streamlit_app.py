@@ -1438,7 +1438,14 @@ def save_uploaded_resume(uploaded_file) -> None:
     """Store uploaded resume data and extracted plain text in session state."""
     resume_bytes = uploaded_file.getvalue()
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_file:
+    # Determine file suffix based on uploaded filename
+    filename_lower = uploaded_file.name.lower()
+    if filename_lower.endswith('.pdf'):
+        suffix = ".pdf"
+    else:
+        suffix = ".docx"
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
         temp_file.write(resume_bytes)
         temp_path = temp_file.name
 
@@ -2803,11 +2810,11 @@ def render_input_screen() -> None:
             st.markdown(
                 """
                 <div class="apple-section-title">Upload your resume</div>
-                <div class="apple-section-copy">Use a <code>.docx</code> file. We preserve the document structure so the finished export still feels like your original resume, just sharper.</div>
+                <div class="apple-section-copy">Use a <code>.docx</code> or <code>.pdf</code> file. We preserve the document structure so the finished export still feels like your original resume, just sharper.</div>
                 """,
                 unsafe_allow_html=True,
             )
-            uploaded_file = st.file_uploader("Upload Resume (.docx)", type=["docx"], label_visibility="collapsed")
+            uploaded_file = st.file_uploader("Upload Resume (.docx or .pdf)", type=["docx", "pdf"], label_visibility="collapsed")
             if uploaded_file is not None:
                 save_uploaded_resume(uploaded_file)
                 st.success(f"Loaded `{uploaded_file.name}`")
