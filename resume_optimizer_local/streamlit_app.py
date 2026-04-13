@@ -3036,29 +3036,23 @@ def render_fit_report_screen() -> None:
     </div>
     """, unsafe_allow_html=True)
 
-    # Key Signals Section
+    # Match Recommendation Section
     with st.container(border=True):
-        st.markdown('<div class="apple-kicker">Key Signals</div>', unsafe_allow_html=True)
-        st.markdown('<div class="apple-section-title">What we found in your resume vs this role.</div>', unsafe_allow_html=True)
+        if score >= 80:
+            recommendation = "Strong fit 💪 - Your resume aligns well with this role. Optimize to maximize impact."
+            color = "#2ecc71"  # Green
+        elif score >= 60:
+            recommendation = "Fair fit 🎯 - Potential match. Optimize to improve your chances significantly."
+            color = "#f39c12"  # Orange
+        else:
+            recommendation = "Weak fit ⚠️ - Limited alignment. Optimization might help, but consider if the role is right for you."
+            color = "#e74c3c"  # Red
 
-        signals_col1, signals_col2 = st.columns(2, gap="large")
-
-        with signals_col1:
-            st.markdown('<div class="apple-section-title" style="font-size: 14px;">✓ What Matches</div>', unsafe_allow_html=True)
-            if signals.get("matches"):
-                for match in signals.get("matches", []):
-                    strength_icon = "⭐" if match.get("strength") == "strong" else "•"
-                    st.caption(f"{strength_icon} {match.get('signal', 'Unknown')}")
-            else:
-                st.caption("Matches are in the details (optimization will find them)")
-
-        with signals_col2:
-            st.markdown("<div class=\"apple-section-title\" style=\"font-size: 14px;\">✗ What Missing</div>", unsafe_allow_html=True)
-            if signals.get("gaps"):
-                for gap in signals.get("gaps", []):
-                    st.caption(f"• {gap.get('signal', 'Unknown')}")
-            else:
-                st.caption("No major gaps detected")
+        st.markdown(f"""
+        <div style="text-align: center; padding: 1rem; border-left: 4px solid {color};">
+            <div style="font-size: 16px; color: {color}; font-weight: 600;">{recommendation}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Action Buttons
     st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
