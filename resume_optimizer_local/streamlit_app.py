@@ -3043,7 +3043,7 @@ def render_fit_report_screen() -> None:
                     strength_icon = "⭐" if match.get("strength") == "strong" else "•"
                     st.caption(f"{strength_icon} {match.get('signal', 'Unknown')}")
             else:
-                st.caption("No strong matches yet")
+                st.caption("Matches are in the details (optimization will find them)")
 
         with signals_col2:
             st.markdown("<div class=\"apple-section-title\" style=\"font-size: 14px;\">✗ What Missing</div>", unsafe_allow_html=True)
@@ -3056,7 +3056,7 @@ def render_fit_report_screen() -> None:
     # Action Buttons
     st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
 
-    action_col1, action_col2, action_col3 = st.columns(3, gap="large")
+    action_col1, action_col2 = st.columns(2, gap="large")
 
     with action_col1:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
@@ -3067,14 +3067,6 @@ def render_fit_report_screen() -> None:
         st.markdown("</div>", unsafe_allow_html=True)
 
     with action_col2:
-        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("Try Another Job", use_container_width=True, key="fit-try-another"):
-            logger.info("User trying another job from fit_report: score=%s", score)
-            st.session_state.screen = "input"
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with action_col3:
         st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
         button_text = "See Details" if score < 50 else "Optimize Now"
         if st.button(button_text, use_container_width=True, key="fit-optimize"):
@@ -3624,7 +3616,7 @@ def render_mode_screen() -> None:
         st.markdown(
             """
             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <div class="apple-kicker">🚀 RECOMMENDED</div>
+                <div class="apple-kicker">RECOMMENDED</div>
             </div>
             <div class="apple-choice-title">Let the app run it (Automatic)</div>
             <div class="apple-section-copy">We'll handle the optimization end-to-end. Provide your API key, and we'll generate, run, validate, and have you ready to download in 30 seconds with no copy-paste.</div>
@@ -3716,7 +3708,7 @@ def handle_validated_payload(payload: dict) -> None:
 
     # Generate improvements summary
     improvements = generate_improvements_summary(
-        replacements_for_analysis=payload.get("replacements", []) if isinstance(payload, dict) else [],
+        optimized_replacements=payload.get("replacements", []) if isinstance(payload, dict) else [],
         jd_text=st.session_state.job_description or "",
         max_improvements=5,
         min_impact="high"
@@ -3905,7 +3897,7 @@ def render_manual_screen() -> None:
         render_instruction_panel(
             "What To Do Next",
             [
-                "Copy the prompt above and paste it into ChatGPT, Claude, or Gemini.",
+                "Copy the prompt above and paste it into ChatGPT, Claude, or Gemini. Include the same resume you uploaded in the box.",
                 "Ask the AI to return only the structured JSON output with no extra explanation.",
                 "Paste the AI result into the box below, then click Validate Output.",
             ],
