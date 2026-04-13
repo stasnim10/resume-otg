@@ -9,12 +9,6 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, Inches
 from typing import List, Tuple, Dict, Any
 
-try:
-    import PyPDF2
-    PDF_AVAILABLE = True
-except ImportError:
-    PDF_AVAILABLE = False
-
 
 def extract_text_from_pdf(pdf_path: str) -> str:
     """
@@ -30,7 +24,9 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         ImportError: If PyPDF2 is not installed
         RuntimeError: If PDF extraction fails
     """
-    if not PDF_AVAILABLE:
+    try:
+        import PyPDF2
+    except ImportError:
         raise ImportError("PyPDF2 is required for PDF support. Install with: pip install PyPDF2")
 
     try:
