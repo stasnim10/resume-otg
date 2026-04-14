@@ -4135,6 +4135,13 @@ def render_review_screen() -> None:
         "Validation and Export",
         "Review the optimized result, confirm the changes, and download when everything looks right.",
     )
+
+    # Show fit score delta immediately — it is the primary signal of whether
+    # the optimization was worth it. Placing it first means users see the
+    # answer before scrolling through change counts and examples.
+    if baseline_report and optimized_report:
+        _render_fit_delta_card(baseline_report, optimized_report)
+
     if not st.session_state.show_review_changes:
         if ready_for_export:
             st.success("Optimization complete. Your resume is validated and ready to download.")
@@ -4211,9 +4218,6 @@ def render_review_screen() -> None:
                         f"{metric['after']}",
                         delta_text,
                     )
-
-        if baseline_report and optimized_report:
-            _render_fit_delta_card(baseline_report, optimized_report)
 
         if review_warnings:
             for warning in review_warnings:
