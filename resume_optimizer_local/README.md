@@ -134,27 +134,12 @@ Output shows:
 
 ## How to Get Full Paragraph Text (Easy Method)
 
-Use the included **paragraph extractor** tool:
-
-```bash
-python extract_paragraphs.py "YourResume.docx"
-```
-
-This will display all paragraphs from your resume with numbers:
-```
-[01] 📝 SUMMARY:
-   "MBA candidate and strategy-driven operations professional..."
-
-[16] PARAGRAPH:
-   "Directed a $50M supply chain transformation across 15 distribution centers..."
-```
-
-**Copy the exact text** (without quotes) and use as your `match_anchor` in JSON.
+Use the in-app **Review Changes** flow to inspect exact paragraph text when an anchor does not match.
 
 ## How to Get Optimized Text
 
 ### Option A: ChatGPT / Claude
-1. Extract paragraphs using the tool above
+1. Copy exact paragraph text from the in-app review
 2. Paste into ChatGPT: "Optimize these resume bullets for [Job Title]"
 3. Ask for full-paragraph replacements (not just keywords)
 4. Copy optimized text into `replacement_text`

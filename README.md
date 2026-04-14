@@ -90,22 +90,9 @@ pip install -r requirements.txt
 
 ## 📝 How to Create JSON Payload
 
-### Step 1: Extract Paragraph Text
+### Step 1: Get Exact Paragraph Text
 
-Use the desktop helper tool:
-```bash
-cd resume_optimizer_local
-python extract_paragraphs.py "YourResume.docx"
-```
-
-Output shows all paragraphs:
-```
-[01] 📝 SUMMARY:
-   "MBA candidate and strategy-driven operations professional..."
-
-[16] PARAGRAPH:
-   "Directed a $50M supply chain transformation..."
-```
+Use the app's review screen to copy exact paragraph text for anchors.
 
 ### Step 2: Create JSON
 
@@ -165,7 +152,6 @@ resume-optimizer-otg/
 │   ├── main.py                  # GUI application
 │   ├── docx_handler.py          # Core document processing
 │   ├── json_parser.py           # JSON validation
-│   ├── extract_paragraphs.py    # Helper tool
 │   ├── requirements.txt
 │   └── README.md
 │
@@ -222,7 +208,7 @@ MIT License - See LICENSE file for details
 
 ## 💡 Tips for Best Results
 
-1. **Extract paragraphs first** using `extract_paragraphs.py`
+1. **Use the review screen first** to copy exact anchor text
 2. **Copy exact text** - don't truncate or modify
 3. **Keep replacement length similar** to preserve layout
 4. **Test with small changes first** before full optimization

@@ -94,13 +94,7 @@ Your app will be live at `https://yourusername.pythonanywhere.com`
 ### Step 2: Prepare JSON Payload
 
 #### Get Full Paragraph Text
-Use the desktop version's extraction tool:
-```bash
-cd resume_optimizer_local
-python extract_paragraphs.py "YourResume.docx"
-```
-
-This shows all paragraphs with numbers - copy the exact text.
+Use the app review flow to copy exact paragraph text from the uploaded document.
 
 #### Create JSON
 Click **"Load Example JSON"** in the web app or create manually:
@@ -225,7 +219,7 @@ MIT License - See LICENSE file for details
 1. **Use full paragraphs as anchors** - Not just first few words!
 2. **Keep replacements similar length** - Preserves document layout
 3. **Test with example JSON first** - Click "Load Example" button
-4. **Extract paragraphs with desktop tool** - Use `extract_paragraphs.py`
+4. **Use exact paragraph text** from the app review flow for anchors
 
 ## ⚠️ Important Notes
 

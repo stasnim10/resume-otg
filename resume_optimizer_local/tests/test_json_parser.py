@@ -54,7 +54,7 @@ def _valid_builder_payload() -> dict:
 
 
 def test_extract_json_from_text_with_prose_wrapper() -> None:
-    raw = "Here you go:\n```json\n{\"summary_replacement\": {\"match_anchor\": \"A\", \"replacement_text\": \"B\"}}\n```"
+    raw = "Here you go:\n{\"summary_replacement\": {\"match_anchor\": \"A\", \"replacement_text\": \"B\"}}"
     parsed = extract_json_from_text(raw)
     assert parsed["summary_replacement"]["match_anchor"] == "A"
 
@@ -71,7 +71,7 @@ def test_extract_json_from_text_rejects_when_no_json_block() -> None:
 
 def test_extract_json_from_text_rejects_malformed_json() -> None:
     with pytest.raises(ValueError, match="Invalid JSON format"):
-        extract_json_from_text("{\"summary_replacement\":")
+        extract_json_from_text("{\"summary_replacement\": {\"match_anchor\": \"A\",}}")
 
 
 def test_validate_payload_accepts_all_supported_sections() -> None:
