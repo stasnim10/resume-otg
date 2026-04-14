@@ -1542,52 +1542,37 @@ def render_landing() -> None:
           <div class="apple-hero">
             <div class="apple-eyebrow">Resume Optimizer</div>
             <h1>Make resume tailoring feel beautifully simple.</h1>
-            <p>Start with your draft, aim it at the role you want, and move through a guided flow that feels calm, clear, and polished from start to download.</p>
+            <p>Start with your draft, target the role you want, and review every change before you download.</p>
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    col1, col2 = st.columns(2, gap="large")
-    with col1:
-        st.markdown(
-            """
-            <div class="apple-landing-card featured">
-              <div>
-                <div class="apple-kicker">Most Popular</div>
-                <div class="apple-landing-card-title">Optimize an existing resume</div>
-                <div class="apple-landing-card-copy">Refine the resume you already have for a specific role, then review the final changes before you export it.</div>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.markdown('<div class="apple-landing-actions apple-primary">', unsafe_allow_html=True)
-        if st.button("Start Optimizing", use_container_width=True, key="landing-optimize"):
-            st.session_state.screen = "input"
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="apple-landing-card featured">
+          <div>
+            <div class="apple-kicker">Most Popular</div>
+            <div class="apple-landing-card-title">Optimize an existing resume</div>
+            <div class="apple-landing-card-copy">Refine the resume you already have for a specific role, then review the final changes before you export it.</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="apple-landing-actions apple-primary">', unsafe_allow_html=True)
+    if st.button("Start Optimizing", use_container_width=True, key="landing-optimize"):
+        st.session_state.screen = "input"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    with col2:
-        st.markdown(
-            """
-            <div class="apple-landing-card">
-              <div>
-                <div class="apple-kicker">Builder Path</div>
-                <div class="apple-landing-card-title">Build your first resume</div>
-                <div class="apple-landing-card-copy">Start with a plain-English brain dump and shape it into a clean first draft with more guidance built in.</div>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.markdown('<div class="apple-landing-actions apple-secondary">', unsafe_allow_html=True)
-        if st.button("Build First Resume", use_container_width=True, key="landing-builder"):
-            st.session_state.career_stage = "Student"
-            st.session_state.screen = "builder_input"
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="apple-landing-actions apple-secondary">', unsafe_allow_html=True)
+    if st.button("Build your first resume instead", use_container_width=True, key="landing-builder"):
+        st.session_state.career_stage = "Student"
+        st.session_state.screen = "builder_input"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
     render_shell_end()
 
@@ -4142,6 +4127,9 @@ def render_review_screen() -> None:
             st.warning("This result needs review before export.")
             st.markdown("We validated the structured output, but some replacements still need attention before download.")
 
+        if baseline_report and optimized_report:
+            _render_fit_delta_card(baseline_report, optimized_report)
+
         with st.container(border=True):
             st.markdown('<div class="apple-summary-label">Success Snapshot</div>', unsafe_allow_html=True)
             st.markdown(
@@ -4211,9 +4199,6 @@ def render_review_screen() -> None:
                         f"{metric['after']}",
                         delta_text,
                     )
-
-        if baseline_report and optimized_report:
-            _render_fit_delta_card(baseline_report, optimized_report)
 
         if review_warnings:
             for warning in review_warnings:
@@ -4346,27 +4331,26 @@ def main() -> None:
     with st.sidebar:
         st.markdown("### Resume Optimizer")
         st.caption("A calmer way to tailor resumes with AI-guided review before export.")
-        render_chip_row(["Apple-inspired redesign", "Prototype build"])
         st.markdown("<div style='height:0.6rem;'></div>", unsafe_allow_html=True)
         st.write("Use the guided flow to upload, target, run, review, and download with confidence.")
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("Start Over", use_container_width=True, key="sidebar-start-over"):
+        if st.button("Home", use_container_width=True, key="sidebar-home"):
             reset_flow()
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("Application Workspace", use_container_width=True, key="sidebar-application-workspace"):
-            st.session_state.screen = "application_workspace"
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("📊 Your Optimizations", use_container_width=True, key="sidebar-optimization-history"):
-            st.session_state.screen = "optimization_history"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
         if st.button("Career Profile", use_container_width=True, key="sidebar-profile"):
             st.session_state.screen = "profile_welcome"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Optimization History", use_container_width=True, key="sidebar-optimization-history"):
+            st.session_state.screen = "optimization_history"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
+        if st.button("Application Workspace", use_container_width=True, key="sidebar-application-workspace"):
+            st.session_state.screen = "application_workspace"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
