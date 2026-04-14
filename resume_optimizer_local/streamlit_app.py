@@ -2867,6 +2867,46 @@ def render_input_screen() -> None:
     st.session_state.target_role = ""
     st.session_state.target_industry = ""
 
+    # Inline fit preview — show as soon as both inputs are ready so users
+    # get the score without navigating to a separate screen.
+    if st.session_state.resume_text and job_description.strip():
+        report = _evaluate_current_resume_fit()
+        score, band, recommendation, _action, _short = summarize_fit_recommendation(report)
+        if score >= 75:
+            band_color = "#27ae60"
+        elif score >= 60:
+            band_color = "#f39c12"
+        else:
+            band_color = "#e74c3c"
+        st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Pre-flight Match Check</div>', unsafe_allow_html=True)
+            fit_col1, fit_col2 = st.columns([1, 3], gap="large")
+            with fit_col1:
+                st.markdown(
+                    f"""
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;">
+                      <div style="font-size:48px;font-weight:bold;color:{band_color};">{score}%</div>
+                      <div style="font-size:13px;color:{band_color};font-weight:600;margin-top:0.2rem;">{band}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with fit_col2:
+                st.markdown(
+                    f'<div class="apple-section-title" style="margin-bottom:0.4rem;">{recommendation}</div>',
+                    unsafe_allow_html=True,
+                )
+                matched = report.get("matched_keywords", [])
+                missing = report.get("missing_keywords", [])
+                if matched:
+                    st.markdown(
+                        build_inline_chip_row(matched[:6]),
+                        unsafe_allow_html=True,
+                    )
+                if missing:
+                    st.caption(f"Missing signals: {', '.join(missing[:5])}")
+
     col1, col2, col3 = st.columns([0.7, 0.9, 1.1], gap="large")
     with col1:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
@@ -2898,7 +2938,9 @@ def render_input_screen() -> None:
             else:
                 st.session_state.jd_cleaning_result = None
                 _evaluate_current_resume_fit(force=True)
-                st.session_state.screen = "fit_report"
+                # Go directly to mode selection — fit score is already
+                # visible inline on this screen, no separate hop needed.
+                st.session_state.screen = "mode"
                 st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
     render_shell_end()
@@ -3669,7 +3711,7 @@ def render_mode_screen() -> None:
     with back_col:
         st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
         if st.button("Back", use_container_width=True, key="mode-back"):
-            st.session_state.screen = "fit_report"
+            st.session_state.screen = "input"
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
     render_shell_end()
