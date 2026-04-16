@@ -24,6 +24,8 @@ class CareerProfile:
     phone: str = ""
     location: str = ""
     linkedin: str = ""
+    portfolio_url: str = ""
+    photo_path: str = ""
     headline: str = ""
     career_stage: str = "Student"
     summary: str = ""
@@ -31,6 +33,8 @@ class CareerProfile:
     target_industries: list[str] = field(default_factory=list)
     preferred_locations: list[str] = field(default_factory=list)
     work_authorization: str = ""
+    onboarding_complete: bool = False
+    onboarding_started_at: str = ""
     created_at: str = field(default_factory=utc_now_iso)
     updated_at: str = field(default_factory=utc_now_iso)
 

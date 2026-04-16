@@ -5,6 +5,76 @@ import json
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
+COMMON_TOP_LEVEL_WRAPPERS = (
+    "result",
+    "data",
+    "output",
+    "payload",
+    "response",
+)
+
+REPLACEMENT_ANCHOR_KEYS = (
+    "match_anchor",
+    "current_text",
+    "original_text",
+    "source_text",
+    "before_text",
+    "original",
+    "anchor",
+)
+
+REPLACEMENT_TEXT_KEYS = (
+    "replacement_text",
+    "optimized_text",
+    "revised_text",
+    "updated_text",
+    "after_text",
+    "rewrite",
+    "replacement",
+    "improved_text",
+)
+
+
+def _strip_common_wrappers(raw_text: str) -> str:
+    """Remove common non-JSON wrappers models add around structured output."""
+    text = raw_text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*```$", "", text)
+    text = re.sub(r"<\|channel\|>thought[\s\S]*?<\|/channel\|>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"<\|channel\|>thought[\s\S]*?<channel\|>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.IGNORECASE)
+    return text.strip()
+
+
+def _extract_balanced_json_object(text: str) -> Optional[str]:
+    """Find the first balanced top-level JSON object in text."""
+    start = text.find("{")
+    while start != -1:
+        depth = 0
+        in_string = False
+        escape = False
+        for index in range(start, len(text)):
+            char = text[index]
+            if in_string:
+                if escape:
+                    escape = False
+                elif char == "\\":
+                    escape = True
+                elif char == '"':
+                    in_string = False
+                continue
+
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start:index + 1]
+        start = text.find("{", start + 1)
+    return None
+
 
 def extract_json_from_text(raw_text: str) -> Dict[str, Any]:
     """
@@ -16,11 +86,10 @@ def extract_json_from_text(raw_text: str) -> Dict[str, Any]:
     if not raw_text or not raw_text.strip():
         raise ValueError("No pasted content found. Paste the AI response and try again.")
 
-    match = re.search(r"\{[\s\S]*\}\s*$", raw_text.strip())
-    if not match:
+    cleaned_text = _strip_common_wrappers(raw_text)
+    json_str = _extract_balanced_json_object(cleaned_text)
+    if not json_str:
         raise ValueError("No JSON block found. Paste the AI response that contains the structured payload.")
-
-    json_str = match.group(0)
 
     try:
         return json.loads(json_str)
@@ -29,6 +98,33 @@ def extract_json_from_text(raw_text: str) -> Dict[str, Any]:
             "Invalid JSON format. "
             f"Line {error.lineno}, Column {error.colno}: {error.msg}"
         ) from error
+
+
+def _unwrap_common_payload_wrappers(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Unwrap common single-key envelopes produced by local models.
+
+    Some models return the real schema inside a top-level key such as
+    ``result`` or ``data`` even when prompted not to. We recover from
+    that here so downstream validation still applies to the actual task
+    payload rather than failing on a harmless wrapper.
+    """
+    current: Any = payload
+    for _ in range(3):
+        if not isinstance(current, dict) or len(current) != 1:
+            break
+
+        wrapper_key = next(iter(current.keys()))
+        if wrapper_key not in COMMON_TOP_LEVEL_WRAPPERS:
+            break
+
+        inner_payload = current.get(wrapper_key)
+        if not isinstance(inner_payload, dict):
+            break
+
+        current = inner_payload
+
+    return current if isinstance(current, dict) else payload
 
 
 def _validate_replacement_object(
@@ -48,6 +144,114 @@ def _validate_replacement_object(
         return False, f"{label}.replacement_text must be a non-empty string."
 
     return True, None
+
+
+def _pick_first_non_empty_string(source: Dict[str, Any], keys: tuple[str, ...]) -> str:
+    """Return the first non-empty string for any of the provided keys."""
+    for key in keys:
+        value = source.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _coerce_replacement_object(value: Any) -> Optional[Dict[str, str]]:
+    """Map common model response variants into the expected replacement shape."""
+    if not isinstance(value, dict):
+        return None
+
+    match_anchor = _pick_first_non_empty_string(value, REPLACEMENT_ANCHOR_KEYS)
+    replacement_text = _pick_first_non_empty_string(value, REPLACEMENT_TEXT_KEYS)
+    if not match_anchor or not replacement_text:
+        return None
+
+    return {
+        "match_anchor": match_anchor,
+        "replacement_text": replacement_text,
+    }
+
+
+def _normalize_replacement_collection(value: Any) -> List[Dict[str, str]]:
+    """Normalize a replacement collection into validated replacement objects."""
+    if isinstance(value, dict):
+        normalized = _coerce_replacement_object(value)
+        return [normalized] if normalized else []
+
+    if not isinstance(value, list):
+        return []
+
+    items: List[Dict[str, str]] = []
+    for raw_item in value:
+        normalized = _coerce_replacement_object(raw_item)
+        if normalized:
+            items.append(normalized)
+    return items
+
+
+def _normalize_replacement_payload_shape(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Recover from common alternate draft schemas returned by local models.
+
+    Gemma sometimes returns semantically useful structures such as
+    ``optimized_sections`` or ``action_items`` even when we asked for the
+    replacement schema. This function translates those variants into the
+    strict payload the rest of the app expects.
+    """
+    if not isinstance(payload, dict):
+        return payload
+
+    supported_keys = {"summary_replacement", "bullet_replacements", "skills_replacements"}
+    if any(key in payload for key in supported_keys):
+        normalized: Dict[str, Any] = {}
+        if "summary_replacement" in payload:
+            summary_replacement = _coerce_replacement_object(payload.get("summary_replacement"))
+            if summary_replacement:
+                normalized["summary_replacement"] = summary_replacement
+        for section_name in ("bullet_replacements", "skills_replacements"):
+            replacements = _normalize_replacement_collection(payload.get(section_name))
+            if replacements:
+                normalized[section_name] = replacements
+        return normalized or payload
+
+    normalized_payload: Dict[str, Any] = {}
+
+    summary_candidate = _coerce_replacement_object(payload.get("summary"))
+    if summary_candidate:
+        normalized_payload["summary_replacement"] = summary_candidate
+
+    bullet_replacements: List[Dict[str, str]] = []
+    skills_replacements: List[Dict[str, str]] = []
+
+    for collection_key in ("optimized_sections", "action_items", "replacements", "changes"):
+        collection = payload.get(collection_key)
+        if not isinstance(collection, list):
+            continue
+        for raw_item in collection:
+            normalized_item = _coerce_replacement_object(raw_item)
+            if not normalized_item:
+                continue
+
+            section_hint = str(
+                raw_item.get("section")
+                or raw_item.get("section_type")
+                or raw_item.get("target_section")
+                or raw_item.get("type")
+                or ""
+            ).lower()
+
+            if "skill" in section_hint:
+                skills_replacements.append(normalized_item)
+            elif "summary" in section_hint or "headline" in section_hint or "profile" in section_hint:
+                normalized_payload.setdefault("summary_replacement", normalized_item)
+            else:
+                bullet_replacements.append(normalized_item)
+
+    if bullet_replacements:
+        normalized_payload["bullet_replacements"] = bullet_replacements
+    if skills_replacements:
+        normalized_payload["skills_replacements"] = skills_replacements
+
+    return normalized_payload or payload
 
 
 def validate_payload(payload: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
@@ -246,7 +450,9 @@ def parse_replacement_payload(raw_text: str) -> Dict[str, Any]:
 
     Raises ValueError when the payload is missing or invalid.
     """
-    payload = extract_json_from_text(raw_text)
+    payload = _normalize_replacement_payload_shape(
+        _unwrap_common_payload_wrappers(extract_json_from_text(raw_text))
+    )
     is_valid, error_message = validate_payload(payload)
     if not is_valid:
         raise ValueError(error_message)
@@ -255,7 +461,7 @@ def parse_replacement_payload(raw_text: str) -> Dict[str, Any]:
 
 def parse_builder_payload(raw_text: str) -> Dict[str, Any]:
     """Extract and validate a builder payload."""
-    payload = extract_json_from_text(raw_text)
+    payload = _unwrap_common_payload_wrappers(extract_json_from_text(raw_text))
     is_valid, error_message = validate_builder_payload(payload)
     if not is_valid:
         raise ValueError(error_message)

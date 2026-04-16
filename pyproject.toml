@@ -1,0 +1,30 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]   # line length handled by formatter
+
+[tool.ruff.lint.per-file-ignores]
+"tests_llm/**" = ["ANN", "D"]
+
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests_llm"]
+addopts = "--tb=short -q"
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests_llm/*", "*/site-packages/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 60

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from collections import OrderedDict
+from typing import Any
 
 from profile_schema import ProfileItem
 
@@ -45,6 +46,21 @@ CONTACT_LINE_PATTERN = re.compile(
     r"(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}",
     flags=re.IGNORECASE,
 )
+
+_LOCATION_WORDS = {
+    "bangladesh", "ethiopia", "france", "sri", "lanka", "india", "cambodia",
+    "rochester", "york", "united", "states", "usa", "ny", "singapore",
+}
+_FILLER_SKILL_WORDS = {
+    "outstanding", "performer", "year", "completion", "award", "leveraging",
+    "strategic", "insights", "future", "trends", "learning", "project",
+    "management", "business", "startup", "transformation", "product",
+    "strategy", "consultant",
+}
+_VERB_HEAVY_WORDS = {
+    "audited", "managed", "worked", "created", "improved", "coached", "supported",
+    "developed", "led", "built", "drove", "delivered",
+}
 
 
 def _normalize_lines(raw_text: str) -> list[str]:
@@ -125,14 +141,47 @@ def _extract_skills(lines: list[str]) -> list[str]:
         skills.extend([part.strip() for part in parts if part.strip()])
     unique: list[str] = []
     for skill in skills:
-        if skill not in unique:
-            unique.append(skill)
+        cleaned = re.sub(r"\s+", " ", skill).strip(" -•\t")
+        lowered = cleaned.lower()
+        token_set = set(re.findall(r"[a-zA-Z]+", lowered))
+        if not cleaned or len(cleaned) < 2 or len(cleaned) > 48:
+            continue
+        if "," in cleaned and cleaned.count(",") >= 2:
+            continue
+        if lowered in _FILLER_SKILL_WORDS or lowered in _LOCATION_WORDS:
+            continue
+        if token_set and token_set.issubset(_LOCATION_WORDS | _FILLER_SKILL_WORDS):
+            continue
+        if token_set & _VERB_HEAVY_WORDS:
+            continue
+        if re.search(r"\b(linkedin|portfolio|email|phone)\b", lowered):
+            continue
+        if cleaned not in unique:
+            unique.append(cleaned)
     return unique[:30]
+
+
+def _looks_like_invalid_title(line: str) -> bool:
+    cleaned = re.sub(r"\s+", " ", line).strip(" -•\t")
+    lowered = cleaned.lower()
+    words = re.findall(r"[a-zA-Z]+", lowered)
+    token_set = set(words)
+    if not cleaned:
+        return True
+    if cleaned.count(",") >= 2:
+        return True
+    if token_set and token_set.issubset(_LOCATION_WORDS):
+        return True
+    if token_set and token_set.issubset(_LOCATION_WORDS | _FILLER_SKILL_WORDS):
+        return True
+    if token_set & _VERB_HEAVY_WORDS and len(words) > 4:
+        return True
+    return cleaned.endswith(".")
 
 
 def _extract_keywords(chunk: list[str]) -> list[str]:
     keyword_source = " ".join(chunk).lower()
-    keywords = [word for word in re.findall(r"[a-zA-Z]{4,}", keyword_source)]
+    keywords = re.findall(r"[a-zA-Z]{4,}", keyword_source)
     unique: list[str] = []
     for keyword in keywords:
         if keyword not in unique:
@@ -198,12 +247,20 @@ def _chunk_items(lines: list[str]) -> list[list[str]]:
             current.append(re.sub(r"^[-\u2022*]\s+", "", line).strip())
             continue
 
+        # Detect if this line is likely a sentence rather than a job title
+        is_sentence = (
+            clean_line.endswith('.')
+            or clean_line.lower().startswith(('this ', 'these ', 'the ', 'a ', 'an ', 'page '))
+            or re.search(r'\b(strengthened|increased|managed|led|developed|worked|created|improved)\b', clean_line.lower())
+        )
+
         line_could_be_title = (
             bool(re.match(r"^[A-Z][A-Za-z0-9&,'()./ -]{2,}$", clean_line))
             and not _looks_like_date_line(clean_line)
             and " · " not in clean_line
             and not _looks_like_contact_line(clean_line)
-            and len(clean_line.split()) <= 10
+            and len(clean_line.split()) <= 6  # Reduced from 10 to avoid sentences like "This experience strengthened..."
+            and not is_sentence  # Reject obvious prose
         )
         current_has_completed_shape = (
             len(current) >= 3
@@ -225,21 +282,41 @@ def _chunk_items(lines: list[str]) -> list[list[str]]:
 
 def _build_generic_item(item_type: str, chunk: list[str]) -> ProfileItem:
     title = chunk[0] if chunk else ""
+    if _looks_like_invalid_title(title):
+        title = ""
     organization = _guess_organization(title, chunk[1:])
     dates = _extract_dates(chunk[1:])
     detail_lines = _strip_metadata_lines(chunk[1:], organization, dates)
     description = "\n".join(detail_lines).strip()
     bullets = [line for line in detail_lines if len(line.split()) > 2][:6]
     keywords = _extract_keywords(chunk)
+
+    # Improved confidence scoring
+    confidence = 0.4
+    if organization:
+        confidence += 0.15
+    if dates:
+        confidence += 0.15
+    if description and len(description) > 20:
+        confidence += 0.15
+    if len(bullets) >= 2:
+        confidence += 0.1
+    if len(keywords) >= 3:
+        confidence += 0.1
+
+    # High confidence when we have multiple signals
+    if organization and description and (dates or len(bullets) >= 2):
+        confidence = max(confidence, 0.8)
+
     return ProfileItem(
         item_type=item_type,
-        title=title,
+        title=title or (organization if not _looks_like_invalid_title(organization) else ""),
         organization=organization,
         start_date=dates,
         description=description,
         bullets=bullets,
         keywords=keywords,
-        confidence_score=0.75 if organization and description else 0.55 if description else 0.4,
+        confidence_score=min(0.95, confidence),
     )
 
 
@@ -311,6 +388,94 @@ def extract_profile_items_from_text(raw_text: str) -> tuple[dict[str, str], list
             item = _build_generic_item(item_type, chunk)
             if section_name == "education":
                 item.organization = chunk[0]
+            if not item.title and not item.organization:
+                continue
             items.append(item)
 
     return basics, _dedupe_profile_items(items)
+
+
+_CAREER_STAGES = [
+    "Student", "Early Career", "Mid-Level", "Manager", "Executive", "Career Pivot"
+]
+
+
+def extract_profile_basics(resume_text: str) -> dict[str, Any]:
+    """Auto-extract profile basics from resume text for pre-filling the profile form.
+
+    Returns a dict with keys: name, email, phone, location, career_stage,
+    industries (list[str]), resume_snippet (str).
+    """
+    lines = resume_text.split("\n")
+
+    # Name — usually the first short, all-alpha line
+    name = ""
+    for line in lines[:10]:
+        clean_line = line.strip()
+        if clean_line and len(clean_line) < 50 and len(clean_line.split()) <= 4:
+            if not any(char.isdigit() for char in clean_line):
+                name = clean_line
+                break
+
+    email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', resume_text)
+    email = email_match.group(0) if email_match else ""
+
+    phone_match = re.search(r'(\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}', resume_text)
+    phone = phone_match.group(0) if phone_match else ""
+
+    location = ""
+    location_match = re.search(
+        r'(?:Location|City|Based|Address)[:\s]+([A-Z][a-z\s]+(?:,\s*[A-Z]{2})?)',
+        resume_text,
+        re.IGNORECASE,
+    )
+    if location_match:
+        location = location_match.group(1).strip()
+
+    years_match = re.findall(
+        r'(\d+)\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|in|project)',
+        resume_text,
+        re.IGNORECASE,
+    )
+    years_exp = max((int(m) for m in years_match), default=0)
+
+    if years_exp < 2:
+        career_stage = "Student"
+    elif years_exp < 5:
+        career_stage = "Early Career"
+    elif years_exp < 10:
+        career_stage = "Mid-Level"
+    elif years_exp < 15:
+        career_stage = "Manager"
+    else:
+        career_stage = "Executive"
+
+    industries: set[str] = set()
+    job_title_match = re.search(r'(?:Title|Role|Position)[:\s]+([^\n]+)', resume_text, re.IGNORECASE)
+    if job_title_match:
+        title = job_title_match.group(1).lower()
+        if any(w in title for w in ("engineer", "developer", "tech", "software")):
+            industries.add("Technology")
+        if any(w in title for w in ("data", "analyst", "science")):
+            industries.add("Technology")
+        if any(w in title for w in ("consult", "adviso")):
+            industries.add("Consulting")
+        if any(w in title for w in ("finance", "accounting", "cfo")):
+            industries.add("Finance")
+        if any(w in title for w in ("market", "sales", "business")):
+            industries.add("General Business")
+    if not industries:
+        industries = {"General Business"}
+
+    bullets = re.findall(r'[•\-\*]\s*(.{20,150})', resume_text[:2000])
+    resume_snippet = "\n".join(bullets[:3]) if bullets else ""
+
+    return {
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "location": location,
+        "career_stage": career_stage,
+        "industries": list(industries),
+        "resume_snippet": resume_snippet[:500],
+    }

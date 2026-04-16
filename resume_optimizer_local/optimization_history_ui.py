@@ -3,14 +3,14 @@ from datetime import datetime
 import streamlit as st
 import logging
 from profile_store import get_optimization_history
+from shell import render_shell_start, render_shell_end, render_screen_intro
+from ui_helpers import primary_button, secondary_button
 
 logger = logging.getLogger(__name__)
 
 
 def render_optimization_history_screen() -> None:
     """Display past optimizations for the user."""
-    from streamlit_app import render_shell_start, render_shell_end, render_screen_intro
-
     render_shell_start()
     history = get_optimization_history(user_id="local-user")
 
@@ -101,18 +101,14 @@ def render_optimization_history_screen() -> None:
 
                 action_col1, action_col2, action_col3 = st.columns(3, gap="large")
                 with action_col1:
-                    st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-                    if st.button("Optimize Again", use_container_width=True, key=f"history-optimize-{opt['id']}"):
+                    if primary_button("Optimize Again", key=f"history-optimize-{opt['id']}", use_container_width=True):
                         st.session_state.job_description = ""
                         st.session_state.screen = "input"
                         logger.info(f"User starting new optimization from history item {opt['id']}")
                         st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
 
                 with action_col2:
-                    st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-                    st.button("View Details", use_container_width=True, key=f"history-view-{opt['id']}", disabled=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    secondary_button("View Details", key=f"history-view-{opt['id']}", use_container_width=True, disabled=True)
 
                 with action_col3:
                     st.markdown('')
@@ -120,24 +116,18 @@ def render_optimization_history_screen() -> None:
     st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1, 1], gap="large")
     with col1:
-        st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-        if st.button("Start New Optimization", use_container_width=True):
+        if primary_button("Start New Optimization", key="history-new-opt", use_container_width=True):
             st.session_state.screen = "input"
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
-        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("Back to Profile", use_container_width=True):
+        if secondary_button("Back to Profile", key="history-back-profile", use_container_width=True):
             st.session_state.screen = "profile_dashboard"
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
     with col3:
-        st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-        if st.button("Home", use_container_width=True):
+        if secondary_button("Home", key="history-home", use_container_width=True):
             st.session_state.screen = "landing"
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
     render_shell_end()

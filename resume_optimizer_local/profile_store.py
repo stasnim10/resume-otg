@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -18,6 +17,8 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "career_profile.db"
 
+_db_initialized: bool = False
+
 
 def get_connection() -> sqlite3.Connection:
     """Open a SQLite connection with row access."""
@@ -27,7 +28,10 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_profile_db() -> None:
-    """Create required tables if missing."""
+    """Create required tables if missing. Idempotent — only runs DDL once per process."""
+    global _db_initialized
+    if _db_initialized:
+        return
     with get_connection() as conn:
         conn.executescript(
             """
@@ -39,6 +43,8 @@ def init_profile_db() -> None:
                 phone TEXT NOT NULL DEFAULT '',
                 location TEXT NOT NULL DEFAULT '',
                 linkedin TEXT NOT NULL DEFAULT '',
+                portfolio_url TEXT NOT NULL DEFAULT '',
+                photo_path TEXT NOT NULL DEFAULT '',
                 headline TEXT NOT NULL DEFAULT '',
                 career_stage TEXT NOT NULL DEFAULT 'Student',
                 summary TEXT NOT NULL DEFAULT '',
@@ -117,6 +123,8 @@ def init_profile_db() -> None:
         )
         _ensure_profile_columns(conn)
         _ensure_redesign_columns(conn)
+        _ensure_onboarding_columns(conn)
+    _db_initialized = True
 
 
 def _ensure_profile_columns(conn: sqlite3.Connection) -> None:
@@ -128,10 +136,24 @@ def _ensure_profile_columns(conn: sqlite3.Connection) -> None:
         "phone": "TEXT NOT NULL DEFAULT ''",
         "location": "TEXT NOT NULL DEFAULT ''",
         "linkedin": "TEXT NOT NULL DEFAULT ''",
+        "portfolio_url": "TEXT NOT NULL DEFAULT ''",
+        "photo_path": "TEXT NOT NULL DEFAULT ''",
     }
     for column_name, column_type in expected_columns.items():
         if column_name not in columns:
             conn.execute(f"ALTER TABLE career_profiles ADD COLUMN {column_name} {column_type}")
+
+
+def _ensure_onboarding_columns(conn: sqlite3.Connection) -> None:
+    """Add onboarding tracking columns to career_profiles."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(career_profiles)").fetchall()}
+    onboarding_columns = {
+        "onboarding_complete":    "INTEGER NOT NULL DEFAULT 0",
+        "onboarding_started_at":  "TEXT NOT NULL DEFAULT ''",
+    }
+    for col, col_type in onboarding_columns.items():
+        if col not in columns:
+            conn.execute(f"ALTER TABLE career_profiles ADD COLUMN {col} {col_type}")
 
 
 def _ensure_redesign_columns(conn: sqlite3.Connection) -> None:
@@ -184,6 +206,7 @@ def create_or_get_profile(user_id: str = "local-user") -> CareerProfile:
             (user_id,),
         ).fetchone()
         if row:
+            row_keys = row.keys()
             return CareerProfile(
                 id=row["id"],
                 user_id=row["user_id"],
@@ -192,6 +215,8 @@ def create_or_get_profile(user_id: str = "local-user") -> CareerProfile:
                 phone=row["phone"],
                 location=row["location"],
                 linkedin=row["linkedin"],
+                portfolio_url=row["portfolio_url"] if "portfolio_url" in row_keys else "",
+                photo_path=row["photo_path"] if "photo_path" in row_keys else "",
                 headline=row["headline"],
                 career_stage=row["career_stage"],
                 summary=row["summary"],
@@ -199,6 +224,8 @@ def create_or_get_profile(user_id: str = "local-user") -> CareerProfile:
                 target_industries=_decode_json_list(row["target_industries_json"]),
                 preferred_locations=_decode_json_list(row["preferred_locations_json"]),
                 work_authorization=row["work_authorization"],
+                onboarding_complete=bool(row["onboarding_complete"]) if "onboarding_complete" in row_keys else False,
+                onboarding_started_at=row["onboarding_started_at"] if "onboarding_started_at" in row_keys else "",
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
             )
@@ -208,10 +235,10 @@ def create_or_get_profile(user_id: str = "local-user") -> CareerProfile:
             """
             INSERT INTO career_profiles (
                 user_id, full_name, email, phone, location, linkedin,
-                headline, career_stage, summary,
+                portfolio_url, photo_path, headline, career_stage, summary,
                 target_roles_json, target_industries_json, preferred_locations_json,
                 work_authorization, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 profile.user_id,
@@ -220,6 +247,8 @@ def create_or_get_profile(user_id: str = "local-user") -> CareerProfile:
                 profile.phone,
                 profile.location,
                 profile.linkedin,
+                profile.portfolio_url,
+                profile.photo_path,
                 profile.headline,
                 profile.career_stage,
                 profile.summary,
@@ -248,6 +277,8 @@ def save_profile_basics(
     target_industries: list[str],
     preferred_locations: list[str],
     work_authorization: str,
+    portfolio_url: str = "",
+    photo_path: str = "",
     user_id: str = "local-user",
 ) -> CareerProfile:
     """Persist editable top-level profile fields."""
@@ -262,6 +293,8 @@ def save_profile_basics(
                 phone = ?,
                 location = ?,
                 linkedin = ?,
+                portfolio_url = ?,
+                photo_path = ?,
                 headline = ?,
                 career_stage = ?,
                 summary = ?,
@@ -278,6 +311,8 @@ def save_profile_basics(
                 phone.strip(),
                 location.strip(),
                 linkedin.strip(),
+                portfolio_url.strip(),
+                photo_path.strip(),
                 headline.strip(),
                 career_stage.strip() or profile.career_stage,
                 summary.strip(),
@@ -290,6 +325,28 @@ def save_profile_basics(
             ),
         )
     return create_or_get_profile(user_id)
+
+
+def start_onboarding(user_id: str = "local-user") -> None:
+    """Mark that onboarding has started (first app open)."""
+    profile = create_or_get_profile(user_id)
+    if profile.onboarding_started_at:
+        return  # already started
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE career_profiles SET onboarding_started_at = ? WHERE id = ?",
+            (utc_now_iso(), profile.id),
+        )
+
+
+def complete_onboarding(user_id: str = "local-user") -> None:
+    """Permanently mark onboarding as done — never shown again."""
+    profile = create_or_get_profile(user_id)
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE career_profiles SET onboarding_complete = 1, updated_at = ? WHERE id = ?",
+            (utc_now_iso(), profile.id),
+        )
 
 
 def save_profile_source(
@@ -753,117 +810,11 @@ def get_optimization_history(user_id: str = "local-user") -> list[dict]:
     return history
 
 
+# Moved to profile_extractor.extract_profile_basics — keep alias for callers not yet updated.
 def extract_profile_basics_from_resume(resume_text: str) -> dict[str, Any]:
-    """
-    Auto-extract profile basics from resume text for pre-filling profile form.
-
-    Returns: dict with keys:
-    {
-        "name": str,
-        "email": str,
-        "phone": str,
-        "location": str,
-        "career_stage": str (one of CAREER_STAGES),
-        "industries": list[str],
-        "resume_snippet": str (first 500 chars of key experience)
-    }
-    """
-    lines = resume_text.split("\n")
-
-    # Extract name (usually first non-empty line)
-    name = ""
-    for line in lines[:10]:
-        clean_line = line.strip()
-        if clean_line and len(clean_line) < 50 and len(clean_line.split()) <= 4:
-            # Likely a name (short, few words)
-            if not any(char.isdigit() for char in clean_line):
-                name = clean_line
-                break
-
-    # Extract email
-    email = ""
-    email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', resume_text)
-    if email_match:
-        email = email_match.group(0)
-
-    # Extract phone
-    phone = ""
-    phone_match = re.search(r'(\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}', resume_text)
-    if phone_match:
-        phone = phone_match.group(0)
-
-    # Extract location (look for common US states or city patterns after city/state keywords)
-    location = ""
-    location_match = re.search(
-        r'(?:Location|City|Based|Address)[:\s]+([A-Z][a-z\s]+(?:,\s*[A-Z]{2})?)',
-        resume_text,
-        re.IGNORECASE
-    )
-    if location_match:
-        location = location_match.group(1).strip()
-
-    # Estimate career stage from years of experience
-    years_match = re.findall(
-        r'(\d+)\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|in|project)',
-        resume_text,
-        re.IGNORECASE
-    )
-    years_exp = 0
-    if years_match:
-        years_exp = max([int(m) for m in years_match])
-
-    career_stages = [
-        "Student", "Early Career", "Mid-Level", "Manager", "Executive", "Career Pivot"
-    ]
-    if years_exp < 2:
-        career_stage = "Student"
-    elif years_exp < 5:
-        career_stage = "Early Career"
-    elif years_exp < 10:
-        career_stage = "Mid-Level"
-    elif years_exp < 15:
-        career_stage = "Manager"
-    else:
-        career_stage = "Executive"
-
-    # Extract industries from company names and job titles
-    industries = set()
-    job_title_match = re.search(
-        r'(?:Title|Role|Position)[:\s]+([^\n]+)',
-        resume_text,
-        re.IGNORECASE
-    )
-    if job_title_match:
-        title = job_title_match.group(1).lower()
-        # Simple industry detection from common keywords
-        if any(word in title for word in ['engineer', 'developer', 'tech', 'software']):
-            industries.add('Technology')
-        if any(word in title for word in ['data', 'analyst', 'science']):
-            industries.add('Technology')
-        if any(word in title for word in ['consult', 'adviso']):
-            industries.add('Consulting')
-        if any(word in title for word in ['finance', 'accounting', 'cfo']):
-            industries.add('Finance')
-        if any(word in title for word in ['market', 'sales', 'business']):
-            industries.add('General Business')
-
-    if not industries:
-        industries = {'General Business'}
-
-    # Extract resume snippet (first meaningful bullet points)
-    bullet_pattern = r'[•\-\*]\s*(.{20,150})'
-    bullets = re.findall(bullet_pattern, resume_text[:2000])
-    resume_snippet = "\n".join(bullets[:3]) if bullets else ""
-
-    return {
-        "name": name,
-        "email": email,
-        "phone": phone,
-        "location": location,
-        "career_stage": career_stage,
-        "industries": list(industries),
-        "resume_snippet": resume_snippet[:500],
-    }
+    """Alias for :func:`profile_extractor.extract_profile_basics`."""
+    from profile_extractor import extract_profile_basics
+    return extract_profile_basics(resume_text)
 
 
 def create_or_update_profile_from_optimization(
@@ -905,6 +856,8 @@ def create_or_update_profile_from_optimization(
             phone=basics.get("phone", profile.phone),
             location=basics.get("location", profile.location),
             linkedin=profile.linkedin,
+            portfolio_url=profile.portfolio_url,
+            photo_path=profile.photo_path,
             headline=profile.headline,
             career_stage=basics.get("career_stage", profile.career_stage),
             summary=basics.get("resume_snippet", profile.summary)[:200],

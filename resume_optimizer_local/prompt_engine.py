@@ -186,6 +186,8 @@ The candidate is at the {career_stage} stage and is targeting a {normalized_role
 OBJECTIVE
 Optimize the uploaded resume for the target role using only information that is clearly supported by the resume. Improve relevance, clarity, and ATS alignment while preserving honesty.
 
+CRITICAL: Your changes must INCREASE or maintain keyword alignment with the job description - they must NOT reduce it. If a change removes specificity or industry terminology that appears in the job description, reject that change.
+
 PRIORITIZATION
 Focus your optimization on these areas (in order of importance):
 {prioritization_block}
@@ -196,10 +198,12 @@ RULES
 1. Do not invent employers, job titles, dates, certifications, scope, or metrics.
 2. Rewrite only what is already supported by the resume and job description.
 3. Preserve the intent of the original experience while making it more targeted.
-4. Use exact paragraph text from the resume as each match_anchor.
-5. Return only valid JSON. No markdown fences. No explanation before or after the JSON.
-6. Every match_anchor must exactly match one full paragraph from the resume text below.
-7. If no changes are needed for a section, omit it from the output. Return {{}} if no changes are needed at all.
+4. PRESERVE SPECIFIC KEYWORDS AND TERMINOLOGY that appear in both the original resume and the job description.
+5. If removing a word/phrase, only do so if the replacement is MORE specific or maintains equal specificity for the job.
+6. Use exact paragraph text from the resume as each match_anchor.
+7. Return only valid JSON. No markdown fences. No explanation before or after the JSON.
+8. Every match_anchor must exactly match one full paragraph from the resume text below.
+9. If no changes are needed for a section, omit it from the output. Return {{}} if no changes are needed at all.
 
 BULLET-WRITING REQUIREMENTS
 Each bullet point in replacements should:
@@ -208,6 +212,7 @@ Each bullet point in replacements should:
 - Remain concise (1-2 lines maximum)
 - Focus on outcome and impact, not just activities
 - Align with the prioritization areas above
+- PRESERVE specific industry terminology and company-specific achievements (e.g., "first", "Decathlon's", "go-to-market")
 
 SKILLS SECTION GUIDANCE
 For skills replacements:
@@ -216,6 +221,7 @@ For skills replacements:
 - Remain truthful to resume experience and do not add unsupported skills
 - Order skills by relevance to the {normalized_role} role
 - Group related skills together when it improves readability
+- Use specific tool names (e.g., "Looker Studio") rather than generic terms (e.g., "analytics tools")
 
 OUTPUT JSON SCHEMA
 {{

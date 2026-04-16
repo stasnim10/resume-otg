@@ -2,12 +2,18 @@
 Handle .docx and .pdf file operations: extraction and deterministic replacement
 Word-style Find & Replace that preserves formatting for .docx
 """
+from __future__ import annotations
+
 import io
+import logging
+import re
+from typing import Any
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Pt, Inches
-from typing import List, Tuple, Dict, Any
+from docx.shared import Inches, Pt
+
+logger = logging.getLogger(__name__)
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
@@ -26,8 +32,8 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     """
     try:
         import PyPDF2
-    except ImportError:
-        raise ImportError("PyPDF2 is required for PDF support. Install with: pip install PyPDF2")
+    except ImportError as exc:
+        raise ImportError("PyPDF2 is required for PDF support. Install with: pip install PyPDF2") from exc
 
     try:
         text_parts = []
@@ -37,10 +43,19 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 page = pdf_reader.pages[page_num]
                 text = page.extract_text()
                 if text:
-                    text_parts.append(text)
+                    # Strip LinkedIn-style pagination artifacts
+                    # Remove lines that are only "Page X of Y"
+                    text = re.sub(r'(?im)^\s*page\s+\d+\s+of\s+\d+\s*$', '', text)
+                    # Remove lines that are "=== Page X ===" style
+                    text = re.sub(r'(?im)^\s*=+\s*page\s+\d+\s*=+\s*$', '', text)
+                    # Clean excessive newlines caused by PDF rendering
+                    text = re.sub(r'\n{3,}', '\n\n', text)
+                    # Only append non-empty text
+                    if text.strip():
+                        text_parts.append(text.strip())
         return "\n".join(text_parts)
-    except Exception as e:
-        raise RuntimeError(f"Failed to extract text from PDF: {str(e)}")
+    except Exception as exc:
+        raise RuntimeError(f"Failed to extract text from PDF: {exc}") from exc
 
 
 def extract_text(doc_path: str) -> str:
@@ -105,8 +120,8 @@ def replace_paragraph_text(para, replacement: str) -> bool:
     if first_fmt['font_color']:
         try:
             new_run.font.color.rgb = first_fmt['font_color']
-        except:
-            pass
+        except Exception:
+            logger.debug("Skipping unsupported font color type: %r", first_fmt['font_color'])
     
     return True
 
@@ -151,7 +166,7 @@ def replace_exact_paragraph(doc, anchor: str, new_text: str) -> str:
     return f"✅ Replaced: '{anchor[:60]}...'"
 
 
-def apply_replacements(doc_path: str, payload: Dict[str, Any]) -> Tuple[bool, str]:
+def apply_replacements(doc_path: str, payload: dict[str, Any]) -> tuple[bool, str]:
     """
     Apply all replacements from payload to document.
     Preserves formatting like Word's Find & Replace.
@@ -174,32 +189,32 @@ def apply_replacements(doc_path: str, payload: Dict[str, Any]) -> Tuple[bool, st
             try:
                 msg = replace_exact_paragraph(doc, sr["match_anchor"], sr["replacement_text"])
                 replaced_anchors.append(sr["match_anchor"])
-                print(msg)
+                logger.debug(msg)
             except ValueError as e:
                 errors.append(str(e))
-                print(str(e))
-        
+                logger.warning(str(e))
+
         # Bullet replacements
         if "bullet_replacements" in payload:
             for idx, bullet in enumerate(payload["bullet_replacements"]):
                 try:
                     msg = replace_exact_paragraph(doc, bullet["match_anchor"], bullet["replacement_text"])
                     replaced_anchors.append(bullet["match_anchor"])
-                    print(msg)
+                    logger.debug(msg)
                 except ValueError as e:
                     errors.append(str(e))
-                    print(str(e))
-        
+                    logger.warning(str(e))
+
         # Skills replacements
         if "skills_replacements" in payload:
             for idx, skill in enumerate(payload["skills_replacements"]):
                 try:
                     msg = replace_exact_paragraph(doc, skill["match_anchor"], skill["replacement_text"])
                     replaced_anchors.append(skill["match_anchor"])
-                    print(msg)
+                    logger.debug(msg)
                 except ValueError as e:
                     errors.append(str(e))
-                    print(str(e))
+                    logger.warning(str(e))
         
         # If any errors, fail
         if errors:
@@ -217,7 +232,7 @@ def apply_replacements(doc_path: str, payload: Dict[str, Any]) -> Tuple[bool, st
         return False, f"❌ Error: {str(e)}"
 
 
-def apply_cover_letter_replacements(doc_path: str, payload: Dict[str, Any]) -> Tuple[bool, str]:
+def apply_cover_letter_replacements(doc_path: str, payload: dict[str, Any]) -> tuple[bool, str]:
     """
     Apply cover letter replacements from payload to document.
 
@@ -296,7 +311,7 @@ def generate_output_filename(original_path: str, suffix: str = "_Optimized") -> 
     return str(output_path)
 
 
-def save_cover_letter_content(template_path: str, content: str, output_path: str) -> Tuple[bool, str]:
+def save_cover_letter_content(template_path: str, content: str, output_path: str) -> tuple[bool, str]:
     """
     Replace cover letter body content while preserving template formatting.
     
@@ -422,7 +437,7 @@ def _add_section_heading(doc: Document, title: str) -> None:
     paragraph.paragraph_format.space_after = Pt(2)
 
 
-def _add_bullets(doc: Document, items: List[str]) -> None:
+def _add_bullets(doc: Document, items: list[str]) -> None:
     """Add bullet items using Word's built-in list style."""
     for item in items:
         bullet = doc.add_paragraph(style="List Bullet")
@@ -430,7 +445,7 @@ def _add_bullets(doc: Document, items: List[str]) -> None:
         bullet.add_run(item)
 
 
-def build_resume_from_scratch(payload: Dict[str, Any]) -> bytes:
+def build_resume_from_scratch(payload: dict[str, Any]) -> bytes:
     """
     Build a simple ATS-friendly resume document from validated builder JSON.
 

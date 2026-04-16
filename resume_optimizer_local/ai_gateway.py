@@ -25,11 +25,11 @@ PROVIDER_CONFIG: Dict[str, Dict[str, Union[List[str], str]]] = {
         "models": ["gemini-2.5-flash", "gemini-2.5-pro"],
         "description": "Hosted provider. Affordable and fast.",
     },
-    "Local Model / Custom Endpoint": {
+    "Advanced Custom Endpoint": {
         "key_label": "API Key (Optional)",
         "placeholder": "Leave blank for local endpoints that do not require auth",
         "models": ["mistral"],
-        "description": "Advanced option for Ollama or other OpenAI-compatible local endpoints.",
+        "description": "Advanced option for custom OpenAI-compatible endpoints.",
     },
 }
 
@@ -124,7 +124,7 @@ def optimize_with_provider(
     """Run the optimizer prompt against the selected provider."""
     if provider not in PROVIDER_CONFIG:
         raise ValueError(f"Unsupported provider: {provider}")
-    if provider != "Local Model / Custom Endpoint" and (not api_key or not api_key.strip()):
+    if provider != "Advanced Custom Endpoint" and (not api_key or not api_key.strip()):
         raise ValueError(f"Enter your {provider} API key to use API mode.")
 
     if provider == "OpenAI":
@@ -133,7 +133,7 @@ def optimize_with_provider(
         return _run_anthropic(api_key, prompt, model)
     if provider == "Gemini":
         return _run_gemini(api_key, prompt, model)
-    if provider == "Local Model / Custom Endpoint":
+    if provider == "Advanced Custom Endpoint":
         return _run_openai_compatible(base_url, api_key, prompt, model)
 
     raise ValueError(f"Unsupported provider: {provider}")
