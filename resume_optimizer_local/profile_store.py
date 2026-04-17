@@ -723,6 +723,7 @@ def save_optimization_result(
     match_after: int,
     improvements: list[dict],
     resume_used_id: str = "",
+    application_id: int | None = None,
 ) -> int:
     """
     Save optimization results to applications table for history tracking.
@@ -734,29 +735,66 @@ def save_optimization_result(
     improvements_json = json.dumps(improvements)
 
     with get_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO applications (
-                user_id, company, job_title, job_description,
-                match_before, match_after, improvements, resume_used_id,
-                created_at, updated_at, optimized_at, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
-            """,
-            (
-                user_id,
-                company_name,
-                job_title,
-                job_description,
-                match_before,
-                match_after,
-                improvements_json,
-                resume_used_id,
-                now,
-                now,
-                now,
-            ),
-        )
-        app_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        if application_id is not None:
+            cursor = conn.execute(
+                """
+                UPDATE applications
+                SET company = ?,
+                    job_title = ?,
+                    job_description = ?,
+                    match_before = ?,
+                    match_after = ?,
+                    improvements = ?,
+                    resume_used_id = ?,
+                    updated_at = ?,
+                    optimized_at = ?,
+                    status = 'completed'
+                WHERE id = ? AND user_id = ?
+                """,
+                (
+                    company_name,
+                    job_title,
+                    job_description,
+                    match_before,
+                    match_after,
+                    improvements_json,
+                    resume_used_id,
+                    now,
+                    now,
+                    application_id,
+                    user_id,
+                ),
+            )
+            if cursor.rowcount == 0:
+                # Row not found (stale ID or wrong user) — fall through to INSERT.
+                application_id = None
+            else:
+                app_id = application_id
+
+        if application_id is None:
+            conn.execute(
+                """
+                INSERT INTO applications (
+                    user_id, company, job_title, job_description,
+                    match_before, match_after, improvements, resume_used_id,
+                    created_at, updated_at, optimized_at, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
+                """,
+                (
+                    user_id,
+                    company_name,
+                    job_title,
+                    job_description,
+                    match_before,
+                    match_after,
+                    improvements_json,
+                    resume_used_id,
+                    now,
+                    now,
+                    now,
+                ),
+            )
+            app_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     return app_id
 

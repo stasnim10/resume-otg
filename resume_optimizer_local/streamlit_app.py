@@ -451,6 +451,35 @@ def apply_apple_theme() -> None:
     st.markdown(
         """
         <style>
+        /* ── Motion ── */
+        @keyframes _fade-up {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Respect user preference */
+        @media (prefers-reduced-motion: no-preference) {
+          .apple-hero {
+            animation: _fade-up 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          }
+
+          /* Stagger landing cards */
+          .apple-landing-card:nth-child(1) {
+            animation: _fade-up 280ms 40ms  cubic-bezier(0.16, 1, 0.3, 1) both;
+          }
+          .apple-landing-card:nth-child(2) {
+            animation: _fade-up 280ms 100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          }
+          .apple-landing-card:nth-child(3) {
+            animation: _fade-up 280ms 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          }
+
+          /* Streamlit border-wrapper cards on other screens */
+          [data-testid="stVerticalBlockBorderWrapper"] {
+            animation: _fade-up 260ms 60ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          }
+        }
+
         :root {
           --bg: #f5f5f7;
           --surface: #ffffff;
@@ -502,12 +531,14 @@ def apply_apple_theme() -> None:
 
         .block-container {
           max-width: 1200px !important;
-          padding-top: 4rem;
-          padding-bottom: 4rem;
+          padding-top: clamp(1.5rem, 4vw, 4rem) !important;
+          padding-bottom: clamp(1.5rem, 4vw, 4rem) !important;
+          padding-left: clamp(1rem, 3vw, 3rem) !important;
+          padding-right: clamp(1rem, 3vw, 3rem) !important;
         }
 
         .apple-hero {
-          padding: 1rem 0 4rem 0;
+          padding: clamp(0.5rem, 1.5vw, 1rem) 0 clamp(2rem, 4vw, 4rem) 0;
           text-align: center;
         }
 
@@ -749,8 +780,34 @@ def apply_apple_theme() -> None:
         }
 
         .apple-landing-card.featured {
-          border-color: var(--line-strong);
-          box-shadow: var(--shadow-soft);
+          background: var(--text) !important;
+          border-color: transparent !important;
+          box-shadow: var(--shadow-raised) !important;
+        }
+
+        .apple-landing-card.featured .apple-kicker {
+          color: rgba(255,255,255,0.55) !important;
+        }
+
+        .apple-landing-card.featured .apple-landing-card-title,
+        .apple-landing-card.featured .apple-landing-card-copy {
+          color: rgba(255,255,255,0.92) !important;
+        }
+
+        /* Button inside the featured card gets an inverted (light) style */
+        .apple-landing-card.featured .stButton button {
+          background: rgba(255,255,255,0.12) !important;
+          color: #ffffff !important;
+          border-color: rgba(255,255,255,0.22) !important;
+        }
+
+        .apple-landing-card.featured .stButton button:hover {
+          background: rgba(255,255,255,0.2) !important;
+          opacity: 1 !important;
+        }
+
+        .apple-landing-card.featured .stButton button * {
+          color: #ffffff !important;
         }
 
         .apple-landing-card-title {
@@ -1002,8 +1059,9 @@ def apply_apple_theme() -> None:
         .stTextArea textarea:focus,
         .stTextInput input:focus {
           background: #ebebf0 !important;
-          border-color: rgba(0,0,0,0.06) !important;
-          box-shadow: 0 0 0 3px rgba(0,113,227,0.08) !important;
+          border-color: rgba(0,113,227,0.5) !important;
+          box-shadow: 0 0 0 3px rgba(0,113,227,0.18) !important;
+          outline: none !important;
         }
 
         .stSelectbox > div > div,
@@ -1030,18 +1088,25 @@ def apply_apple_theme() -> None:
           opacity: 0.82;
         }
 
+        .stButton button:focus-visible,
+        .stDownloadButton button:focus-visible {
+          outline: 2px solid var(--blue) !important;
+          outline-offset: 2px !important;
+          box-shadow: 0 0 0 4px rgba(0,113,227,0.18) !important;
+        }
+
         .apple-primary button {
-          background: #1d1d1f !important;
-          color: #ffffff !important;
-          border-color: #1d1d1f !important;
+          background: var(--btn-primary-bg) !important;
+          color: var(--btn-primary-text) !important;
+          border-color: var(--btn-primary-bg) !important;
         }
 
         .apple-primary button *,
         .apple-primary button p,
         .apple-primary button span,
         .apple-primary button div {
-          color: #ffffff !important;
-          fill: #ffffff !important;
+          color: var(--btn-primary-text) !important;
+          fill: var(--btn-primary-text) !important;
           opacity: 1 !important;
         }
 
@@ -1144,8 +1209,39 @@ def apply_apple_theme() -> None:
             background: rgba(255,255,255,0.04);
           }
 
+          /* Featured card in dark mode: light fill so it pops against the dark bg,
+             but inner text and button must be dark to stay readable. */
+          .apple-landing-card.featured {
+            background: var(--text) !important;
+            border-color: transparent !important;
+          }
+
+          .apple-landing-card.featured .apple-kicker {
+            color: rgba(0,0,0,0.45) !important;
+          }
+
+          .apple-landing-card.featured .apple-landing-card-title,
+          .apple-landing-card.featured .apple-landing-card-copy {
+            color: rgba(0,0,0,0.88) !important;
+          }
+
+          .apple-landing-card.featured .stButton button {
+            background: rgba(0,0,0,0.12) !important;
+            color: #1d1d1f !important;
+            border-color: rgba(0,0,0,0.16) !important;
+          }
+
+          .apple-landing-card.featured .stButton button:hover {
+            background: rgba(0,0,0,0.18) !important;
+            opacity: 1 !important;
+          }
+
+          .apple-landing-card.featured .stButton button * {
+            color: #1d1d1f !important;
+          }
+
           .apple-chip,
-          .apple-landing-card,
+          .apple-landing-card:not(.featured),
           .apple-panel,
           .apple-card,
           .apple-choice,
@@ -1200,13 +1296,13 @@ def apply_apple_theme() -> None:
           .stTextArea textarea:focus,
           .stTextInput input:focus {
             background: var(--input-fill-focus) !important;
-            border-color: rgba(76,159,255,0.45) !important;
-            box-shadow: 0 0 0 3px rgba(76,159,255,0.12) !important;
+            border-color: rgba(76,159,255,0.7) !important;
+            box-shadow: 0 0 0 3px rgba(76,159,255,0.22) !important;
+            outline: none !important;
           }
 
-          .apple-primary button,
-          .stButton button,
-          .stDownloadButton button {
+          /* Dark mode: only explicitly-wrapped primary buttons get the filled treatment */
+          .apple-primary button {
             background: var(--btn-primary-bg) !important;
             color: var(--btn-primary-text) !important;
             border-color: var(--btn-primary-bg) !important;
@@ -1215,24 +1311,14 @@ def apply_apple_theme() -> None:
           .apple-primary button *,
           .apple-primary button p,
           .apple-primary button span,
-          .apple-primary button div,
-          .stButton button *,
-          .stButton button p,
-          .stButton button span,
-          .stButton button div,
-          .stDownloadButton button *,
-          .stDownloadButton button p,
-          .stDownloadButton button span,
-          .stDownloadButton button div {
+          .apple-primary button div {
             color: var(--btn-primary-text) !important;
             fill: var(--btn-primary-text) !important;
             opacity: 1 !important;
           }
 
-          /* Override the broad dark-mode button rule for secondary buttons */
-          .apple-secondary button,
-          .apple-secondary .stButton button,
-          .apple-secondary .stDownloadButton button {
+          /* Secondary buttons stay transparent with blue text in dark mode */
+          .apple-secondary button {
             background: transparent !important;
             color: var(--blue) !important;
             border-color: var(--line-strong) !important;
@@ -1241,11 +1327,7 @@ def apply_apple_theme() -> None:
           .apple-secondary button *,
           .apple-secondary button p,
           .apple-secondary button span,
-          .apple-secondary button div,
-          .apple-secondary .stButton button *,
-          .apple-secondary .stButton button p,
-          .apple-secondary .stButton button span,
-          .apple-secondary .stButton button div {
+          .apple-secondary button div {
             color: var(--blue) !important;
             fill: var(--blue) !important;
             opacity: 1 !important;
@@ -1437,6 +1519,17 @@ def get_effective_target_role(job_description: str) -> str:
         or (st.session_state.jd_role_hint.strip() if st.session_state.jd_source_url else "")
         or detect_role_title(job_description)
         or "the target role"
+    )
+
+
+def get_fresh_detected_target_role(job_description: str) -> str:
+    """Prefer the latest JD-derived title over older session carry-over values."""
+    local_ai_signals = st.session_state.get("local_ai_job_signals") or {}
+    return (
+        str(local_ai_signals.get("normalized_role_title", "")).strip()
+        or st.session_state.get("jd_role_hint", "").strip()
+        or detect_role_title(job_description)
+        or ""
     )
 
 
@@ -3662,11 +3755,18 @@ def render_input_screen() -> None:
                 extracted_text, final_url, role_hint = fetch_job_description_from_url(job_input)
             cleaning_result = clean_job_description(extracted_text)
             cleaned_text = cleaning_result["cleaned_text"]
+            # A newly processed JD should not inherit the prior application's identity.
+            st.session_state.current_application_id = None
+            st.session_state.current_application_company = ""
+            st.session_state.target_role = ""
+            st.session_state.target_industry = ""
             st.session_state.job_description = cleaned_text
             st.session_state.pending_job_description_input = cleaned_text
             st.session_state.jd_source_url = final_url
             st.session_state.jd_cleaning_result = cleaning_result
             st.session_state.jd_role_hint = role_hint or detect_role_title(cleaned_text)
+            st.session_state.target_role = st.session_state.jd_role_hint
+            st.session_state.target_industry = detect_industry(cleaned_text)
             st.session_state.local_ai_job_signals = {}
             maybe_process_job_description_with_local_ai()
             st.success("Job description extracted and cleaned successfully. Review the text below before continuing.")
@@ -3679,11 +3779,17 @@ def render_input_screen() -> None:
         """Normalize manually pasted JD text so downstream detection is cleaner."""
         cleaned_result = clean_job_description(job_input)
         cleaned_text = cleaned_result["cleaned_text"]
+        st.session_state.current_application_id = None
+        st.session_state.current_application_company = ""
+        st.session_state.target_role = ""
+        st.session_state.target_industry = ""
         st.session_state.job_description = cleaned_text
         st.session_state.pending_job_description_input = cleaned_text
         st.session_state.jd_source_url = ""
         st.session_state.jd_cleaning_result = cleaned_result
         st.session_state.jd_role_hint = detect_role_title(cleaned_text)
+        st.session_state.target_role = st.session_state.jd_role_hint
+        st.session_state.target_industry = detect_industry(cleaned_text)
         st.session_state.local_ai_job_signals = {}
         maybe_process_job_description_with_local_ai()
         st.success("Job description cleaned and ready. Review the text below before continuing.")
@@ -5157,10 +5263,10 @@ def handle_validated_payload(payload: dict) -> None:
     )
 
     # Save to optimization history database
-    _opt_title   = get_effective_target_role(st.session_state.job_description)
+    _opt_title   = get_fresh_detected_target_role(st.session_state.job_description)
     _opt_company = st.session_state.get("current_application_company", "").strip()
     try:
-        save_optimization_result(
+        _saved_application_id = save_optimization_result(
             user_id="local-user",
             company_name=_opt_company or "Unknown",
             job_title=_opt_title or "Unknown",
@@ -5169,9 +5275,12 @@ def handle_validated_payload(payload: dict) -> None:
             match_after=match_score_after,
             improvements=improvements,
             resume_used_id="",
+            application_id=st.session_state.get("current_application_id"),
         )
+        st.session_state.current_application_id = _saved_application_id
     except Exception as e:
         logger.warning("Failed to save optimization result: %s", str(e))
+        _saved_application_id = st.session_state.get("current_application_id")
 
     # Job Tracker integration — decide whether to auto-save or show save card
     _active_tracker_job = st.session_state.get("active_tracker_job_id")
@@ -5202,6 +5311,33 @@ def handle_validated_payload(payload: dict) -> None:
             st.session_state.tracker_auto_saved_to = _active_tracker_job
         except Exception as e:
             logger.warning("Failed to auto-save tracker run: %s", e)
+        st.session_state.tracker_pending_save = None
+    elif st.session_state.get("current_application_id"):
+        try:
+            from job_tracker_store import (
+                add_optimization_run as _jt_add_run,
+                get_job as _jt_get_job,
+                update_job_metadata as _jt_update_job,
+            )
+            _existing_job = _jt_get_job(st.session_state.current_application_id) or {}
+            _metadata_updates = {}
+            if (st.session_state.job_description or "").strip():
+                _metadata_updates["jd_text"] = st.session_state.job_description
+            if _opt_title:
+                _metadata_updates["job_title"] = _opt_title
+            if _opt_company:
+                _metadata_updates["company"] = _opt_company
+            if _metadata_updates:
+                _jt_update_job(st.session_state.current_application_id, **_metadata_updates)
+            _jt_add_run(
+                job_id=st.session_state.current_application_id,
+                match_before=match_score_before,
+                match_after=match_score_after,
+                improvements=improvements,
+            )
+            st.session_state.tracker_auto_saved_to = st.session_state.current_application_id
+        except Exception as e:
+            logger.warning("Failed to attach optimization to existing application: %s", e)
         st.session_state.tracker_pending_save = None
     else:
         # Fresh optimization: stash data so the review screen can show the save card

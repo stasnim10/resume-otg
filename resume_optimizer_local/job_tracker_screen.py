@@ -25,6 +25,7 @@ from job_tracker_store import (
     update_job_metadata,
     update_job_status,
 )
+from ui_helpers import primary_button, secondary_button
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -125,8 +126,8 @@ def _render_add_job_form() -> None:
 
         sa, sb, _ = st.columns([1.2, 1.2, 4])
         with sa:
-            if st.button(
-                "Save Job", key="jt-add-save", use_container_width=True, type="primary",
+            if primary_button(
+                "Save Job", key="jt-add-save", use_container_width=True,
                 disabled=not (title.strip() or company.strip()),
             ):
                 try:
@@ -195,7 +196,7 @@ def _render_edit_form(job: dict) -> None:
 
     ea, eb, ec, _ = st.columns([1.2, 1.2, 1.2, 4])
     with ea:
-        if st.button("Save Changes", key=f"jt-edit-save-{job_id}", use_container_width=True, type="primary"):
+        if primary_button("Save Changes", key=f"jt-edit-save-{job_id}", use_container_width=True):
             try:
                 update_job_metadata(
                     job_id,
@@ -211,11 +212,11 @@ def _render_edit_form(job: dict) -> None:
             except Exception as err:
                 st.error(str(err))
     with eb:
-        if st.button("Cancel", key=f"jt-edit-cancel-{job_id}", use_container_width=True):
+        if secondary_button("Cancel", key=f"jt-edit-cancel-{job_id}", use_container_width=True):
             st.session_state.jt_edit_open = None
             st.rerun()
     with ec:
-        if st.button("Delete", key=f"jt-edit-delete-{job_id}", use_container_width=True):
+        if secondary_button("Delete", key=f"jt-edit-delete-{job_id}", use_container_width=True):
             st.session_state.jt_delete_confirm = job_id
             st.rerun()
 
@@ -239,11 +240,11 @@ def _render_empty_state(is_filtered: bool) -> None:
             )
             c1, c2, _ = st.columns([1.6, 1.6, 3])
             with c1:
-                if st.button("Add Job Manually", key="jt-empty-add", use_container_width=True, type="primary"):
+                if primary_button("Add Job Manually", key="jt-empty-add", use_container_width=True):
                     st.session_state.jt_add_open = True
                     st.rerun()
             with c2:
-                if st.button("Optimize a Resume", key="jt-empty-opt", use_container_width=True):
+                if secondary_button("Optimize a Resume", key="jt-empty-opt", use_container_width=True):
                     st.session_state.active_tracker_job_id = None
                     st.session_state.screen = "input"
                     st.rerun()
@@ -346,12 +347,12 @@ def _render_job_card(job: dict) -> None:
         action_cols = st.columns([1.1, 1, 1, 1])
 
         with action_cols[0]:
-            if st.button("Open", key=f"jt-open-{job_id}", use_container_width=True, type="primary"):
+            if primary_button("Open", key=f"jt-open-{job_id}", use_container_width=True):
                 _nav("job_detail", active_job_detail_id=job_id)
 
         with action_cols[1]:
             status_lbl = "Status" if st.session_state.jt_status_editing != job_id else "Close"
-            if st.button(status_lbl, key=f"jt-status-{job_id}", use_container_width=True):
+            if secondary_button(status_lbl, key=f"jt-status-{job_id}", use_container_width=True):
                 if st.session_state.jt_status_editing == job_id:
                     st.session_state.jt_status_editing = None
                 else:
@@ -362,7 +363,7 @@ def _render_job_card(job: dict) -> None:
 
         with action_cols[2]:
             note_lbl = "Note" if st.session_state.jt_note_editing != job_id else "Close"
-            if st.button(note_lbl, key=f"jt-note-{job_id}", use_container_width=True):
+            if secondary_button(note_lbl, key=f"jt-note-{job_id}", use_container_width=True):
                 if st.session_state.jt_note_editing == job_id:
                     st.session_state.jt_note_editing = None
                 else:
@@ -373,7 +374,7 @@ def _render_job_card(job: dict) -> None:
 
         with action_cols[3]:
             edit_lbl = "Edit" if st.session_state.jt_edit_open != job_id else "Close"
-            if st.button(edit_lbl, key=f"jt-edit-{job_id}", use_container_width=True):
+            if secondary_button(edit_lbl, key=f"jt-edit-{job_id}", use_container_width=True):
                 if st.session_state.jt_edit_open == job_id:
                     st.session_state.jt_edit_open = None
                 else:
@@ -395,7 +396,7 @@ def _render_job_card(job: dict) -> None:
             )
             sv_col, _ = st.columns([1.5, 6])
             with sv_col:
-                if st.button("Save Status", key=f"jt-status-save-{job_id}", type="primary", use_container_width=True):
+                if primary_button("Save Status", key=f"jt-status-save-{job_id}", use_container_width=True):
                     update_job_status(job_id, new_status)
                     st.session_state.jt_status_editing = None
                     st.rerun()
@@ -413,16 +414,16 @@ def _render_job_card(job: dict) -> None:
             )
             nn1, nn2, _ = st.columns([1.2, 1.2, 5])
             with nn1:
-                if st.button(
+                if primary_button(
                     "Save Note", key=f"jt-note-save-{job_id}",
-                    use_container_width=True, type="primary",
+                    use_container_width=True,
                     disabled=not (note_text or "").strip(),
                 ):
                     add_note(job_id, (note_text or "").strip())
                     st.session_state.jt_note_editing = None
                     st.rerun()
             with nn2:
-                if st.button("Cancel", key=f"jt-note-cancel-{job_id}", use_container_width=True):
+                if secondary_button("Cancel", key=f"jt-note-cancel-{job_id}", use_container_width=True):
                     st.session_state.jt_note_editing = None
                     st.rerun()
 
@@ -439,14 +440,14 @@ def _render_job_card(job: dict) -> None:
             st.caption("This removes the job card, notes, materials, and optimization history.")
             dc1, dc2, _ = st.columns([1.2, 1.2, 4])
             with dc1:
-                if st.button("Delete Job", key=f"jt-delete-confirm-{job_id}", type="primary", use_container_width=True):
+                if primary_button("Delete Job", key=f"jt-delete-confirm-{job_id}", use_container_width=True):
                     delete_job(job_id)
                     st.session_state.jt_delete_confirm = None
                     if st.session_state.get("active_tracker_job_id") == job_id:
                         st.session_state.active_tracker_job_id = None
                     st.rerun()
             with dc2:
-                if st.button("Cancel", key=f"jt-delete-cancel-{job_id}", use_container_width=True):
+                if secondary_button("Cancel", key=f"jt-delete-cancel-{job_id}", use_container_width=True):
                     st.session_state.jt_delete_confirm = None
                     st.rerun()
 
@@ -462,9 +463,8 @@ def render_job_tracker_screen() -> None:
     with hdr_col:
         st.title("Job Tracker")
     with add_col:
-        st.markdown("<br>", unsafe_allow_html=True)
         add_label = "Close" if st.session_state.jt_add_open else "Add Job"
-        if st.button(add_label, key="jt-add-btn", use_container_width=True):
+        if secondary_button(add_label, key="jt-add-btn", use_container_width=True):
             st.session_state.jt_add_open = not st.session_state.jt_add_open
             st.rerun()
 
@@ -516,7 +516,7 @@ def render_job_tracker_screen() -> None:
         selected_ids = _selected_ids_for_visible_jobs(jobs)
         bulk_col1, bulk_col2, bulk_col3, _ = st.columns([1.2, 1.2, 1.6, 4])
         with bulk_col1:
-            if st.button("Select Visible", key="jt-select-visible", use_container_width=True):
+            if secondary_button("Select Visible", key="jt-select-visible", use_container_width=True):
                 selected = set(st.session_state.get("jt_selected_ids", []))
                 for job in jobs:
                     st.session_state[f"jt-select-{job['id']}"] = True
@@ -524,7 +524,7 @@ def render_job_tracker_screen() -> None:
                 st.session_state.jt_selected_ids = list(selected)
                 st.rerun()
         with bulk_col2:
-            if st.button("Clear Selection", key="jt-clear-visible", use_container_width=True):
+            if secondary_button("Clear Selection", key="jt-clear-visible", use_container_width=True):
                 for job in jobs:
                     st.session_state[f"jt-select-{job['id']}"] = False
                 st.session_state.jt_selected_ids = [
@@ -534,7 +534,12 @@ def render_job_tracker_screen() -> None:
                 st.rerun()
         with bulk_col3:
             delete_label = f"Delete Selected ({len(selected_ids)})" if selected_ids else "Delete Selected"
-            if st.button(delete_label, key="jt-bulk-delete", use_container_width=True, disabled=not selected_ids):
+            if secondary_button(
+                delete_label,
+                key="jt-bulk-delete",
+                use_container_width=True,
+                disabled=not selected_ids,
+            ):
                 for job_id in selected_ids:
                     delete_job(job_id)
                     st.session_state[f"jt-select-{job_id}"] = False
