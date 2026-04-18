@@ -5958,6 +5958,43 @@ def render_review_screen() -> None:
                 st.session_state.show_review_changes = True
                 st.rerun()
 
+        # ===== Share & Support =====
+        st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div style="
+                background: linear-gradient(135deg, #fff8f0 0%, #fff3e6 100%);
+                border: 1px solid #fddcb5;
+                border-radius: 12px;
+                padding: 1.25rem 1.5rem;
+                text-align: center;
+            ">
+                <div style="font-size: 1.35rem; margin-bottom: 0.35rem;">🎉</div>
+                <div style="font-weight: 700; font-size: 1rem; color: #1a1a1a; margin-bottom: 0.3rem;">
+                    Resume optimized!
+                </div>
+                <div style="font-size: 0.85rem; color: #555; margin-bottom: 0; line-height: 1.5;">
+                    If this saved you time, share it with a friend or support future development.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div style='margin-top: 0.75rem;'></div>", unsafe_allow_html=True)
+        share_col1, share_col2 = st.columns(2, gap="medium")
+        with share_col1:
+            st.link_button(
+                "☕  Buy me a coffee",
+                "https://buy.stripe.com/cNiaEZ4KwgLJdtA2C0dMI01",
+                use_container_width=True,
+            )
+        with share_col2:
+            st.link_button(
+                "🔗  Share with a friend",
+                "https://resume-optimizer-otg.streamlit.app",
+                use_container_width=True,
+            )
+
         # ===== Bottom Actions =====
         st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
         bottom_col1, bottom_col2 = st.columns(2, gap="large")
