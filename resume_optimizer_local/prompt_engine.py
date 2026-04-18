@@ -28,99 +28,204 @@ def _extract_role_specific_priorities(job_description: str, target_role: str, ta
     industry_lower = target_industry.lower()
 
     mappings = [
+        # ── Supply chain / logistics ──────────────────────────────────────────
         {
             "keywords": (
-                "route optimization",
-                "routing",
-                "network design",
-                "transportation modeling",
-                "flow-path",
-                "mode selection",
+                "route optimization", "routing", "network design",
+                "transportation modeling", "flow-path", "mode selection",
+                "last mile", "freight network",
             ),
-            "priority": "Route optimization & network design",
+            "priority": "Route optimization & transportation network design",
         },
         {
             "keywords": (
-                "analytics",
-                "dashboard",
-                "dashboards",
-                "kpi",
-                "reporting",
-                "metrics",
-                "data-driven",
-                "forecasting",
-            ),
-            "priority": "Advanced analytics, dashboards & performance reporting",
-        },
-        {
-            "keywords": (
-                "cost",
-                "savings",
-                "budget",
-                "efficiency",
-                "reduce",
-                "freight",
-                "$100mm",
-                "cost-reduction",
-            ),
-            "priority": "Cost reduction, budget management & operational efficiency",
-        },
-        {
-            "keywords": (
-                "supplier",
-                "vendor",
-                "negotiation",
-                "contract",
-                "procurement",
-                "sourcing",
+                "supplier", "vendor", "negotiation", "contract",
+                "procurement", "sourcing", "rfp", "rfq", "spend management",
             ),
             "priority": "Supplier management, sourcing & contract negotiation",
         },
         {
             "keywords": (
-                "cross-functional",
-                "collaboration",
-                "stakeholder",
-                "distribution",
-                "inventory",
-                "finance",
-                "carrier",
-                "operations",
+                "inventory", "warehouse", "fulfillment", "distribution",
+                "carrier", "3pl", "demand planning", "s&op",
             ),
-            "priority": "Cross-functional collaboration & stakeholder management",
+            "priority": "Inventory management, warehouse operations & distribution",
+        },
+        # ── Software / technology ─────────────────────────────────────────────
+        {
+            "keywords": (
+                "software development", "engineering", "backend", "frontend",
+                "full stack", "api", "microservices", "system design",
+                "architecture", "ci/cd", "devops", "infrastructure",
+            ),
+            "priority": "Software design, system architecture & engineering best practices",
         },
         {
             "keywords": (
-                "strategy",
-                "strategic",
-                "planning",
-                "execution",
-                "initiative",
-                "initiatives",
+                "python", "java", "javascript", "typescript", "golang", "rust",
+                "react", "node", "sql", "nosql", "kubernetes", "docker",
+                "aws", "gcp", "azure", "cloud",
             ),
-            "priority": "Strategic planning, project execution & operational leadership",
+            "priority": "Technical stack depth and breadth across required languages & platforms",
         },
         {
             "keywords": (
-                "process",
-                "improvement",
-                "standardized",
-                "standardizing",
-                "documentation",
-                "procedures",
-                "workflow",
+                "machine learning", "deep learning", "nlp",
+                "model training", "model deployment", "data science",
+                "feature engineering", "a/b testing", "ml pipeline",
+                "llm", "neural network",
             ),
-            "priority": "Process improvement, standardization & workflow design",
+            "priority": "Machine learning, AI/ML model development & data-driven experimentation",
+        },
+        # ── Product management ────────────────────────────────────────────────
+        {
+            "keywords": (
+                "product strategy", "roadmap", "customer insight",
+                "prioritization", "product vision", "go-to-market",
+                "product-market fit", "user research", "product lifecycle",
+            ),
+            "priority": "Product strategy, roadmap prioritization & go-to-market execution",
         },
         {
             "keywords": (
-                "product strategy",
-                "roadmap",
-                "customer insight",
-                "experimentation",
-                "prioritization",
+                "user stories", "sprint", "agile", "scrum", "backlog",
+                "product requirements", "prd", "acceptance criteria", "release",
             ),
-            "priority": "Product strategy, customer insight & roadmap prioritization",
+            "priority": "Agile product development, backlog management & release planning",
+        },
+        # ── Finance / accounting ──────────────────────────────────────────────
+        {
+            "keywords": (
+                "financial modeling", "fp&a", "variance analysis",
+                "financial reporting", "p&l", "balance sheet", "cash flow",
+                "valuation", "dcf", "investment analysis",
+            ),
+            "priority": "Financial modeling, reporting & investment/valuation analysis",
+        },
+        {
+            "keywords": (
+                "audit", "compliance", "sox", "internal controls", "gaap",
+                "ifrs", "tax", "accounting", "reconciliation", "general ledger",
+            ),
+            "priority": "Audit, compliance, internal controls & accounting accuracy",
+        },
+        {
+            "keywords": (
+                "budget", "forecast", "cost reduction", "cost-reduction",
+                "savings", "efficiency", "capex", "opex", "spend",
+            ),
+            "priority": "Budgeting, cost management & financial efficiency",
+        },
+        # ── Marketing / growth ────────────────────────────────────────────────
+        {
+            "keywords": (
+                "brand", "brand strategy", "brand identity", "brand equity",
+                "positioning", "messaging", "creative direction",
+            ),
+            "priority": "Brand strategy, positioning & messaging",
+        },
+        {
+            "keywords": (
+                "growth marketing", "user acquisition", "customer acquisition",
+                "conversion rate", "funnel", "cac", "ltv", "churn",
+                "performance marketing", "paid media", "seo", "sem", "ppc",
+                "email marketing", "drip campaign",
+            ),
+            "priority": "Growth marketing, customer acquisition & retention metrics",
+        },
+        {
+            "keywords": (
+                "content marketing", "copywriting", "editorial", "social media",
+                "influencer marketing", "brand community", "content campaign",
+                "content engagement", "content strategy",
+            ),
+            "priority": "Content strategy, campaign execution & audience engagement",
+        },
+        # ── Healthcare / clinical ─────────────────────────────────────────────
+        {
+            "keywords": (
+                "patient", "clinical", "care", "ehr", "emr", "hipaa",
+                "outcomes", "treatment", "diagnosis", "clinical trial",
+            ),
+            "priority": "Clinical care quality, patient outcomes & healthcare compliance (HIPAA)",
+        },
+        {
+            "keywords": (
+                "healthcare operations", "revenue cycle", "billing",
+                "coding", "prior authorization", "insurance", "payer",
+            ),
+            "priority": "Healthcare operations, revenue cycle & payer management",
+        },
+        # ── HR / people ───────────────────────────────────────────────────────
+        {
+            "keywords": (
+                "talent acquisition", "recruiting", "recruiter",
+                "employer brand", "candidate experience", "headcount",
+                "open requisitions", "interview process",
+            ),
+            "priority": "Talent acquisition, recruiting strategy & onboarding excellence",
+        },
+        {
+            "keywords": (
+                "performance management", "employee engagement", "hrbp",
+                "learning and development", "l&d", "succession planning",
+                "organizational development", "workforce planning",
+            ),
+            "priority": "Performance management, employee development & organizational effectiveness",
+        },
+        {
+            "keywords": (
+                "compensation", "benefits", "total rewards", "equity",
+                "payroll", "hris", "workday", "people analytics",
+            ),
+            "priority": "Compensation, benefits design & HR systems (HRIS)",
+        },
+        # ── Consulting / strategy ─────────────────────────────────────────────
+        {
+            "keywords": (
+                "consulting", "client engagement", "advisory", "engagements",
+                "client management", "deliverables", "workstream", "deck",
+            ),
+            "priority": "Client engagement, structured problem-solving & deliverable quality",
+        },
+        {
+            "keywords": (
+                "due diligence", "m&a", "transaction", "integration",
+                "carve-out", "deal", "private equity", "portfolio",
+            ),
+            "priority": "M&A due diligence, integration planning & transaction support",
+        },
+        # ── Analytics / data (cross-domain) ──────────────────────────────────
+        {
+            "keywords": (
+                "analytics", "dashboard", "dashboards", "kpi",
+                "reporting", "metrics", "data-driven", "data analysis",
+                "bi", "tableau", "power bi", "looker", "sql",
+            ),
+            "priority": "Data analysis, KPI reporting & business intelligence",
+        },
+        # ── Leadership / general management ───────────────────────────────────
+        {
+            "keywords": (
+                "cross-functional", "cross functional", "stakeholder",
+                "executive", "leadership", "manage teams", "director",
+                "vp", "general manager",
+            ),
+            "priority": "Cross-functional leadership, stakeholder management & executive presence",
+        },
+        {
+            "keywords": (
+                "strategy", "strategic", "planning", "vision",
+                "roadmap", "initiative", "transformation", "change management",
+            ),
+            "priority": "Strategic planning, transformation initiatives & organizational change",
+        },
+        {
+            "keywords": (
+                "process", "improvement", "lean", "six sigma", "kaizen",
+                "standardization", "documentation", "workflow", "efficiency",
+            ),
+            "priority": "Process improvement, standardization & operational excellence",
         },
     ]
 

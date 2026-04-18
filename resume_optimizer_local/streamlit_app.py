@@ -1486,22 +1486,69 @@ def detect_industry(job_description: str) -> str:
 
     keyword_map = {
         "Supply Chain / Operations": [
-            "supply chain",
-            "logistics",
-            "transportation",
-            "warehouse",
-            "inventory",
-            "distribution",
-            "carrier",
-            "routing",
-            "fulfillment",
-            "delivery network",
+            "supply chain", "logistics", "transportation", "warehouse",
+            "inventory", "distribution", "carrier", "routing", "fulfillment",
+            "delivery network", "procurement", "sourcing", "3pl", "s&op",
+            "demand planning",
         ],
-        "Finance": ["finance", "financial", "fp&a", "banking", "investment", "accounting", "budget", "forecasting"],
-        "Consulting": ["consulting", "client engagement", "advisory", "strategy projects"],
-        "Technology": ["software", "saas", "cloud", "developer", "product", "tech", "automation platform"],
-        "Healthcare": ["healthcare", "clinical", "patient", "medical", "hospital", "pharma"],
-        "Marketing": ["marketing", "brand", "campaign", "growth", "content", "seo"],
+        "Software Engineering": [
+            "software engineer", "backend", "frontend", "full stack",
+            "api", "microservices", "devops", "ci/cd", "kubernetes", "docker",
+            "software development", "system design", "architecture",
+        ],
+        "Data & Analytics": [
+            "data science", "machine learning", "ml", "deep learning", "nlp",
+            "data engineer", "data analyst", "analytics engineer",
+            "bi", "tableau", "power bi", "looker", "databricks",
+        ],
+        "Product Management": [
+            "product manager", "product owner", "roadmap", "product strategy",
+            "user stories", "backlog", "product requirements", "go-to-market",
+            "product-market fit",
+        ],
+        "Finance": [
+            "finance", "financial", "fp&a", "banking", "investment",
+            "accounting", "budget", "forecasting", "valuation", "p&l",
+            "audit", "gaap", "ifrs", "tax", "treasury",
+        ],
+        "Consulting": [
+            "consulting", "client engagement", "advisory", "strategy projects",
+            "management consulting", "due diligence", "m&a", "workstream",
+        ],
+        "Technology": [
+            "software", "saas", "cloud", "developer", "product", "tech",
+            "automation platform", "platform", "enterprise software",
+        ],
+        "Healthcare": [
+            "healthcare", "clinical", "patient", "medical", "hospital",
+            "pharma", "ehr", "emr", "hipaa", "revenue cycle", "health system",
+        ],
+        "Marketing": [
+            "marketing", "brand", "campaign", "growth", "content", "seo",
+            "paid", "acquisition", "retention", "demand generation", "cmo",
+        ],
+        "Human Resources": [
+            "human resources", "hr", "talent acquisition", "recruiting",
+            "hrbp", "people operations", "employee engagement",
+            "compensation", "benefits", "hris", "workforce planning",
+        ],
+        "Sales": [
+            "sales", "account executive", "business development", "revenue",
+            "quota", "pipeline", "crm", "salesforce", "enterprise sales",
+            "account management", "customer success",
+        ],
+        "Legal": [
+            "legal", "attorney", "counsel", "compliance", "regulatory",
+            "contract review", "litigation", "intellectual property", "law",
+        ],
+        "Education": [
+            "education", "teaching", "curriculum", "students", "learning",
+            "instruction", "classroom", "higher education", "k-12",
+        ],
+        "Real Estate": [
+            "real estate", "property management", "leasing", "acquisitions",
+            "asset management", "brokerage", "cre", "commercial real estate",
+        ],
     }
     scores = {
         industry: sum(text.count(keyword) for keyword in keywords)
@@ -3930,8 +3977,15 @@ def render_input_screen() -> None:
             if local_ai_selected and not local_ai_ready:
                 st.session_state.screen = "local_ai_setup"
                 st.rerun()
-            st.session_state.use_career_profile = False
-            st.session_state.selected_profile_item_ids = []
+            # Auto-enable profile context when the user has active profile items.
+            # They can still override this on the mode screen if needed.
+            active_profile_items_for_continue = [item for item in list_profile_items() if item.visibility == "active"]
+            if active_profile_items_for_continue:
+                st.session_state.use_career_profile = True
+                st.session_state.selected_profile_item_ids = [item.id for item in active_profile_items_for_continue]
+            else:
+                st.session_state.use_career_profile = False
+                st.session_state.selected_profile_item_ids = []
             st.session_state.show_fit_details = False
             if looks_like_url(job_description):
                 if fetch_and_store_job_description(job_description):
