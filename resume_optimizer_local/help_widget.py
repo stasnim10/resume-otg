@@ -16,9 +16,24 @@ import streamlit as st
 # ── Contact details ────────────────────────────────────────────────────────────
 CONTACT_EMAIL    = "tasnimsimum@gmail.com"
 CONTACT_LINKEDIN = "https://www.linkedin.com/in/simum-tasnim/"
+DONATE_URL       = "https://buy.stripe.com/cNiaEZ4KwgLJdtA2C0dMI01"
 # ──────────────────────────────────────────────────────────────────────────────
 
 _DIV = '<hr style="border:none;border-top:1px solid var(--line,#e5e5e5);margin:0.65rem 0;">'
+
+
+def render_support_button() -> None:
+    """Render a standalone 'Buy me a coffee' button in the sidebar."""
+    st.markdown(_DIV, unsafe_allow_html=True)
+    st.markdown(
+        "<p style='font-size:0.78rem;color:#888;margin-bottom:0.35rem;'>Like the app? Support future development.</p>",
+        unsafe_allow_html=True,
+    )
+    st.link_button(
+        "☕  Buy me a coffee",
+        DONATE_URL,
+        use_container_width=True,
+    )
 
 
 def render_help_section() -> None:
@@ -124,3 +139,14 @@ def render_help_section() -> None:
                 CONTACT_LINKEDIN,
                 use_container_width=True,
             )
+
+        st.markdown(_DIV, unsafe_allow_html=True)
+
+        # ── Support ───────────────────────────────────────────────────────────
+        st.markdown("**Support future development**")
+        st.caption("If this saved you time, a coffee goes a long way.")
+        st.link_button(
+            "☕  Buy me a coffee",
+            DONATE_URL,
+            use_container_width=True,
+        )
