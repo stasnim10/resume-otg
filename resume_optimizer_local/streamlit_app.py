@@ -72,6 +72,7 @@ from improvements_generator import generate_improvements_summary
 from review_engine import analyze_payload_against_document
 from optimization_history_ui import render_optimization_history_screen
 from ui_helpers import primary_button, primary_download_button, primary_form_submit, secondary_button
+from help_widget import render_help_section
 from profile_screen import render_profile_screen
 from onboarding_screen import render_onboarding_screen
 from job_tracker_screen import render_job_tracker_screen
@@ -6166,6 +6167,8 @@ def main() -> None:
         if secondary_button("Start Over", use_container_width=True, key="sidebar-start-over"):
             reset_flow()
             st.rerun()
+
+        render_help_section()
 
     screen = st.session_state.screen
     # NOTE: _prev_rendered_screen is updated at the END of the routing block so that

@@ -1059,6 +1059,66 @@ def _profile_completeness(profile, items: list[ProfileItem]) -> tuple[int, list[
 
 
 # ---------------------------------------------------------------------------
+# Post-onboarding verification banner
+# ---------------------------------------------------------------------------
+
+def _render_verification_banner(profile, pct: int, missing: list[str]) -> None:
+    """
+    One-time banner shown immediately after onboarding completes.
+    Prompts the user to verify the extracted information is correct and
+    highlights any fields that still need attention.
+    Dismissed by clicking "Looks good!" or navigating away.
+    """
+    is_complete = pct == 100
+
+    if is_complete:
+        icon    = "✅"
+        heading = "Profile complete — you're all set!"
+        body    = (
+            "Everything looks filled in. You can still edit any field using "
+            "the tabs below, but you're ready to start optimising resumes."
+        )
+        bg      = "#f0fdf4"
+        border  = "#bbf7d0"
+    else:
+        icon    = "👀"
+        heading = "Please take a moment to verify your profile"
+        missing_str = ", ".join(missing) if missing else "a few fields"
+        body    = (
+            f"We extracted information from your documents and saved what we found. "
+            f"Check each tab below to confirm the details are accurate. "
+            f"Still missing: **{missing_str}**."
+        )
+        bg      = "#fffbeb"
+        border  = "#fde68a"
+
+    st.markdown(
+        f"""
+        <div style="background:{bg}; border:1px solid {border}; border-radius:12px;
+                    padding:1.1rem 1.4rem; margin-bottom:1.5rem;">
+          <div style="font-size:1.05rem; font-weight:700; margin-bottom:0.35rem;">
+            {icon}&nbsp; {heading}
+          </div>
+          <div style="font-size:0.93rem; line-height:1.65; color:#374151;">
+            {body}
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    dismiss_col, _ = st.columns([1.5, 4])
+    with dismiss_col:
+        if primary_button(
+            "Looks good! ✓" if is_complete else "Got it — I'll review now",
+            key="ob-verify-dismiss",
+            use_container_width=True,
+        ):
+            st.session_state.ob_just_completed = False
+            st.rerun()
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -1086,6 +1146,10 @@ def render_profile_screen() -> None:
 
     # ---- Profile completeness ----
     pct, missing = _profile_completeness(profile, items)
+
+    # ---- Post-onboarding verification banner ----
+    if st.session_state.get("ob_just_completed"):
+        _render_verification_banner(profile, pct, missing)
 
     # ---- Page header ----
     display_name     = profile.full_name.strip() or "Your Profile"

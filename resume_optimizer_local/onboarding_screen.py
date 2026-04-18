@@ -586,29 +586,33 @@ def _step5_all_set() -> None:
 
     # Adaptive CTA
     if docs_added:
+        cta_label = "Verify my profile →"
+        cta_dest  = "profile"
+        cta_hint  = (
+            "We extracted information from your documents. "
+            "Please take a moment to confirm everything looks right — "
+            "accurate profile data leads to better resume results."
+        )
+    elif st.session_state.ob_full_name:
         cta_label = "Go to my profile →"
         cta_dest  = "profile"
-        cta_hint  = "Your profile has been seeded from your documents. Review and fill in any gaps."
-    elif st.session_state.ob_full_name:
-        cta_label = "Build my first resume →"
-        cta_dest  = "input"
-        cta_hint  = "We have enough to get started. You can always enrich your profile later."
+        cta_hint  = (
+            "Your basics are saved. Open your profile to fill in education, "
+            "experience, and skills — the more complete it is, the better your results."
+        )
     else:
-        cta_label = "Take me to the app →"
-        cta_dest  = "landing"
-        cta_hint  = ""
+        cta_label = "Go to my profile →"
+        cta_dest  = "profile"
+        cta_hint  = "Set up your profile first to get personalised resume results."
 
-    if cta_hint:
-        st.caption(cta_hint)
+    st.caption(cta_hint)
     st.markdown('<div style="height:0.5rem;"></div>', unsafe_allow_html=True)
     if primary_button(cta_label, key="ob-finish", use_container_width=True):
         _finish(cta_dest)
 
-    # Secondary: go to profile regardless
-    if cta_dest != "profile":
-        st.markdown('<div style="height:0.5rem;"></div>', unsafe_allow_html=True)
-        if secondary_button("Go to my profile", key="ob-finish-profile", use_container_width=True):
-            _finish("profile")
+    st.markdown('<div style="height:0.5rem;"></div>', unsafe_allow_html=True)
+    if secondary_button("Skip to the app →", key="ob-finish-skip", use_container_width=True):
+        _finish("landing")
 
 
 def _save_basics_from_steps() -> None:
@@ -648,6 +652,8 @@ def _save_basics_from_steps() -> None:
 def _finish(dest: str) -> None:
     """Mark onboarding complete, clear wizard session state, and route."""
     complete_onboarding()
+    # Signal to the profile screen that it should show a verification banner.
+    st.session_state.ob_just_completed = True
     for key in [k for k in st.session_state if k.startswith("ob_")]:
         del st.session_state[key]
     st.session_state.screen = dest
