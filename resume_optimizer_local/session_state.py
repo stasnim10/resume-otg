@@ -124,6 +124,13 @@ def init_session_state() -> None:
         "tracker_pending_save": None,
         "tracker_auto_saved_to": None,
         "active_tracker_job_id": None,
+        # Auth
+        "_sb_access_token": "",
+        "_sb_refresh_token": "",
+        "auth_user_id": "",
+        "auth_user_email": "",
+        "is_authenticated": False,
+        "hosted_web_mode": False,
     }
 
     for key, value in defaults.items():

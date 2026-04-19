@@ -802,3 +802,34 @@ def get_profile_items_for_job(job_id: int) -> list[dict]:
             (job_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── Hosted-web routing (Supabase) ─────────────────────────────────────────────
+
+
+def _is_hosted() -> bool:
+    try:
+        import streamlit as st
+        return str(st.secrets.get("HOSTED_WEB", "false")).lower() == "true"
+    except Exception:
+        return False
+
+
+def _apply_supabase_override() -> None:
+    if not _is_hosted():
+        return
+    try:
+        import sys
+        import supabase_job_store as _sb
+        _mod = sys.modules[__name__]
+        _public = [n for n in dir(_sb) if not n.startswith("_") and callable(getattr(_sb, n))]
+        for name in _public:
+            setattr(_mod, name, getattr(_sb, name))
+        logger.info("job_tracker_store: Supabase override applied (%d functions)", len(_public))
+    except Exception as exc:
+        logger.warning(
+            "job_tracker_store: Supabase override failed — falling back to SQLite: %s", exc
+        )
+
+
+_apply_supabase_override()

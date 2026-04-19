@@ -910,3 +910,35 @@ def create_or_update_profile_from_optimization(
     except Exception as e:
         logger.error(f"Error saving profile basics: {e}")
         return None
+
+
+# ── Hosted-web routing (Supabase) ─────────────────────────────────────────────
+# When HOSTED_WEB=true, replace all public functions with Supabase-backed
+# versions so callers (streamlit_app.py, onboarding_screen.py, etc.) don't
+# need to change their import statements.
+
+
+def _is_hosted() -> bool:
+    try:
+        import streamlit as st
+        return str(st.secrets.get("HOSTED_WEB", "false")).lower() == "true"
+    except Exception:
+        return False
+
+
+def _apply_supabase_override() -> None:
+    if not _is_hosted():
+        return
+    try:
+        import sys
+        import supabase_profile_store as _sb
+        _mod = sys.modules[__name__]
+        _public = [n for n in dir(_sb) if not n.startswith("_") and callable(getattr(_sb, n))]
+        for name in _public:
+            setattr(_mod, name, getattr(_sb, name))
+        logger.info("profile_store: Supabase override applied (%d functions)", len(_public))
+    except Exception as exc:
+        logger.warning("profile_store: Supabase override failed — falling back to SQLite: %s", exc)
+
+
+_apply_supabase_override()

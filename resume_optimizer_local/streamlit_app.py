@@ -95,6 +95,10 @@ from shell import (
     render_progress_stepper,
 )
 from session_state import CAREER_STAGES, init_session_state, reset_flow
+from auth_state import is_authenticated, load_auth_into_session, sign_out
+from auth_screen import render_auth_screen
+from hosted_mode import is_hosted_web, show_local_ai_cards, show_private_mode
+from settings_screen import render_settings_screen
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1699,41 +1703,48 @@ def render_landing() -> None:
     has_profile_memory = bool(_cached_list_profile_items() or _cached_list_profile_sources())
     profile_setup_complete = has_profile_identity and (has_profile_targets or has_profile_memory)
     is_returning_user = has_profile_identity or bool(applications) or bool(optimization_history)
-    local_ai_base_url = st.session_state.get("local_ai_base_url", OLLAMA_BASE_URL)
-    local_ai_model = _get_local_ai_model_name()
-    ollama_status = _cached_check_ollama_status(base_url=local_ai_base_url)
-    model_installed = ollama_status["reachable"] and is_model_installed(local_ai_model, base_url=local_ai_base_url)
+    local_ai_card_status = ""
+    local_ai_status_copy = ""
+    local_ai_button_text = ""
+    local_ai_button_key = ""
+    local_ai_cta_route = ""
 
-    if not ollama_status["reachable"]:
-        local_ai_card_status = "Not Installed"
-        local_ai_status_copy = "Install Ollama once to unlock private on-device AI."
-        local_ai_button_text = "Set Up Private Mode"
-        local_ai_button_key = "landing-local-ai-setup"
-        local_ai_cta_route = "local_ai_setup"
-        st.session_state.local_ai_ready = False
-    elif model_installed:
-        readiness = _cached_run_readiness_check(model_name=local_ai_model, base_url=local_ai_base_url)
-        st.session_state.local_ai_setup_status = readiness
-        st.session_state.local_ai_ready = readiness.get("ready", False)
-        if readiness.get("ready", False):
-            local_ai_card_status = "Local AI Ready"
-            local_ai_status_copy = f"{DEFAULT_LOCAL_AI_LABEL} is ready on this computer."
-            local_ai_button_text = "Start in Private Mode"
-            local_ai_button_key = "landing-local-ai-start"
-            local_ai_cta_route = "input"
+    if show_local_ai_cards():
+        local_ai_base_url = st.session_state.get("local_ai_base_url", OLLAMA_BASE_URL)
+        local_ai_model = _get_local_ai_model_name()
+        ollama_status = _cached_check_ollama_status(base_url=local_ai_base_url)
+        model_installed = ollama_status["reachable"] and is_model_installed(local_ai_model, base_url=local_ai_base_url)
+
+        if not ollama_status["reachable"]:
+            local_ai_card_status = "Not Installed"
+            local_ai_status_copy = "Install Ollama once to unlock private on-device AI."
+            local_ai_button_text = "Set Up Private Mode"
+            local_ai_button_key = "landing-local-ai-setup"
+            local_ai_cta_route = "local_ai_setup"
+            st.session_state.local_ai_ready = False
+        elif model_installed:
+            readiness = _cached_run_readiness_check(model_name=local_ai_model, base_url=local_ai_base_url)
+            st.session_state.local_ai_setup_status = readiness
+            st.session_state.local_ai_ready = readiness.get("ready", False)
+            if readiness.get("ready", False):
+                local_ai_card_status = "Local AI Ready"
+                local_ai_status_copy = f"{DEFAULT_LOCAL_AI_LABEL} is ready on this computer."
+                local_ai_button_text = "Start in Private Mode"
+                local_ai_button_key = "landing-local-ai-start"
+                local_ai_cta_route = "input"
+            else:
+                local_ai_card_status = "Setup Needed"
+                local_ai_status_copy = readiness.get("message", "Finish the one-time Local AI check.")
+                local_ai_button_text = "Finish Private Mode Setup"
+                local_ai_button_key = "landing-local-ai-finish"
+                local_ai_cta_route = "local_ai_setup"
         else:
             local_ai_card_status = "Setup Needed"
-            local_ai_status_copy = readiness.get("message", "Finish the one-time Local AI check.")
+            local_ai_status_copy = "Ollama is available, but Gemma 4 still needs to be downloaded."
             local_ai_button_text = "Finish Private Mode Setup"
-            local_ai_button_key = "landing-local-ai-finish"
+            local_ai_button_key = "landing-local-ai-model"
             local_ai_cta_route = "local_ai_setup"
-    else:
-        local_ai_card_status = "Setup Needed"
-        local_ai_status_copy = "Ollama is available, but Gemma 4 still needs to be downloaded."
-        local_ai_button_text = "Finish Private Mode Setup"
-        local_ai_button_key = "landing-local-ai-model"
-        local_ai_cta_route = "local_ai_setup"
-        st.session_state.local_ai_ready = False
+            st.session_state.local_ai_ready = False
 
     hero_eyebrow = "Welcome Back" if is_returning_user else "Resume Optimizer"
     hero_title = f"Welcome back, {profile.full_name.strip()}." if is_returning_user and profile.full_name.strip() else "Make resume tailoring feel beautifully simple."
@@ -1743,10 +1754,14 @@ def render_landing() -> None:
         else "Start with the task you need right now. The app will quietly build your profile in the background so future applications get easier."
     )
     local_ai_chip = (
-        f'<div class="apple-landing-status" style="max-width: 430px; margin: 1.4rem auto 0 auto;">'
-        f'<div class="apple-landing-status-kicker">{local_ai_card_status}</div>'
-        f'<div class="apple-landing-status-copy">{local_ai_status_copy}</div>'
-        f'</div>'
+        (
+            f'<div class="apple-landing-status" style="max-width: 430px; margin: 1.4rem auto 0 auto;">'
+            f'<div class="apple-landing-status-kicker">{local_ai_card_status}</div>'
+            f'<div class="apple-landing-status-copy">{local_ai_status_copy}</div>'
+            f'</div>'
+        )
+        if show_local_ai_cards() and local_ai_card_status
+        else ""
     )
     st.markdown(
         f"""
@@ -5322,7 +5337,7 @@ def handle_validated_payload(payload: dict) -> None:
     _opt_company = st.session_state.get("current_application_company", "").strip()
     try:
         _saved_application_id = save_optimization_result(
-            user_id="local-user",
+            user_id=st.session_state.get("auth_user_id") or "local-user",
             company_name=_opt_company or "Unknown",
             job_title=_opt_title or "Unknown",
             job_description=st.session_state.job_description or "",
@@ -6191,9 +6206,19 @@ def main() -> None:
     """Run the Streamlit app."""
     logger.info("Streamlit app started")
     st.set_page_config(page_title="Resume Optimizer", layout="wide")
+    init_session_state()
+
+    # ── Auth gate (hosted web only) ──────────────────────────────────────────
+    if is_hosted_web():
+        st.session_state.hosted_web_mode = True
+        load_auth_into_session()
+        if not is_authenticated():
+            apply_apple_theme()
+            render_auth_screen()
+            st.stop()
+
     init_profile_db()
     init_tracker_tables()
-    init_session_state()
     handle_step_navigation_request()
     apply_apple_theme()
 
@@ -6258,6 +6283,16 @@ def main() -> None:
         if secondary_button("Start Over", use_container_width=True, key="sidebar-start-over"):
             reset_flow()
             st.rerun()
+        if secondary_button("Settings", use_container_width=True, key="sidebar-settings"):
+            st.session_state.screen = "settings"
+            st.rerun()
+        if is_hosted_web():
+            user_email = st.session_state.get("auth_user_email", "")
+            if user_email:
+                st.caption(f"Signed in as {user_email}")
+            if secondary_button("Sign Out", use_container_width=True, key="sidebar-sign-out"):
+                sign_out()
+                st.rerun()
 
         render_support_button()
         render_help_section()
@@ -6312,9 +6347,19 @@ def main() -> None:
     elif screen == "mode":
         render_mode_screen()
     elif screen == "local_ai_setup":
-        render_local_ai_setup_screen()
+        if show_private_mode():
+            render_local_ai_setup_screen()
+        else:
+            st.session_state.screen = "landing"
+            st.rerun()
     elif screen == "local_ai_run":
-        render_local_ai_run_screen()
+        if show_private_mode():
+            render_local_ai_run_screen()
+        else:
+            st.session_state.screen = "landing"
+            st.rerun()
+    elif screen == "settings":
+        render_settings_screen()
     elif screen == "manual":
         render_manual_screen()
     elif screen == "api":

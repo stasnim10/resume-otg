@@ -61,3 +61,6 @@ htmlcov/
 # Old projects (if you want to exclude them)
 # resume_optimizer/
 # resume-replacer/
+
+# Streamlit secrets — never commit
+**/.streamlit/secrets.toml
