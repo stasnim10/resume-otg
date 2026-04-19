@@ -5,7 +5,5 @@ anthropic
 google-genai
 beautifulsoup4
 requests
-langgraph
-guardrails-ai
 PyPDF2
 lxml
