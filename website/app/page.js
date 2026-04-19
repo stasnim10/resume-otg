@@ -1,53 +1,45 @@
 import Image from "next/image";
+import { Reveal } from "./components/Reveal";
+import { StaggerGrid, StaggerItem } from "./components/StaggerGrid";
+import { StickyNav } from "./components/StickyNav";
+import { AnimatedHero } from "@/components/ui/animated-hero";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://resume-optimizer-otg.streamlit.app";
 const contactEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "tasnimsimum@gmail.com";
 const linkedinUrl =
   process.env.NEXT_PUBLIC_LINKEDIN_URL || "https://www.linkedin.com/in/simum-tasnim/";
 const donateUrl = "https://buy.stripe.com/cNiaEZ4KwgLJdtA2C0dMI01";
+const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+  "I've been using Resume Builder OTG to turn resumes and job descriptions into cleaner, more tailored applications. " +
+    appUrl
+)}`;
 
-const highlights = [
-  {
-    title: "Guided onboarding that actually builds your profile",
-    body:
-      "Start with a few simple questions, upload your resume or LinkedIn material, and let the app draft your profile automatically before asking you to confirm every important detail.",
-  },
-  {
-    title: "Review-first optimization, not blind AI rewriting",
-    body:
-      "Every optimization is surfaced as changes you can inspect before you export. The app is designed to earn trust, not ask for it.",
-  },
-  {
-    title: "A profile that gets smarter over time",
-    body:
-      "Your profile, saved job targets, materials, and feedback loops become the foundation for faster future applications instead of making you start from zero each time.",
-  },
+const heroPoints = [
+  "Guided onboarding that builds your profile from your existing materials",
+  "Review-first optimization so you approve changes before export",
+  "Job Tracker that keeps each role, version, and follow-up in one place",
 ];
 
 const flow = [
   {
     step: "01",
     title: "Tell us who you are",
-    body:
-      "A short, conversational onboarding captures your name, career stage, target roles, and preferences without overwhelming you on day one.",
+    body: "A short conversational onboarding captures your name, career stage, target roles, and preferences without overwhelming you on day one.",
   },
   {
     step: "02",
     title: "Upload your existing materials",
-    body:
-      "Resume, LinkedIn PDF, or other documents are used to auto-build your profile so the hard setup work happens once, not every time you apply.",
+    body: "Resume, LinkedIn PDF, or other documents auto-build your profile so the hard setup work happens once, not every time you apply.",
   },
   {
     step: "03",
     title: "Cross-check and confirm",
-    body:
-      "The app shows exactly what it extracted and asks you to review each section before anything becomes part of your profile.",
+    body: "The app shows exactly what it extracted and asks you to review each section before anything becomes part of your profile.",
   },
   {
     step: "04",
     title: "Optimize with confidence",
-    body:
-      "Bring in a job description, generate tailored improvements, review the suggested changes, then save the role into Job Tracker if you want to keep the full application story.",
+    body: "Bring in a job description, generate tailored improvements, review the changes, then save the role to Job Tracker.",
   },
 ];
 
@@ -55,8 +47,7 @@ const productSections = [
   {
     kicker: "Onboarding",
     title: "A smoother first five minutes.",
-    body:
-      "New users should never feel like they are doing admin work for the app. Resume Builder OTG uses onboarding to collect just enough context, then lets uploaded materials do the heavy lifting.",
+    body: "New users should never feel like they are doing admin work for the app. Resume Builder OTG uses onboarding to collect just enough context, then lets uploaded materials do the heavy lifting.",
     bullets: [
       "Conversational first-run experience",
       "Automatic profile building from resume and LinkedIn materials",
@@ -66,8 +57,7 @@ const productSections = [
   {
     kicker: "Optimization",
     title: "A review flow you can trust.",
-    body:
-      "Instead of black-box rewriting, the app shows before and after fit, explains the changes, and keeps the user in control all the way to export.",
+    body: "Instead of black-box rewriting, the app shows before-and-after fit, explains the changes, and keeps the user in control all the way to export.",
     bullets: [
       "Readable fit improvement story",
       "Structured change review before download",
@@ -77,8 +67,7 @@ const productSections = [
   {
     kicker: "Job Tracker",
     title: "More than a pile of old runs.",
-    body:
-      "Every saved role can become a living application record with the job description, status, notes, and the exact resume version you used when it matters.",
+    body: "Every saved role can become a living application record with the job description, status, notes, and the exact resume version you used.",
     bullets: [
       "Status tracking from preparing to offer",
       "Save application materials when you want to",
@@ -90,233 +79,228 @@ const productSections = [
 const faqs = [
   {
     q: "Do I need technical knowledge to use it?",
-    a:
-      "No. The product is being designed around guided onboarding, editable review steps, and plain-language prompts so first-time users can move through it without understanding models, prompts, or endpoints.",
+    a: "No. The product is built around guided onboarding, editable review steps, and plain-language prompts so first-time users can move through it without understanding models, prompts, or endpoints.",
   },
   {
-    q: "Will private mode work on the public website?",
-    a:
-      "The public website is meant to introduce the product and send users into the app. Private mode depends on a local Ollama setup, so it is best experienced on a supported local install.",
+    q: "Will private mode work on the public version?",
+    a: "Private mode depends on a local Ollama setup and is best experienced on a supported local install. Standard mode works on the public hosted version with your own API key.",
   },
   {
     q: "What if the app extracts something incorrectly?",
-    a:
-      "That is exactly why the confirmation step matters. The app should show users what it found and let them correct profile sections before continuing.",
+    a: "That is exactly why the confirmation step matters. The app shows what it found and lets you correct each section before it becomes part of your profile.",
   },
 ];
 
 export default function HomePage() {
   return (
     <main className="page-shell">
-      <div className="backdrop backdrop-one" />
-      <div className="backdrop backdrop-two" />
 
-      <header className="site-header">
-        <a className="brand-mark" href="#top">
-          <div className="brand-lockup">
-            <Image src="/logo.png" alt="Resume Builder OTG logo" width={52} height={52} />
-            <div>
-              <p className="brand-name">Resume Builder OTG</p>
-              <p className="brand-subtitle">Resume optimization that feels guided, not chaotic.</p>
+      {/* ── Sticky nav ──────────────────────────────────────────────────── */}
+      <StickyNav>
+        <header className="site-header">
+          <a className="brand-mark" href="#top">
+            <div className="brand-lockup">
+              <Image src="/logo.png" alt="Resume Builder OTG logo" width={46} height={46} />
+              <div>
+                <p className="brand-name">Resume Builder OTG</p>
+                <p className="brand-subtitle">Resume optimization that feels guided, not chaotic.</p>
+              </div>
             </div>
-          </div>
-        </a>
-
-        <nav className="site-nav">
-          <a href="#how-it-works">How it works</a>
-          <a href="#product">Product</a>
-          <a href="#support">Support</a>
-          <a className="nav-cta" href={appUrl} target="_blank" rel="noreferrer">
-            Open app
           </a>
-        </nav>
-      </header>
-
-      <section className="hero" id="top">
-        <div className="hero-copy">
-          <p className="eyebrow">Resume Builder OTG</p>
-          <h1>Build stronger applications without losing trust in the process.</h1>
-          <p className="hero-body">
-            Resume Builder OTG helps job seekers turn resumes, LinkedIn materials, and job descriptions
-            into cleaner profiles, better tailored drafts, and application-ready documents with a calmer,
-            more human workflow.
-          </p>
-          <div className="hero-actions">
-            <a className="button button-primary" href={appUrl} target="_blank" rel="noreferrer">
-              Start optimizing
+          <nav className="site-nav">
+            <a href="#how-it-works">How it works</a>
+            <a href="#product">Product</a>
+            <a href="#support">Support</a>
+            <a className="nav-cta" href={appUrl} target="_blank" rel="noreferrer">
+              Open app
             </a>
-            <a className="button button-secondary" href="#how-it-works">
-              See the workflow
-            </a>
-          </div>
-          <div className="hero-trust">
-            <span>Guided onboarding</span>
-            <span>Editable profile confirmation</span>
-            <span>Explainable resume review</span>
-          </div>
-        </div>
+          </nav>
+        </header>
+      </StickyNav>
 
-        <div className="hero-panel">
-          <div className="panel-card panel-primary">
-            <p className="panel-kicker">What makes it different</p>
-            <h2>The app should understand the user before it asks them to optimize anything.</h2>
+      {/* ── Animated Hero ────────────────────────────────────────────── */}
+      <div id="top" style={{ width: "min(100%, var(--max-width))", margin: "0 auto" }}>
+        <AnimatedHero />
+      </div>
+
+      {/* ── How it works ────────────────────────────────────────────────── */}
+      <section className="section section-flow" id="how-it-works">
+        <Reveal>
+          <div className="section-heading">
+            <p className="eyebrow">How it works</p>
+            <h2>A product flow built around confidence.</h2>
             <p>
-              Onboarding, profile creation, job targeting, review, and application tracking should feel
-              like one connected journey, not a collection of disconnected tools.
+              Help users move from first visit to tailored application without feeling lost,
+              overloaded, or forced to trust opaque AI output.
             </p>
           </div>
-          <div className="panel-grid">
-            {highlights.map((item) => (
-              <article className="panel-card panel-secondary" key={item.title}>
+        </Reveal>
+        <StaggerGrid className="flow-grid">
+          {flow.map((item) => (
+            <StaggerItem key={item.step}>
+              <article className="flow-card">
+                <span className="flow-step">{item.step}</span>
                 <h3>{item.title}</h3>
                 <p>{item.body}</p>
               </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section section-flow" id="how-it-works">
-        <div className="section-heading">
-          <p className="eyebrow">How it works</p>
-          <h2>A product flow built around confidence.</h2>
-          <p>
-            The goal is simple: help users move from first visit to tailored application without feeling
-            lost, overloaded, or forced to trust opaque AI output.
-          </p>
-        </div>
-        <div className="flow-grid">
-          {flow.map((item) => (
-            <article className="flow-card" key={item.step}>
-              <span className="flow-step">{item.step}</span>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </article>
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerGrid>
       </section>
 
+      {/* ── Product pillars ─────────────────────────────────────────────── */}
       <section className="section section-product" id="product">
-        <div className="section-heading narrow">
-          <p className="eyebrow">Product pillars</p>
-          <h2>Built for the actual pain points of applying, not just AI demos.</h2>
-        </div>
+        <Reveal>
+          <div className="section-heading narrow">
+            <p className="eyebrow">Product pillars</p>
+            <h2>Built for the actual pain points of applying, not just AI demos.</h2>
+          </div>
+        </Reveal>
         <div className="feature-stack">
-          {productSections.map((section) => (
-            <article className="feature-row" key={section.title}>
-              <div className="feature-copy">
-                <p className="feature-kicker">{section.kicker}</p>
-                <h3>{section.title}</h3>
-                <p>{section.body}</p>
-              </div>
-              <ul className="feature-list">
-                {section.bullets.map((bullet) => (
-                  <li key={bullet}>{bullet}</li>
-                ))}
-              </ul>
-            </article>
+          {productSections.map((section, i) => (
+            <Reveal key={section.title} delay={i * 0.06}>
+              <article className="feature-row">
+                <div className="feature-copy">
+                  <p className="feature-kicker">{section.kicker}</p>
+                  <h3>{section.title}</h3>
+                  <p>{section.body}</p>
+                </div>
+                <ul className="feature-list">
+                  {section.bullets.map((bullet) => (
+                    <li key={bullet}>{bullet}</li>
+                  ))}
+                </ul>
+              </article>
+            </Reveal>
           ))}
         </div>
       </section>
 
-      <section className="section section-proof">
+      {/* ── Proof card ──────────────────────────────────────────────────── */}
+      <Reveal className="section">
         <div className="proof-card">
           <div>
             <p className="eyebrow">Designed for launch readiness</p>
             <h2>A calmer path into public testing.</h2>
           </div>
-          <div className="proof-grid">
-            <div>
-              <strong>Trust first</strong>
-              <p>Review before export, confirm before profile save, and help when users get stuck.</p>
-            </div>
-            <div>
-              <strong>Fewer repeated steps</strong>
-              <p>Profile intelligence and Job Tracker make every future application lighter.</p>
-            </div>
-            <div>
-              <strong>Human support still matters</strong>
-              <p>Users should always have a help path before they abandon the product.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section section-faq" id="support">
-        <div className="section-heading narrow">
-          <p className="eyebrow">Help and support</p>
-          <h2>Users should never be left alone with a confusing screen.</h2>
-          <p>
-            A strong launch includes guided help inside the product and a clear path to reach a real
-            person when needed.
-          </p>
-        </div>
-
-        <div className="faq-grid">
-          <div className="faq-list">
-            {faqs.map((item) => (
-              <article className="faq-item" key={item.q}>
-                <h3>{item.q}</h3>
-                <p>{item.a}</p>
-              </article>
+          <StaggerGrid className="proof-grid">
+            {[
+              {
+                title: "Trust first",
+                body: "Review before export, confirm before profile save, and help when users get stuck.",
+              },
+              {
+                title: "Fewer repeated steps",
+                body: "Profile intelligence and Job Tracker make every future application lighter.",
+              },
+              {
+                title: "Human support still matters",
+                body: "Users always have a help path before they abandon the product.",
+              },
+            ].map((item) => (
+              <StaggerItem key={item.title}>
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.body}</p>
+                </div>
+              </StaggerItem>
             ))}
-          </div>
-
-          <aside className="support-card">
-            <p className="support-kicker">Need help?</p>
-            <h3>Guide users in-product first, then offer direct support.</h3>
-            <p>
-              The product should include task-based help for onboarding, profile review, optimization, and
-              saving to Job Tracker. If that still is not enough, users should be able to contact you
-              directly.
-            </p>
-            <div className="support-links">
-              <a className="button button-primary" href={`mailto:${contactEmail}`}>
-                Email support
-              </a>
-              <a className="button button-secondary" href={linkedinUrl} target="_blank" rel="noreferrer">
-                Connect on LinkedIn
-              </a>
-            </div>
-          </aside>
+          </StaggerGrid>
         </div>
-      </section>
+      </Reveal>
 
-      {/* ── Screenshots ──────────────────────────────────────────────────── */}
+      {/* ── Screenshots ─────────────────────────────────────────────────── */}
       <section className="section section-screenshots" id="screenshots">
-        <div className="section-heading">
-          <p className="eyebrow">Inside the app</p>
-          <h2>See the workflow in action.</h2>
-          <p>
-            From first-run onboarding to the final optimized export — every step is designed to keep
-            you in control.
-          </p>
-        </div>
-        {/* Drop real screenshots into /public/screenshots/ and replace the src values below */}
-        <div className="screenshots-grid">
-          <figure className="screenshot-item screenshot-large">
-            <div className="screenshot-placeholder">
-              <span>Onboarding — welcome &amp; profile setup</span>
-            </div>
-            <figcaption>Guided onboarding that builds your profile automatically</figcaption>
-          </figure>
-          <figure className="screenshot-item">
-            <div className="screenshot-placeholder">
-              <span>Optimization — before &amp; after score</span>
-            </div>
-            <figcaption>Explainable before/after fit score</figcaption>
-          </figure>
-          <figure className="screenshot-item">
-            <div className="screenshot-placeholder">
-              <span>Job Tracker — application history</span>
-            </div>
-            <figcaption>Job Tracker keeps every application organised</figcaption>
-          </figure>
+        <Reveal>
+          <div className="section-heading">
+            <p className="eyebrow">Inside the app</p>
+            <h2>See the workflow in action.</h2>
+            <p>
+              From first-run onboarding to the final optimized export — every step is designed to
+              keep you in control.
+            </p>
+          </div>
+        </Reveal>
+        {/* Replace placeholder divs with <Image> once you have real screenshots */}
+        <StaggerGrid className="screenshots-grid">
+          <StaggerItem>
+            <figure className="screenshot-item screenshot-large">
+              <div className="screenshot-placeholder">
+                <span>Onboarding — welcome &amp; profile setup</span>
+              </div>
+              <figcaption>Guided onboarding that builds your profile automatically</figcaption>
+            </figure>
+          </StaggerItem>
+          <StaggerItem>
+            <figure className="screenshot-item">
+              <div className="screenshot-placeholder">
+                <span>Optimization — before &amp; after score</span>
+              </div>
+              <figcaption>Explainable before/after fit score</figcaption>
+            </figure>
+          </StaggerItem>
+          <StaggerItem>
+            <figure className="screenshot-item">
+              <div className="screenshot-placeholder">
+                <span>Job Tracker — application history</span>
+              </div>
+              <figcaption>Job Tracker keeps every application organised</figcaption>
+            </figure>
+          </StaggerItem>
+        </StaggerGrid>
+      </section>
+
+      {/* ── FAQ & support ───────────────────────────────────────────────── */}
+      <section className="section section-faq" id="support">
+        <Reveal>
+          <div className="section-heading narrow">
+            <p className="eyebrow">Help and support</p>
+            <h2>Users should never be left alone with a confusing screen.</h2>
+            <p>
+              A strong launch includes guided help inside the product and a clear path to reach a
+              real person when needed.
+            </p>
+          </div>
+        </Reveal>
+        <div className="faq-grid">
+          <StaggerGrid className="faq-list">
+            {faqs.map((item) => (
+              <StaggerItem key={item.q}>
+                <article className="faq-item">
+                  <h3>{item.q}</h3>
+                  <p>{item.a}</p>
+                </article>
+              </StaggerItem>
+            ))}
+          </StaggerGrid>
+          <Reveal delay={0.1}>
+            <aside className="support-card">
+              <p className="support-kicker">Need help?</p>
+              <h3>In-product guidance first, direct support when needed.</h3>
+              <p>
+                The app includes task-based help for onboarding, profile review, optimization, and
+                Job Tracker. If that still isn&apos;t enough, reach out directly.
+              </p>
+              <div className="support-links" style={{ marginTop: "20px" }}>
+                <a className="button button-primary" href={`mailto:${contactEmail}`}>
+                  Email support
+                </a>
+                <a
+                  className="button button-secondary"
+                  href={linkedinUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Connect on LinkedIn
+                </a>
+              </div>
+            </aside>
+          </Reveal>
         </div>
       </section>
 
-      {/* ── Support the developer ─────────────────────────────────────────── */}
-      <section className="section section-support-dev">
+      {/* ── Support the developer ────────────────────────────────────────── */}
+      <Reveal className="section section-support-dev">
         <div className="support-dev-card">
           <div className="support-dev-copy">
             <p className="eyebrow">Built by one person, for real job seekers</p>
@@ -326,40 +310,36 @@ export default function HomePage() {
               fund future features, and cover API costs for users who need it most.
             </p>
             <div className="support-dev-actions">
-              <a className="button button-coffee" href={donateUrl} target="_blank" rel="noreferrer">
+              <a className="button button-support" href={donateUrl} target="_blank" rel="noreferrer">
                 ☕ Buy me a coffee
               </a>
               <a
                 className="button button-secondary"
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                  "Just used Resume Builder OTG to optimise my resume for a job application. Free, guided, and surprisingly good. " + appUrl
-                )}`}
+                href={shareUrl}
                 target="_blank"
                 rel="noreferrer"
               >
-                Share on Twitter / X
+                Share with a friend
               </a>
             </div>
           </div>
           <aside className="support-dev-aside">
-            <div className="support-dev-stat">
-              <strong>Free to use</strong>
-              <p>No account required to start optimizing</p>
-            </div>
-            <div className="support-dev-stat">
-              <strong>Private mode available</strong>
-              <p>Run AI locally — no data leaves your machine</p>
-            </div>
-            <div className="support-dev-stat">
-              <strong>Actively maintained</strong>
-              <p>Built and improved based on real user feedback</p>
-            </div>
+            {[
+              { title: "Free to use", body: "No account required to start optimizing" },
+              { title: "Private mode available", body: "Run AI locally — no data leaves your machine" },
+              { title: "Actively maintained", body: "Built and improved based on real user feedback" },
+            ].map((stat) => (
+              <div className="support-dev-stat" key={stat.title}>
+                <strong>{stat.title}</strong>
+                <p>{stat.body}</p>
+              </div>
+            ))}
           </aside>
         </div>
-      </section>
+      </Reveal>
 
-      {/* ── Final CTA ─────────────────────────────────────────────────────── */}
-      <section className="section section-cta">
+      {/* ── Final CTA ───────────────────────────────────────────────────── */}
+      <Reveal className="section section-cta">
         <div className="cta-card">
           <div>
             <p className="eyebrow">Ready to try it?</p>
@@ -374,24 +354,18 @@ export default function HomePage() {
             </a>
           </div>
         </div>
-      </section>
+      </Reveal>
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
+      {/* ── Footer ──────────────────────────────────────────────────────── */}
       <footer className="site-footer">
         <div className="footer-inner">
           <div className="footer-brand">
             <p className="brand-name">Resume Builder OTG</p>
             <p className="footer-tagline">Resume optimization that feels guided, not chaotic.</p>
             <div className="footer-social">
-              <a href={`mailto:${contactEmail}`} aria-label="Email support">
-                Email
-              </a>
-              <a href={linkedinUrl} target="_blank" rel="noreferrer" aria-label="LinkedIn">
-                LinkedIn
-              </a>
-              <a href={donateUrl} target="_blank" rel="noreferrer">
-                ☕ Support
-              </a>
+              <a href={`mailto:${contactEmail}`}>Email</a>
+              <a href={linkedinUrl} target="_blank" rel="noreferrer">LinkedIn</a>
+              <a href={donateUrl} target="_blank" rel="noreferrer">☕ Support</a>
             </div>
           </div>
           <nav className="footer-nav" aria-label="Footer navigation">
@@ -400,23 +374,17 @@ export default function HomePage() {
               <a href="#how-it-works">How it works</a>
               <a href="#product">Features</a>
               <a href="#screenshots">Screenshots</a>
-              <a href={appUrl} target="_blank" rel="noreferrer">
-                Open app
-              </a>
+              <a href={appUrl} target="_blank" rel="noreferrer">Open app</a>
             </div>
             <div className="footer-nav-group">
               <p className="footer-nav-label">Support</p>
               <a href="#support">Help &amp; FAQ</a>
               <a href={`mailto:${contactEmail}`}>Email us</a>
-              <a href={linkedinUrl} target="_blank" rel="noreferrer">
-                LinkedIn
-              </a>
+              <a href={linkedinUrl} target="_blank" rel="noreferrer">LinkedIn</a>
             </div>
             <div className="footer-nav-group">
               <p className="footer-nav-label">Support the project</p>
-              <a href={donateUrl} target="_blank" rel="noreferrer">
-                Buy me a coffee
-              </a>
+              <a href={donateUrl} target="_blank" rel="noreferrer">Buy me a coffee</a>
             </div>
           </nav>
         </div>

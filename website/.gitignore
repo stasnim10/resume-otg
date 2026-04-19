@@ -1,0 +1,17 @@
+# Next.js
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Misc
+.DS_Store
+*.pem
+.env*.local
+
+# Override root gitignore — include website source dirs
+!lib/
+!lib/**
+!components/
+!components/**
