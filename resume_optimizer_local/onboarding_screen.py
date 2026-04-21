@@ -5,13 +5,6 @@ Stage 1  Welcome      name · career stage · target roles  (conversational)
 Stage 2  Upload       resume · LinkedIn · other docs       (explicit + reassuring)
 Stage 3  Review       section-by-section confirm / edit   (builds confidence)
 Stage 4  Done         adaptive CTA
-
-Design rules:
-  • Conversational, not administrative — no wall-of-form energy.
-  • "Nothing is final until you review it." shown explicitly in Stage 2.
-  • Stage 3 shows each section with a status badge and lets the user
-    edit inline and confirm one section at a time.
-  • User can continue even if sections are incomplete.
 """
 from __future__ import annotations
 
@@ -40,14 +33,65 @@ from ui_helpers import primary_button, secondary_button
 
 TOTAL_STEPS = 4
 
-_CAREER_STAGES: list[tuple[str, str, str]] = [
-    ("Student",       "📚", "In school or recently graduated"),
-    ("Early Career",  "🌱", "0–3 years of experience"),
-    ("Mid-Level",     "⚡", "3–8 years, growing in your field"),
-    ("Manager",       "🎯", "Leading teams or into management"),
-    ("Executive",     "🏔", "Senior leadership or C-suite"),
-    ("Career Pivot",  "🔄", "Switching industries or roles"),
-    ("Not Sure Yet",  "💭", "Still figuring it out — that's fine"),
+_CAREER_STAGES: list[str] = [
+    "Student",
+    "Early Career (0–3 yrs)",
+    "Mid-Level (3–8 yrs)",
+    "Manager / Team Lead",
+    "Executive / C-Suite",
+    "Career Pivot",
+    "Not Sure Yet",
+]
+
+_TARGET_ROLES: list[str] = [
+    "Software Engineer",
+    "Frontend Developer",
+    "Backend Developer",
+    "Full Stack Developer",
+    "DevOps / Platform Engineer",
+    "Machine Learning Engineer",
+    "Data Scientist",
+    "Data Analyst",
+    "Product Manager",
+    "Product Designer",
+    "UX Designer",
+    "Business Analyst",
+    "Project Manager",
+    "Operations Manager",
+    "Supply Chain Manager",
+    "Financial Analyst",
+    "Marketing Manager",
+    "Content Writer / Strategist",
+    "Account Executive",
+    "Sales Manager",
+    "Customer Success Manager",
+    "HR Manager",
+    "Consultant",
+    "Research Scientist",
+    "Strategy Manager",
+]
+
+_TARGET_INDUSTRIES: list[str] = [
+    "Technology",
+    "Finance & Banking",
+    "Healthcare",
+    "Education",
+    "E-Commerce & Retail",
+    "Media & Entertainment",
+    "Consulting",
+    "Manufacturing",
+    "Non-Profit",
+    "Government & Public Sector",
+    "Energy & Utilities",
+    "Real Estate",
+    "Legal",
+    "Pharmaceuticals & Biotech",
+    "Supply Chain & Logistics",
+    "Marketing & Advertising",
+    "Insurance",
+    "Aerospace & Defense",
+    "Agriculture",
+    "Hospitality & Travel",
 ]
 
 _EDU_TYPES   = {"education", "undergraduate", "masters", "phd", "certificate", "high_school"}
@@ -55,12 +99,77 @@ _EXP_TYPES   = {"experience", "project", "leadership", "volunteering", "business
 _SKILL_TYPES = {"skills", "certification", "award", "activity"}
 
 _STATUS_CFG: dict[str, tuple[str, str, str]] = {
-    "good":    ("✓ Looks good",        "#dcfce7", "#15803d"),
-    "review":  ("⚠ Check this",        "#fef9c3", "#b45309"),
-    "missing": ("○ Not found yet",     "#f3f4f6", "#6b7280"),
+    "good":    ("Looks good",        "#dcfce7", "#15803d"),
+    "review":  ("Check this",        "#fef9c3", "#b45309"),
+    "missing": ("Not found yet",     "#f3f4f6", "#6b7280"),
 }
 
-_DIVIDER = '<div style="border-top:1px solid var(--line,#e5e5e5);margin:1.5rem 0;"></div>'
+_DIVIDER = '<div style="border-top:1px solid #e5e7eb;margin:2rem 0;"></div>'
+
+_ONBOARDING_CSS = """
+<style>
+    /* Onboarding page chrome */
+    .ob-wrap { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+    /* Radio pill strip */
+    div[data-testid="stRadio"] > div {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+    }
+    div[data-testid="stRadio"] > div > label {
+        flex: 0 0 auto !important;
+        border: 1.5px solid #d1d5db !important;
+        border-radius: 999px !important;
+        padding: 0.4rem 1rem !important;
+        font-size: 0.875rem !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        background: transparent !important;
+        color: #374151 !important;
+        transition: border-color 150ms, background 150ms !important;
+        margin: 0 !important;
+    }
+    div[data-testid="stRadio"] > div > label:has(input:checked) {
+        border-color: #111827 !important;
+        background: #111827 !important;
+        color: #ffffff !important;
+    }
+    div[data-testid="stRadio"] > div > label > div:first-child {
+        display: none !important;
+    }
+
+    /* Step indicator */
+    .ob-step-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #9ca3af;
+        margin-bottom: 0.5rem;
+    }
+    .ob-headline {
+        font-size: clamp(1.6rem, 3vw, 2.2rem);
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        line-height: 1.2;
+        color: #111827;
+        margin-bottom: 0.4rem;
+    }
+    .ob-sub {
+        font-size: 0.95rem;
+        color: #6b7280;
+        line-height: 1.65;
+        margin-bottom: 2rem;
+    }
+    .ob-section-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #374151;
+        margin: 1.5rem 0 0.75rem;
+    }
+</style>
+"""
 
 
 # ── Session state ──────────────────────────────────────────────────────────────
@@ -68,19 +177,18 @@ _DIVIDER = '<div style="border-top:1px solid var(--line,#e5e5e5);margin:1.5rem 0
 def _init() -> None:
     defaults: dict = {
         "ob_step":              1,
-        "ob_first_name":        "",
         "ob_full_name":         "",
         "ob_email":             "",
         "ob_location":          "",
         "ob_career_stage":      "",
-        "ob_target_roles":      "",
-        "ob_target_industries": "",
+        "ob_target_roles":      [],
+        "ob_target_industries": [],
         "ob_docs_added":        False,
         "ob_pending_basics":    {},
         "ob_pending_items":     [],
         "ob_pending_source":    "",
-        "ob_review_editing":    None,   # section name being edited inline
-        "ob_confirmed":         [],     # list of confirmed section names
+        "ob_review_editing":    None,
+        "ob_confirmed":         [],
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -104,56 +212,53 @@ def _step_indicator(current: int, total: int) -> None:
     for i in range(1, total + 1):
         if i < current:
             dots.append(
-                '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;'
-                'background:var(--muted,#888);margin:0 5px;vertical-align:middle;opacity:0.45;"></span>'
+                '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
+                'background:#d1d5db;margin:0 4px;vertical-align:middle;"></span>'
             )
         elif i == current:
             dots.append(
-                '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;'
-                'background:var(--text,#111);margin:0 5px;vertical-align:middle;"></span>'
+                '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;'
+                'background:#111827;margin:0 4px;vertical-align:middle;"></span>'
             )
         else:
             dots.append(
-                '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;'
-                'border:1.5px solid var(--line-strong,#aaa);margin:0 5px;vertical-align:middle;opacity:0.35;"></span>'
+                '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
+                'border:1.5px solid #d1d5db;margin:0 4px;vertical-align:middle;"></span>'
             )
     st.markdown(
-        f'<div style="text-align:center;margin-bottom:2rem;">{"".join(dots)}</div>',
+        f'<div style="text-align:center;margin-bottom:2.5rem;">{"".join(dots)}</div>',
         unsafe_allow_html=True,
     )
 
 
 def _heading(headline: str, sub: str = "", step_label: str = "") -> None:
     step_html = (
-        f'<div style="font-size:0.76rem;font-weight:600;letter-spacing:0.09em;'
-        f'text-transform:uppercase;color:var(--muted,#888);margin-bottom:0.5rem;">'
-        f'Step {step_label} of {TOTAL_STEPS}</div>'
+        f'<div class="ob-step-label">Step {step_label} of {TOTAL_STEPS}</div>'
         if step_label else ""
     )
     sub_html = (
-        f'<div style="color:var(--muted,#888);font-size:0.96rem;line-height:1.65;'
-        f'margin-top:0.4rem;margin-bottom:1.75rem;">{sub}</div>'
-        if sub else '<div style="height:1.25rem;"></div>'
+        f'<div class="ob-sub">{sub}</div>'
+        if sub else '<div style="height:0.5rem;"></div>'
     )
     st.markdown(
+        f'<div class="ob-wrap">'
         f'{step_html}'
-        f'<div style="font-size:clamp(1.5rem,3vw,2.1rem);font-weight:700;'
-        f'letter-spacing:-0.022em;line-height:1.2;">{headline}</div>'
-        f'{sub_html}',
+        f'<div class="ob-headline">{headline}</div>'
+        f'{sub_html}'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
 
-def _sub_heading(text: str) -> None:
+def _section_label(text: str) -> None:
     st.markdown(
-        f'<div style="font-size:1rem;font-weight:600;margin:0.25rem 0 0.75rem 0;">{text}</div>',
+        f'<div class="ob-section-label">{text}</div>',
         unsafe_allow_html=True,
     )
 
 
 def _help_hint(label: str, body: str) -> None:
-    """Small collapsible contextual help snippet."""
-    with st.expander(f"ℹ️  {label}", expanded=False):
+    with st.expander(f"  {label}", expanded=False):
         st.caption(body)
 
 
@@ -164,6 +269,11 @@ def _status_badge(status: str) -> str:
         f'border-radius:999px;padding:0.15rem 0.7rem;font-size:0.78rem;'
         f'font-weight:600;white-space:nowrap;">{label}</span>'
     )
+
+
+def _first_name() -> str:
+    full = st.session_state.get("ob_full_name", "")
+    return full.split()[0] if full else "there"
 
 
 def _csv_list(value: str) -> list[str]:
@@ -180,15 +290,15 @@ def _step1_welcome() -> None:
     )
 
     # ── Name + Contact ─────────────────────────────────────────────────────────
-    _sub_heading("What should I call you?")
+    _section_label("Your name")
 
     c1, c2 = st.columns(2, gap="large")
     with c1:
-        first_name = st.text_input(
-            "First name ✱",
-            value=st.session_state.ob_first_name,
-            placeholder="Sarah",
-            key="_ob1_fn",
+        full_name = st.text_input(
+            "Full name",
+            value=st.session_state.ob_full_name,
+            placeholder="Sarah Johnson",
+            key="_ob1_full",
         )
         email = st.text_input(
             "Email",
@@ -197,13 +307,6 @@ def _step1_welcome() -> None:
             key="_ob1_email",
         )
     with c2:
-        full_name = st.text_input(
-            "Full name",
-            value=st.session_state.ob_full_name,
-            placeholder="Sarah Johnson",
-            key="_ob1_full",
-            help="Used on your resume — can be added later",
-        )
         location = st.text_input(
             "Location",
             value=st.session_state.ob_location,
@@ -213,92 +316,110 @@ def _step1_welcome() -> None:
 
     # ── Career Stage ───────────────────────────────────────────────────────────
     st.markdown(_DIVIDER, unsafe_allow_html=True)
-    _sub_heading("Where are you in your career?")
+    _section_label("Where are you in your career?")
 
-    selected_stage = st.session_state.ob_career_stage
-    for row_start in range(0, len(_CAREER_STAGES), 4):
-        chunk = _CAREER_STAGES[row_start : row_start + 4]
-        cols = st.columns(len(chunk), gap="small")
-        for col, (label, icon, desc) in zip(cols, chunk):
-            with col:
-                is_sel = selected_stage == label
-                border = "2px solid var(--text,#111)" if is_sel else "1px solid var(--line,#ddd)"
-                bg     = "var(--surface-muted,#f5f5f5)" if is_sel else "transparent"
-                check  = "✓ " if is_sel else ""
-                st.markdown(
-                    f'<div style="border:{border};background:{bg};border-radius:10px;'
-                    f'padding:0.65rem 0.4rem;text-align:center;margin-bottom:0.3rem;">'
-                    f'<div style="font-size:1.3rem;margin-bottom:0.2rem;">{icon}</div>'
-                    f'<div style="font-weight:600;font-size:0.8rem;">{check}{label}</div>'
-                    f'<div style="font-size:0.7rem;color:var(--muted,#888);line-height:1.4;'
-                    f'margin-top:0.1rem;">{desc}</div></div>',
-                    unsafe_allow_html=True,
-                )
-                if st.button(
-                    "Selected ✓" if is_sel else "Select",
-                    key=f"ob-stage-{label}",
-                    use_container_width=True,
-                ):
-                    st.session_state.ob_career_stage = label
-                    st.rerun()
+    current_stage = st.session_state.ob_career_stage or None
+    stage_index = _CAREER_STAGES.index(current_stage) if current_stage in _CAREER_STAGES else None
+
+    selected_stage = st.radio(
+        "Career stage",
+        options=_CAREER_STAGES,
+        index=stage_index,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="_ob1_stage",
+    )
 
     # ── Target Roles ───────────────────────────────────────────────────────────
     st.markdown(_DIVIDER, unsafe_allow_html=True)
-    _sub_heading("What kind of work are you looking for?")
+    _section_label("What kind of work are you looking for?")
 
-    target_roles = st.text_input(
+    current_roles = st.session_state.ob_target_roles
+    if isinstance(current_roles, str):
+        current_roles = _csv_list(current_roles)
+
+    target_roles = st.multiselect(
         "Target roles",
-        value=st.session_state.ob_target_roles,
-        placeholder="Operations Analyst, Supply Chain Manager, Project Lead…",
+        options=_TARGET_ROLES,
+        default=[r for r in current_roles if r in _TARGET_ROLES],
+        placeholder="Choose one or more roles…",
         key="_ob1_roles",
-        help="Comma-separated is fine",
     )
-    target_industries = st.text_input(
+
+    # Free-text add for roles not in the list
+    extra_roles_raw = st.text_input(
+        "Other roles not listed above (optional)",
+        value=", ".join(r for r in current_roles if r not in _TARGET_ROLES),
+        placeholder="e.g. Revenue Operations Lead",
+        key="_ob1_roles_extra",
+    )
+
+    current_industries = st.session_state.ob_target_industries
+    if isinstance(current_industries, str):
+        current_industries = _csv_list(current_industries)
+
+    target_industries = st.multiselect(
         "Industries (optional)",
-        value=st.session_state.ob_target_industries,
-        placeholder="Supply Chain, Technology, Finance…",
+        options=_TARGET_INDUSTRIES,
+        default=[i for i in current_industries if i in _TARGET_INDUSTRIES],
+        placeholder="Choose industries…",
         key="_ob1_inds",
     )
 
-    st.caption("💡 You can update all of this anytime from your profile.")
+    extra_industries_raw = st.text_input(
+        "Other industries not listed above (optional)",
+        value=", ".join(i for i in current_industries if i not in _TARGET_INDUSTRIES),
+        placeholder="e.g. Web3 / Crypto",
+        key="_ob1_inds_extra",
+    )
+
+    st.markdown(
+        '<div style="font-size:0.83rem;color:#9ca3af;margin-top:1rem;">'
+        'You can update all of this anytime from your profile.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown('<div style="height:1rem;"></div>', unsafe_allow_html=True)
 
-    if primary_button("Continue →", key="ob-step1-go", use_container_width=True):
-        fn = st.session_state.get("_ob1_fn", "").strip()
+    if primary_button("Continue", key="ob-step1-go", use_container_width=True):
+        fn = st.session_state.get("_ob1_full", "").strip()
         if not fn:
-            st.error("Just a first name is enough — we need something to call you!")
+            st.error("Please enter your name to continue.")
             return
-        st.session_state.ob_first_name        = fn
-        st.session_state.ob_full_name         = st.session_state.get("_ob1_full", "").strip() or fn
+
+        extra_roles = _csv_list(st.session_state.get("_ob1_roles_extra", ""))
+        extra_inds  = _csv_list(st.session_state.get("_ob1_inds_extra", ""))
+
+        st.session_state.ob_full_name         = fn
         st.session_state.ob_email             = st.session_state.get("_ob1_email", "").strip()
         st.session_state.ob_location          = st.session_state.get("_ob1_loc", "").strip()
-        st.session_state.ob_target_roles      = st.session_state.get("_ob1_roles", "").strip()
-        st.session_state.ob_target_industries = st.session_state.get("_ob1_inds", "").strip()
+        st.session_state.ob_career_stage      = selected_stage or ""
+        st.session_state.ob_target_roles      = list(target_roles) + extra_roles
+        st.session_state.ob_target_industries = list(target_industries) + extra_inds
         _next()
 
 
 # ── Stage 2 — Upload ───────────────────────────────────────────────────────────
 
 def _step2_upload() -> None:
-    name = st.session_state.ob_first_name or "there"
+    name = _first_name()
     _heading(
         f"Let's build your profile, {name}.",
         "",
         step_label="2",
     )
 
-    # Reassurance banner — this sentence matters
     st.markdown(
-        '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;'
+        '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;'
         'padding:0.9rem 1.1rem;margin-bottom:1.5rem;font-size:0.94rem;line-height:1.6;">'
-        '📄 <strong>We\'ll use these to build your profile automatically.</strong><br>'
-        '&nbsp;&nbsp;&nbsp;&nbsp;Nothing is final until you review it — you\'ll check every section before anything is saved.'
+        '<strong>We\'ll use these to build your profile automatically.</strong><br>'
+        'Nothing is final until you review it — you\'ll check every section before anything is saved.'
         '</div>',
         unsafe_allow_html=True,
     )
 
     # ── Resume upload ──────────────────────────────────────────────────────────
-    _sub_heading("Resume or CV")
+    _section_label("Resume or CV")
     resume_files = st.file_uploader(
         "Upload resume",
         type=["docx", "pdf", "txt", "md"],
@@ -316,7 +437,7 @@ def _step2_upload() -> None:
 
     # ── LinkedIn ───────────────────────────────────────────────────────────────
     st.markdown(_DIVIDER, unsafe_allow_html=True)
-    _sub_heading("LinkedIn profile (optional)")
+    _section_label("LinkedIn profile (optional)")
 
     li_tab, li_paste = st.tabs(["Upload LinkedIn PDF", "Paste LinkedIn text"])
 
@@ -380,12 +501,12 @@ def _step2_upload() -> None:
     col_back, col_build, col_skip = st.columns([1, 3, 1], gap="large")
 
     with col_back:
-        if secondary_button("← Back", key="ob-upload-back", use_container_width=True):
+        if secondary_button("Back", key="ob-upload-back", use_container_width=True):
             _back()
 
     with col_build:
         if primary_button(
-            "Build my profile →",
+            "Build my profile",
             key="ob-build-btn",
             disabled=not has_input,
             use_container_width=True,
@@ -397,7 +518,7 @@ def _step2_upload() -> None:
             _run_extraction(all_files, linkedin_text or "")
 
     with col_skip:
-        if secondary_button("Skip →", key="ob-upload-skip", use_container_width=True):
+        if secondary_button("Skip", key="ob-upload-skip", use_container_width=True):
             _go(3)
 
 
@@ -500,7 +621,7 @@ def _section_header_row(title: str, status: str, section_id: str) -> None:
 
 def _confirm_btn(section_id: str, key: str) -> None:
     confirmed = section_id in st.session_state.ob_confirmed
-    label = "✓ Confirmed" if confirmed else "Looks good ✓"
+    label = "Confirmed" if confirmed else "Looks good"
     if st.button(label, key=key, disabled=confirmed, use_container_width=True):
         if section_id not in st.session_state.ob_confirmed:
             st.session_state.ob_confirmed.append(section_id)
@@ -514,13 +635,12 @@ def _review_personal(basics: dict) -> None:
         status = _section_status("personal", basics, [])
         _section_header_row("Personal", status, "personal")
 
-        # Merge step-1 data with extracted basics (step-1 wins)
-        name_val    = st.session_state.ob_full_name  or basics.get("full_name",  "")
-        email_val   = st.session_state.ob_email       or basics.get("email",     "")
-        phone_val   = basics.get("phone",    "")
-        loc_val     = st.session_state.ob_location    or basics.get("location",  "")
-        linkedin_val= basics.get("linkedin", "")
-        headline_val= basics.get("headline", "")
+        name_val     = st.session_state.ob_full_name  or basics.get("full_name",  "")
+        email_val    = st.session_state.ob_email       or basics.get("email",     "")
+        phone_val    = basics.get("phone",    "")
+        loc_val      = st.session_state.ob_location    or basics.get("location",  "")
+        linkedin_val = basics.get("linkedin", "")
+        headline_val = basics.get("headline", "")
 
         if st.session_state.ob_review_editing == "personal":
             with st.form("ob-review-personal"):
@@ -540,7 +660,6 @@ def _review_personal(basics: dict) -> None:
                     cancelled = st.form_submit_button("Cancel", use_container_width=True)
 
             if saved:
-                # Push edits back into session state / pending basics
                 st.session_state.ob_full_name = r_name.strip() or name_val
                 st.session_state.ob_email     = r_email.strip()
                 st.session_state.ob_location  = r_location.strip()
@@ -566,10 +685,10 @@ def _review_personal(basics: dict) -> None:
             ]
             preview_html = "".join(
                 f'<div style="display:flex;gap:0.6rem;font-size:0.88rem;padding:0.22rem 0;">'
-                f'<span style="color:var(--muted,#888);min-width:5.5rem;">{lbl}</span>'
+                f'<span style="color:#6b7280;min-width:5.5rem;">{lbl}</span>'
                 f'<span style="font-weight:500;">{val}</span></div>'
                 for lbl, val in rows if val
-            ) or '<div style="font-size:0.87rem;color:var(--muted,#888);">Nothing extracted yet.</div>'
+            ) or '<div style="font-size:0.87rem;color:#6b7280;">Nothing extracted yet.</div>'
             st.markdown(preview_html, unsafe_allow_html=True)
 
             btn_col, conf_col = st.columns([1, 1])
@@ -581,7 +700,7 @@ def _review_personal(basics: dict) -> None:
                 _confirm_btn("personal", "ob-rev-personal-ok")
 
 
-# ── Section: Education ─────────────────────────────────────────────────────────
+# ── Section: Education / Experience ───────────────────────────────────────────
 
 def _review_section_items(
     section_id: str,
@@ -596,8 +715,7 @@ def _review_section_items(
 
         if filtered:
             st.markdown(
-                f'<div style="font-size:0.84rem;color:var(--muted,#888);'
-                f'margin-bottom:0.5rem;">Select what to keep:</div>',
+                '<div style="font-size:0.84rem;color:#6b7280;margin-bottom:0.5rem;">Select what to keep:</div>',
                 unsafe_allow_html=True,
             )
             for item in filtered:
@@ -615,7 +733,7 @@ def _review_section_items(
                 _confirm_btn(section_id, f"ob-rev-{section_id}-ok")
         else:
             st.markdown(
-                '<div style="font-size:0.87rem;color:var(--muted,#888);">'
+                '<div style="font-size:0.87rem;color:#6b7280;">'
                 'Nothing found in your documents. You can add this in your profile later.</div>',
                 unsafe_allow_html=True,
             )
@@ -658,13 +776,13 @@ def _review_skills(items: list[ProfileItem]) -> None:
 
         elif all_skills:
             chips = "".join(
-                f'<span style="display:inline-block;background:var(--surface-muted,#f5f5f5);'
-                f'border:1px solid var(--line,#ddd);border-radius:999px;'
-                f'padding:0.18rem 0.6rem;font-size:0.83rem;margin:0.15rem 0.15rem 0 0;">{s}</span>'
+                f'<span style="display:inline-block;background:#f3f4f6;'
+                f'border:1px solid #e5e7eb;border-radius:999px;'
+                f'padding:0.18rem 0.65rem;font-size:0.83rem;margin:0.15rem 0.15rem 0 0;">{s}</span>'
                 for s in all_skills[:20]
             )
             if len(all_skills) > 20:
-                chips += f'<span style="font-size:0.8rem;color:var(--muted,#888);"> +{len(all_skills)-20} more</span>'
+                chips += f'<span style="font-size:0.8rem;color:#9ca3af;"> +{len(all_skills)-20} more</span>'
             st.markdown(f'<div style="line-height:2;">{chips}</div>', unsafe_allow_html=True)
 
             edit_col, conf_col = st.columns([1, 1])
@@ -677,7 +795,7 @@ def _review_skills(items: list[ProfileItem]) -> None:
                 _confirm_btn("skills", "ob-rev-skills-ok")
         else:
             st.markdown(
-                '<div style="font-size:0.87rem;color:var(--muted,#888);">'
+                '<div style="font-size:0.87rem;color:#6b7280;">'
                 'No skills found. You can add them in your profile later.</div>',
                 unsafe_allow_html=True,
             )
@@ -689,14 +807,20 @@ def _review_preferences() -> None:
     with st.container(border=True):
         status = _section_status("preferences", {}, [])
         _section_header_row("Preferences", status, "preferences")
+
+        roles = st.session_state.ob_target_roles
+        inds  = st.session_state.ob_target_industries
+        roles_str = ", ".join(roles) if isinstance(roles, list) else roles or "—"
+        inds_str  = ", ".join(inds)  if isinstance(inds, list)  else inds  or "—"
+
         rows = [
-            ("Career stage",  st.session_state.ob_career_stage      or "—"),
-            ("Target roles",  st.session_state.ob_target_roles      or "—"),
-            ("Industries",    st.session_state.ob_target_industries  or "—"),
+            ("Career stage",  st.session_state.ob_career_stage or "—"),
+            ("Target roles",  roles_str or "—"),
+            ("Industries",    inds_str  or "—"),
         ]
         preview_html = "".join(
             f'<div style="display:flex;gap:0.6rem;font-size:0.88rem;padding:0.22rem 0;">'
-            f'<span style="color:var(--muted,#888);min-width:7rem;">{lbl}</span>'
+            f'<span style="color:#6b7280;min-width:7rem;">{lbl}</span>'
             f'<span style="font-weight:500;">{val}</span></div>'
             for lbl, val in rows
         )
@@ -716,12 +840,11 @@ def _step3_review() -> None:
         step_label="3",
     )
 
-    # Top message
     st.markdown(
         '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;'
         'padding:0.85rem 1.1rem;margin-bottom:1.5rem;font-size:0.93rem;line-height:1.6;">'
-        '👀 <strong>We filled this in for you.</strong> '
-        'Please take 1 minute to check it before continuing. '
+        '<strong>We filled this in for you.</strong> '
+        'Please take a moment to check it before continuing. '
         'Use the <em>Edit</em> button in any section to make corrections.'
         '</div>',
         unsafe_allow_html=True,
@@ -740,7 +863,6 @@ def _step3_review() -> None:
     st.markdown('<div style="height:0.5rem;"></div>', unsafe_allow_html=True)
     _review_preferences()
 
-    # Contextual help
     st.markdown('<div style="height:0.5rem;"></div>', unsafe_allow_html=True)
     _help_hint(
         "How do I fix wrong extraction?",
@@ -753,16 +875,15 @@ def _step3_review() -> None:
         "You can fill in missing sections anytime from **Career Profile** in the sidebar.",
     )
 
-    # Navigation
     st.markdown('<div style="height:1.25rem;"></div>', unsafe_allow_html=True)
     col_back, col_save, col_skip = st.columns([1, 3, 1], gap="large")
 
     with col_back:
-        if secondary_button("← Back", key="ob-review-back", use_container_width=True):
+        if secondary_button("Back", key="ob-review-back", use_container_width=True):
             _back()
 
     with col_save:
-        if primary_button("Save and continue →", key="ob-review-save", use_container_width=True):
+        if primary_button("Save and continue", key="ob-review-save", use_container_width=True):
             profile = create_or_get_profile()
             _persist_all(profile, basics, items)
             _go(4)
@@ -776,24 +897,29 @@ def _step3_review() -> None:
 # ── Stage 4 — Done ─────────────────────────────────────────────────────────────
 
 def _step4_done() -> None:
-    name       = st.session_state.ob_first_name or "there"
+    name       = _first_name()
     docs_added = st.session_state.ob_docs_added
 
-    _heading(f"You're all set, {name}! 🎉")
+    _heading(f"You're all set, {name}.")
+
+    roles = st.session_state.ob_target_roles
+    inds  = st.session_state.ob_target_industries
+    roles_str = ", ".join(roles) if isinstance(roles, list) else roles or "—"
+    inds_str  = ", ".join(inds)  if isinstance(inds, list)  else inds  or "—"
 
     with st.container(border=True):
         rows = [
             ("Name",          st.session_state.ob_full_name          or "—"),
             ("Career Stage",  st.session_state.ob_career_stage       or "—"),
-            ("Target Roles",  st.session_state.ob_target_roles       or "—"),
-            ("Industries",    st.session_state.ob_target_industries   or "—"),
-            ("Profile",       "✓ Built from documents" if docs_added else "Set up from your answers"),
+            ("Target Roles",  roles_str or "—"),
+            ("Industries",    inds_str  or "—"),
+            ("Profile",       "Built from documents" if docs_added else "Set up from your answers"),
         ]
         for label, value in rows:
             st.markdown(
                 f'<div style="display:flex;justify-content:space-between;align-items:baseline;'
-                f'padding:0.4rem 0;border-bottom:1px solid var(--line,#eee);font-size:0.93rem;">'
-                f'<span style="color:var(--muted,#888);min-width:9rem;">{label}</span>'
+                f'padding:0.4rem 0;border-bottom:1px solid #f3f4f6;font-size:0.93rem;">'
+                f'<span style="color:#6b7280;min-width:9rem;">{label}</span>'
                 f'<span style="font-weight:500;text-align:right;">{value}</span></div>',
                 unsafe_allow_html=True,
             )
@@ -806,11 +932,11 @@ def _step4_done() -> None:
     )
 
     st.markdown('<div style="height:0.5rem;"></div>', unsafe_allow_html=True)
-    if primary_button("Verify my profile →", key="ob-done-profile", use_container_width=True):
+    if primary_button("Verify my profile", key="ob-done-profile", use_container_width=True):
         _finish("profile")
 
     st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
-    if secondary_button("Skip to the app →", key="ob-done-skip", use_container_width=True):
+    if secondary_button("Skip to the app", key="ob-done-skip", use_container_width=True):
         _finish("landing")
 
 
@@ -819,6 +945,13 @@ def _step4_done() -> None:
 def _persist_all(profile, basics: dict, items: list[ProfileItem]) -> None:
     """Save reviewed basics + selected items. Step-1 data always wins over extraction."""
     if basics or st.session_state.ob_full_name:
+        roles = st.session_state.ob_target_roles
+        inds  = st.session_state.ob_target_industries
+        if isinstance(roles, str):
+            roles = _csv_list(roles)
+        if isinstance(inds, str):
+            inds = _csv_list(inds)
+
         save_profile_basics(
             full_name=st.session_state.ob_full_name         or basics.get("full_name",  ""),
             email    =st.session_state.ob_email              or basics.get("email",      ""),
@@ -828,13 +961,12 @@ def _persist_all(profile, basics: dict, items: list[ProfileItem]) -> None:
             headline =basics.get("headline", ""),
             career_stage=st.session_state.ob_career_stage   or "Student",
             summary  =basics.get("summary",  ""),
-            target_roles       =_csv_list(st.session_state.ob_target_roles)      or profile.target_roles,
-            target_industries  =_csv_list(st.session_state.ob_target_industries) or profile.target_industries,
+            target_roles       =roles or profile.target_roles,
+            target_industries  =inds  or profile.target_industries,
             preferred_locations=profile.preferred_locations,
             work_authorization =profile.work_authorization,
         )
 
-    # Items — save only checkboxed ones (default=True if no state key yet)
     edu_exp_items = [i for i in items if i.item_type in (_EDU_TYPES | _EXP_TYPES)]
     skill_items   = [i for i in items if i.item_type in _SKILL_TYPES]
     other_items   = [i for i in items if i not in edu_exp_items and i not in skill_items]
@@ -850,7 +982,6 @@ def _persist_all(profile, basics: dict, items: list[ProfileItem]) -> None:
             if st.session_state.get(f"ob_keep_{section_id}_{idx}", True):
                 to_save.append(item)
 
-    # Skills: may have been edited in review step
     edited_skills_str = st.session_state.get("_ob_skills_edited")
     if edited_skills_str is not None:
         edited_skills = _csv_list(edited_skills_str)
@@ -881,12 +1012,19 @@ def _persist_all(profile, basics: dict, items: list[ProfileItem]) -> None:
 
 
 def _save_basics_from_steps() -> None:
-    """Persist steps 1 data only (called when skipping the review)."""
+    """Persist step-1 data only (called when skipping the review)."""
     profile = create_or_get_profile()
+    roles = st.session_state.ob_target_roles
+    inds  = st.session_state.ob_target_industries
+    if isinstance(roles, str):
+        roles = _csv_list(roles)
+    if isinstance(inds, str):
+        inds = _csv_list(inds)
+
     if not any([
         st.session_state.ob_full_name,
         st.session_state.ob_career_stage,
-        st.session_state.ob_target_roles,
+        roles,
         st.session_state.ob_email,
         st.session_state.ob_location,
     ]):
@@ -901,15 +1039,15 @@ def _save_basics_from_steps() -> None:
         headline           = profile.headline,
         career_stage       = st.session_state.ob_career_stage        or profile.career_stage or "Student",
         summary            = profile.summary,
-        target_roles       = _csv_list(st.session_state.ob_target_roles)      or profile.target_roles,
-        target_industries  = _csv_list(st.session_state.ob_target_industries) or profile.target_industries,
+        target_roles       = roles or profile.target_roles,
+        target_industries  = inds  or profile.target_industries,
         preferred_locations= profile.preferred_locations,
         work_authorization = profile.work_authorization,
     )
 
 
 def _finish(dest: str) -> None:
-    """Mark onboarding complete, set verification flag, clear wizard state, and route."""
+    """Mark onboarding complete, clear wizard state, and route."""
     complete_onboarding()
     st.session_state.ob_just_completed = True
     for key in [k for k in st.session_state if k.startswith("ob_") or k.startswith("_ob")]:
@@ -922,8 +1060,9 @@ def _finish(dest: str) -> None:
 
 def render_onboarding_screen() -> None:
     """Render the active onboarding stage inside a centred column."""
+    st.markdown(_ONBOARDING_CSS, unsafe_allow_html=True)
     _init()
-    start_onboarding()  # no-op if already started
+    start_onboarding()
 
     step = st.session_state.ob_step
 

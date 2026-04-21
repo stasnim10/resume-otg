@@ -101,9 +101,13 @@ def analyze_payload_against_document(doc_path: str, payload: Dict[str, Any]) -> 
 
     warnings: List[str] = []
     if unmatched:
-        warnings.append(f"{unmatched} requested replacement(s) could not be matched exactly.")
+        warnings.append(
+            "Some of the AI-generated edits were unclear, so the app could not place them safely."
+        )
     if duplicate:
-        warnings.append(f"{duplicate} requested replacement(s) matched multiple paragraphs.")
+        warnings.append(
+            "Some of the AI-generated edits were unclear, so the app could not place them safely."
+        )
 
     return {
         "paragraph_count": len(paragraphs),

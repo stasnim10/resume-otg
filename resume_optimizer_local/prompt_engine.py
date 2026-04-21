@@ -267,66 +267,89 @@ def build_optimizer_prompt(
     target_role: str,
     target_industry: str,
     profile_context: str = "",
+    missing_keywords: list[str] | None = None,
+    missing_skills: list[str] | None = None,
 ) -> str:
     """Generate the manual/API prompt for the optimizer flow."""
     normalized_role = normalize_role_title(target_role) or "the target role"
     industry_text = target_industry if target_industry else "the target industry"
     prioritization_block = _build_prioritization_block(normalized_role, industry_text, job_description)
 
+    # Profile context — placed early so the LLM has full candidate context before rules
     profile_context_block = ""
     if profile_context.strip():
         profile_context_block = f"""
-PROFILE EVIDENCE TO PRIORITIZE
-Use this career-profile evidence as a relevance guide when choosing what to emphasize. Only use it when it is already supported by the uploaded resume text below. Do not introduce facts that cannot be anchored back to the resume.
+CANDIDATE PROFILE EVIDENCE
+Use this saved career-profile evidence as a relevance guide when deciding what to emphasize. Only surface this evidence when it is already supported by the uploaded resume text. Do not introduce facts that cannot be directly anchored back to the resume.
 
 {profile_context}
 """
 
+    # Missing keywords block — shows the LLM exactly where the gap is
+    gap_block = ""
+    _missing_kw = [k for k in (missing_keywords or []) if k]
+    _missing_sk = [s for s in (missing_skills or []) if s]
+    if _missing_kw or _missing_sk:
+        gap_lines = []
+        if _missing_kw:
+            gap_lines.append(
+                "Keywords present in the job description but NOT yet in the resume "
+                f"(incorporate naturally where the candidate's background supports it):\n"
+                + ", ".join(_missing_kw[:18])
+            )
+        if _missing_sk:
+            gap_lines.append(
+                "Skills/tools listed in the job description that are missing from the resume "
+                f"(add only if they are genuinely supported by the candidate's experience):\n"
+                + ", ".join(_missing_sk[:12])
+            )
+        gap_block = "\nGAP ANALYSIS — MISSING JD SIGNALS\n" + "\n\n".join(gap_lines) + "\n"
+
     return f"""ROLE
-Act as an expert recruiter, resume strategist, and professional editor focused on {industry_text}.
+Act as an expert recruiter, resume strategist, and professional editor specializing in {industry_text}.
 
 PERSONA CONTEXT
 The candidate is at the {career_stage} stage and is targeting a {normalized_role} role.
-
+{profile_context_block}
 OBJECTIVE
-Optimize the uploaded resume for the target role using only information that is clearly supported by the resume. Improve relevance, clarity, and ATS alignment while preserving honesty.
+Optimize the uploaded resume for the target role using only information that is clearly supported by the resume text. Your primary goals in order of priority:
+1. Close keyword and skill gaps identified in the Gap Analysis section below.
+2. Improve ATS alignment by using the exact terminology from the job description wherever possible.
+3. Strengthen bullet clarity with action verbs and quantified impact.
+4. Improve the professional summary to directly address the role.
 
-CRITICAL: Your changes must INCREASE or maintain keyword alignment with the job description - they must NOT reduce it. If a change removes specificity or industry terminology that appears in the job description, reject that change.
-
+CRITICAL CONSTRAINT: Every change must increase or maintain keyword alignment with the job description. If a change removes industry terminology that appears in the job description, reject that change.
+{gap_block}
 PRIORITIZATION
-Focus your optimization on these areas (in order of importance):
+Emphasize these areas in every rewrite (ordered by importance for this role):
 {prioritization_block}
-
-When rewriting, emphasize accomplishments and experience that directly align with these five areas.
 
 RULES
 1. Do not invent employers, job titles, dates, certifications, scope, or metrics.
 2. Rewrite only what is already supported by the resume and job description.
 3. Preserve the intent of the original experience while making it more targeted.
-4. PRESERVE SPECIFIC KEYWORDS AND TERMINOLOGY that appear in both the original resume and the job description.
-5. If removing a word/phrase, only do so if the replacement is MORE specific or maintains equal specificity for the job.
+4. Keep all keywords and terminology that already appear in BOTH the resume and the JD.
+5. Only remove a word or phrase if the replacement is MORE specific or equally specific for the role.
 6. Use exact paragraph text from the resume as each match_anchor.
 7. Return only valid JSON. No markdown fences. No explanation before or after the JSON.
 8. Every match_anchor must exactly match one full paragraph from the resume text below.
-9. If no changes are needed for a section, omit it from the output. Return {{}} if no changes are needed at all.
+9. If no changes are needed for a section, omit it. Return {{}} only if no changes are needed at all.
 
 BULLET-WRITING REQUIREMENTS
-Each bullet point in replacements should:
-- Start with a strong action verb (Led, Managed, Developed, Coordinated, Negotiated, Established, Implemented, etc.)
-- Include a quantifiable result or impact when present in the original (metrics, percentages, cost savings, efficiency gains)
-- Remain concise (1-2 lines maximum)
-- Focus on outcome and impact, not just activities
-- Align with the prioritization areas above
-- PRESERVE specific industry terminology and company-specific achievements (e.g., "first", "Decathlon's", "go-to-market")
+Each rewritten bullet must:
+- Start with a strong action verb (Led, Built, Negotiated, Implemented, Delivered, Designed, etc.)
+- Quantify impact when any number, metric, or scope is present in the original
+- Stay concise: 1–2 lines maximum
+- Prioritize outcome and business impact over task description
+- Weave in missing JD keywords where the underlying experience genuinely supports it
+- Preserve company-specific facts, "first", proprietary names, and earned achievements
 
 SKILLS SECTION GUIDANCE
-For skills replacements:
-- Prioritize technical and operational skills from the job description
-- Include analytical tools and platforms mentioned in the JD when they are already supported by the resume
-- Remain truthful to resume experience and do not add unsupported skills
-- Order skills by relevance to the {normalized_role} role
-- Group related skills together when it improves readability
-- Use specific tool names (e.g., "Looker Studio") rather than generic terms (e.g., "analytics tools")
+- Lead with skills from the job description that are already supported by the resume
+- Incorporate missing JD tools/platforms only if the candidate's background can honestly support them
+- Use specific names (e.g. "Looker Studio", "SAP S/4HANA") over generic terms
+- Group related skills logically; order groups by relevance to {normalized_role}
+- Do not add skills that have no grounding in the resume text
 
 OUTPUT JSON SCHEMA
 {{
@@ -349,11 +372,9 @@ OUTPUT JSON SCHEMA
 }}
 
 TOP-LEVEL RULES
-- All top-level keys are optional.
-- Include only sections that truly need updating.
+- All top-level keys are optional. Include only sections that genuinely need updating.
 - Each replacement object must contain both match_anchor and replacement_text.
-- Do not include comments, analysis, or any extra keys.
-{profile_context_block}
+- Do not include comments, analysis, or extra keys.
 
 RESUME TEXT
 {resume_text}

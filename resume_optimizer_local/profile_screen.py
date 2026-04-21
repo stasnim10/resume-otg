@@ -26,6 +26,7 @@ Interaction model
 
 from __future__ import annotations
 
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -95,12 +96,89 @@ _EXP_LABEL_BY_VAL = {v: l for v, l in _EXP_TYPE_OPTIONS}
 # Small utilities
 # ---------------------------------------------------------------------------
 
+_MONTHS = [
+    ("", "Month"),
+    ("01", "January"), ("02", "February"), ("03", "March"),
+    ("04", "April"), ("05", "May"), ("06", "June"),
+    ("07", "July"), ("08", "August"), ("09", "September"),
+    ("10", "October"), ("11", "November"), ("12", "December"),
+]
+_MONTH_LABELS = [l for _, l in _MONTHS]
+_MONTH_VALUES = [v for v, _ in _MONTHS]
+_MONTH_ABBR = {
+    "jan": "01", "feb": "02", "mar": "03", "apr": "04",
+    "may": "05", "jun": "06", "jul": "07", "aug": "08",
+    "sep": "09", "sept": "09", "oct": "10", "nov": "11", "dec": "12",
+    "january": "01", "february": "02", "march": "03", "april": "04",
+    "june": "06", "july": "07", "august": "08", "september": "09",
+    "october": "10", "november": "11", "december": "12",
+}
+
+
 def _csv(value: str) -> list[str]:
     return [p.strip() for p in value.split(",") if p.strip()]
 
 
+# Pattern 1: digit immediately followed by 3+ lowercase letters (e.g. "50million")
+# Pattern 2: 3+ lowercase letters immediately followed by a digit (e.g. "million2")
+# Pattern 3: lowercase letter immediately followed by an uppercase letter that starts
+#             a word ≥4 chars long — catches "millionLogistics" style PDF run-ons
+#             where the extractor preserved capitalisation at word boundaries.
+_MISSING_SPACE_RE = re.compile(
+    r'(\d)([a-z]{3,})'          # digit → lowercase word
+    r'|([a-z]{3,})(\d)'         # lowercase word → digit
+    r'|([a-z])([A-Z][a-z]{2,})' # camelCase run-on: lowerUpper (e.g. millionLogistics)
+)
+
+
+def _fix_concat_text(text: str) -> str:
+    """Add spaces at obvious word-concatenation points from PDF/text extraction.
+
+    PDF extractors sometimes strip spaces at line-break hyphens, producing
+    strings like '$50millionLogisticsTransformation'. This adds spaces at:
+      - digit ↔ letter boundaries   (50million → 50 million)
+      - camelCase run-on boundaries  (millionLogistics → million Logistics)
+    Short tokens like "3PL", "IPv4", "S&P500" are left alone.
+    """
+    if not text:
+        return text
+
+    def _add_space(m: re.Match) -> str:
+        if m.group(1):  # digit → lowercase
+            return m.group(1) + " " + m.group(2)
+        if m.group(3):  # lowercase → digit
+            return m.group(3) + " " + m.group(4)
+        return m.group(5) + " " + m.group(6)  # camelCase split
+
+    return _MISSING_SPACE_RE.sub(_add_space, text)
+
+
 def _lines(value: str) -> list[str]:
     return [ln.strip() for ln in value.splitlines() if ln.strip()]
+
+
+def _parse_date_parts(date_str: str) -> tuple[str, str]:
+    """Return (month_num '01'-'12' or '', year '2024' or '') from a date string."""
+    if not date_str:
+        return "", ""
+    m = re.match(r"^(\d{2})/(\d{4})$", date_str.strip())
+    if m:
+        return m.group(1), m.group(2)
+    m = re.match(r"^([A-Za-z]+)\.?\s+(\d{4})", date_str.strip())
+    if m:
+        month_num = _MONTH_ABBR.get(m.group(1).lower().rstrip("."), "")
+        return month_num, m.group(2)
+    m = re.match(r"^(\d{4})$", date_str.strip())
+    if m:
+        return "", m.group(1)
+    return "", ""
+
+
+def _compose_date(month_num: str, year: str) -> str:
+    year = year.strip()
+    if month_num and year:
+        return f"{month_num}/{year}"
+    return year
 
 
 def _date_range(item: ProfileItem) -> str:
@@ -532,9 +610,13 @@ def _render_personal(profile) -> None:
         st.markdown(contact_rows, unsafe_allow_html=True)
 
         if profile.summary:
+            # Replace newlines with <br> so Streamlit's markdown parser doesn't
+            # convert double-newlines into <p> tags (which inherit Streamlit's
+            # default paragraph font-size and override the parent div's 0.95rem).
+            _summary_html = _fix_concat_text(profile.summary).replace("\n\n", "<br><br>").replace("\n", "<br>")
             st.markdown(
-                f'<div style="margin-top:1rem; font-size:0.95rem; color:var(--muted); line-height:1.65;">'
-                f"{profile.summary}</div>",
+                f'<div style="margin-top:1rem; font-size:0.95rem; color:var(--muted); line-height:1.72;">'
+                f"{_summary_html}</div>",
                 unsafe_allow_html=True,
             )
 
@@ -633,14 +715,15 @@ def _render_item_card(item: ProfileItem, tab: str) -> None:
                 st.rerun()
 
         if item.description:
+            desc = _fix_concat_text(item.description)
             st.markdown(
                 f'<div style="font-size:0.9rem; color:var(--muted);">'
-                f'{item.description[:220]}{"…" if len(item.description) > 220 else ""}</div>',
+                f'{desc[:220]}{"…" if len(desc) > 220 else ""}</div>',
                 unsafe_allow_html=True,
             )
         for bullet in item.bullets[:3]:
             st.markdown(
-                f'<div style="font-size:0.88rem; color:var(--muted); padding-left:0.75rem; margin-top:0.15rem;">• {bullet}</div>',
+                f'<div style="font-size:0.88rem; color:var(--muted); padding-left:0.75rem; margin-top:0.15rem;">• {_fix_concat_text(bullet)}</div>',
                 unsafe_allow_html=True,
             )
         if len(item.bullets) > 3:
@@ -691,16 +774,42 @@ def _item_form(
                 value=existing.location if existing else "",
             )
         with c2:
-            start = st.text_input(
-                "Start Date",
-                value=existing.start_date if existing else "",
-                placeholder="Jun 2022",
+            start_m0, start_y0 = _parse_date_parts(existing.start_date if existing else "")
+            end_m0, end_y0     = _parse_date_parts(existing.end_date   if existing else "")
+            start_idx = _MONTH_VALUES.index(start_m0) if start_m0 in _MONTH_VALUES else 0
+            end_idx   = _MONTH_VALUES.index(end_m0)   if end_m0   in _MONTH_VALUES else 0
+
+            st.markdown(
+                '<p style="font-size:0.875rem;font-weight:600;margin:0 0 0.25rem;">Start Date</p>',
+                unsafe_allow_html=True,
             )
-            end = st.text_input(
-                "End Date",
-                value=existing.end_date if existing else "",
-                placeholder="Aug 2024",
+            s1, s2 = st.columns([3, 2])
+            with s1:
+                start_month_label = st.selectbox(
+                    "Start Month", _MONTH_LABELS, index=start_idx,
+                    key=f"{form_key}_sm", label_visibility="collapsed",
+                )
+            with s2:
+                start_year = st.text_input(
+                    "Start Year", value=start_y0, placeholder="2022",
+                    key=f"{form_key}_sy", label_visibility="collapsed",
+                )
+
+            st.markdown(
+                '<p style="font-size:0.875rem;font-weight:600;margin:0.5rem 0 0.25rem;">End Date</p>',
+                unsafe_allow_html=True,
             )
+            e1, e2 = st.columns([3, 2])
+            with e1:
+                end_month_label = st.selectbox(
+                    "End Month", _MONTH_LABELS, index=end_idx,
+                    key=f"{form_key}_em", label_visibility="collapsed",
+                )
+            with e2:
+                end_year = st.text_input(
+                    "End Year", value=end_y0, placeholder="2024",
+                    key=f"{form_key}_ey", label_visibility="collapsed",
+                )
             is_current = st.checkbox(
                 "Currently here",
                 value=existing.is_current if existing else False,
@@ -730,9 +839,13 @@ def _item_form(
                 deleted = st.form_submit_button("Remove", use_container_width=True)
 
     if saved:
+        start_m_num = _MONTH_VALUES[_MONTH_LABELS.index(start_month_label)]
+        end_m_num   = _MONTH_VALUES[_MONTH_LABELS.index(end_month_label)]
+        composed_start = _compose_date(start_m_num, start_year)
+        composed_end   = "" if is_current else _compose_date(end_m_num, end_year)
         data = dict(
             item_type=item_type, title=title.strip(), organization=org.strip(),
-            location=loc.strip(), start_date=start.strip(), end_date=end.strip(),
+            location=loc.strip(), start_date=composed_start, end_date=composed_end,
             is_current=is_current, description=description.strip(),
             bullets=_lines(bullets_raw),
             skills=existing.skills if existing else [],

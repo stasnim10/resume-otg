@@ -14,7 +14,7 @@ import streamlit as st
 def primary_button(label: str, key: str, **kwargs: Any) -> bool:
     """Render a primary-styled button. Returns True when clicked."""
     st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-    clicked = st.button(label, key=key, **kwargs)
+    clicked = st.button(label, key=key, type="primary", **kwargs)
     st.markdown("</div>", unsafe_allow_html=True)
     return clicked
 
@@ -22,7 +22,7 @@ def primary_button(label: str, key: str, **kwargs: Any) -> bool:
 def secondary_button(label: str, key: str, **kwargs: Any) -> bool:
     """Render a secondary-styled button. Returns True when clicked."""
     st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-    clicked = st.button(label, key=key, **kwargs)
+    clicked = st.button(label, key=key, type="primary", **kwargs)
     st.markdown("</div>", unsafe_allow_html=True)
     return clicked
 
@@ -30,7 +30,7 @@ def secondary_button(label: str, key: str, **kwargs: Any) -> bool:
 def primary_form_submit(label: str, **kwargs: Any) -> bool:
     """Render a primary-styled form submit button. Must be inside st.form."""
     st.markdown('<div class="apple-primary">', unsafe_allow_html=True)
-    clicked = st.form_submit_button(label, **kwargs)
+    clicked = st.form_submit_button(label, type="primary", **kwargs)
     st.markdown("</div>", unsafe_allow_html=True)
     return clicked
 

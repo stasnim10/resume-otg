@@ -16,6 +16,7 @@ from job_tracker_store import (
     TRACKER_STATUSES,
     _clean_company,
     _clean_title,
+    _job_matches_search,
     normalize_status,
 )
 from profile_schema import utc_now_iso
@@ -120,11 +121,11 @@ def list_jobs(
             "updated_at": row.get("updated_at", ""),
             "next_action": (row.get("next_action") or "").strip(),
             "has_run": bool(latest_run),
-            "run_match_after": latest_run.get("match_after"),
-            "run_delta": latest_run.get("delta"),
-            "run_run_at": latest_run.get("run_at"),
-            "run_resume_path": "",
-            "run_cover_letter_path": "",
+            "current_fit": latest_run.get("match_after") if latest_run else None,
+            "latest_delta": latest_run.get("delta") if latest_run else None,
+            "last_run_at": latest_run.get("run_at") if latest_run else None,
+            "has_resume": False,
+            "has_cover_letter": False,
             "note_count": note_count,
         }
         jobs.append(job)
@@ -132,14 +133,8 @@ def list_jobs(
     # Filter
     if status_filter and status_filter != "All":
         jobs = [j for j in jobs if j["status"] == status_filter]
-    if search:
-        q = search.lower()
-        jobs = [
-            j for j in jobs
-            if q in (j["job_title"] or "").lower()
-            or q in (j["company"] or "").lower()
-            or q in (j["jd_text"] or "").lower()
-        ]
+    if search.strip():
+        jobs = [j for j in jobs if _job_matches_search(j, search)]
 
     # Sort
     if sort_by == "Newest saved":
@@ -147,7 +142,7 @@ def list_jobs(
     elif sort_by == "Date applied":
         jobs.sort(key=lambda j: j.get("applied_date") or "", reverse=True)
     elif sort_by == "Highest fit":
-        jobs.sort(key=lambda j: j.get("run_match_after") or 0, reverse=True)
+        jobs.sort(key=lambda j: j.get("current_fit") if j.get("current_fit") is not None else -1, reverse=True)
     # Default "Last updated" already sorted by DB query
 
     return jobs
@@ -182,6 +177,9 @@ def get_job(job_id: Any) -> dict | None:
                 "next_action": (row.get("next_action") or "").strip(),
                 "created_at": row.get("created_at", ""),
                 "updated_at": row.get("updated_at", ""),
+                "current_fit": None,
+                "latest_delta": None,
+                "note_count": 0,
             }
     except Exception as exc:
         logger.warning("get_job failed: %s", exc)

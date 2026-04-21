@@ -76,19 +76,36 @@ def load_auth_into_session() -> bool:
     if not (access and refresh):
         return False
     try:
-        # get_session() refreshes the access token automatically if expired.
-        resp = get_supabase().auth.get_session()
-        if resp and resp.user:
-            st.session_state.auth_user_id = resp.user.id
-            st.session_state.auth_user_email = resp.user.email
+        client = get_supabase()
+
+        # First validate the token directly. This is the most reliable path in
+        # Streamlit because reruns don't always preserve the SDK's in-memory
+        # session shape the same way a browser SPA would.
+        user_resp = client.auth.get_user(access)
+        user = getattr(user_resp, "user", None)
+        if user:
+            st.session_state.auth_user_id = user.id
+            st.session_state.auth_user_email = user.email
             st.session_state.is_authenticated = True
-            # Persist any refreshed tokens
-            if resp.session:
-                st.session_state._sb_access_token = resp.session.access_token
-                st.session_state._sb_refresh_token = resp.session.refresh_token
+            st.session_state._sb_access_token = access
+            st.session_state._sb_refresh_token = refresh
+            return True
+
+        # Fallback: consult the SDK-managed session if present.
+        resp = client.auth.get_session()
+        session = getattr(resp, "session", None)
+        user = getattr(session, "user", None) if session else None
+        if session and user:
+            st.session_state.auth_user_id = user.id
+            st.session_state.auth_user_email = user.email
+            st.session_state.is_authenticated = True
+            st.session_state._sb_access_token = session.access_token
+            st.session_state._sb_refresh_token = session.refresh_token
             return True
     except Exception as exc:
-        logger.debug("Session refresh failed: %s", exc)
+        logger.warning("Session refresh failed: %s", exc)
+    for key in ("_sb_access_token", "_sb_refresh_token", "auth_user_id", "auth_user_email"):
+        st.session_state[key] = ""
     st.session_state.is_authenticated = False
     return False
 

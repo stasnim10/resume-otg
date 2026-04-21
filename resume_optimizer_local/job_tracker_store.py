@@ -224,6 +224,21 @@ def _clean_company(raw: str) -> str:
     return raw.strip()
 
 
+def _normalize_search_text(raw: str) -> str:
+    """Lowercase and collapse internal whitespace for predictable matching."""
+    return " ".join((raw or "").lower().split())
+
+
+def _job_matches_search(job: dict[str, Any], query: str) -> bool:
+    """Match only against role title or company, never description text."""
+    normalized_query = _normalize_search_text(query)
+    if not normalized_query:
+        return True
+    title = _normalize_search_text(job.get("job_title", ""))
+    company = _normalize_search_text(job.get("company", ""))
+    return normalized_query in title or normalized_query in company
+
+
 def list_jobs(
     user_id: str = "local-user",
     search: str = "",
@@ -290,11 +305,7 @@ def list_jobs(
 
     # ── Search ────────────────────────────────────────────────────────────────
     if search.strip():
-        q = search.strip().lower()
-        jobs = [
-            j for j in jobs
-            if q in j["job_title"].lower() or q in j["company"].lower()
-        ]
+        jobs = [j for j in jobs if _job_matches_search(j, search)]
 
     # ── Status filter ─────────────────────────────────────────────────────────
     if status_filter and status_filter != "All":

@@ -29,124 +29,104 @@ def render_support_button() -> None:
         "<p style='font-size:0.78rem;color:#888;margin-bottom:0.35rem;'>Like the app? Support future development.</p>",
         unsafe_allow_html=True,
     )
-    st.link_button(
-        "☕  Buy me a coffee",
-        DONATE_URL,
-        use_container_width=True,
+    st.markdown(
+        """
+        <style>
+        .coffee-cta-link {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+            min-height: 36px !important;
+            height: 36px !important;
+            background: #d97757 !important;
+            color: #111111 !important;
+            border: 1px solid #d97757 !important;
+            border-radius: 8px !important;
+            font-weight: 700 !important;
+            font-size: 0.875rem !important;
+            text-decoration: none !important;
+            box-shadow: 0 8px 20px rgba(217, 119, 87, 0.18) !important;
+            transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease !important;
+            box-sizing: border-box !important;
+        }
+
+        .coffee-cta-link:hover {
+            background: #c9683f !important;
+            border-color: #c9683f !important;
+            color: #111111 !important;
+            transform: translateY(-1px);
+        }
+
+        .coffee-cta-link * {
+            color: #111111 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'''
+        <a class="coffee-cta-link" href="{DONATE_URL}" target="_blank" rel="noopener noreferrer">
+            ☕&nbsp;&nbsp;Buy me a coffee
+        </a>
+        ''',
+        unsafe_allow_html=True,
     )
 
 
 def render_help_section() -> None:
     """
-    Render the collapsible help panel inside whatever sidebar context the
-    caller has already opened. Does NOT call `with st.sidebar:` itself.
+    Render help content inline. Caller is responsible for any expander wrapper.
+    Does NOT call `with st.sidebar:` itself.
     """
+    st.markdown("**Getting started**")
+    st.markdown(
+        "1. Complete the setup wizard on first use.\n"
+        "2. Upload your resume to build your profile.\n"
+        "3. Review extracted data and correct anything off.\n"
+        "4. Pick a job, choose a mode, optimize."
+    )
+
     st.markdown(_DIV, unsafe_allow_html=True)
 
-    with st.expander("Need help?", expanded=False):
+    st.markdown("**How to optimize a resume**")
+    st.markdown(
+        "1. From **Home**, choose *Optimize My Resume*.\n"
+        "2. Upload your **.docx** or **.pdf** resume.\n"
+        "3. Paste the job description you're targeting.\n"
+        "4. Choose **Full AI Optimization** and enter your API key.\n"
+        "5. Review every change before accepting.\n"
+        "6. Download the updated **.docx**."
+    )
 
-        # ── Getting started ──────────────────────────────────────────────────
-        st.markdown("**Getting started**")
-        st.markdown(
-            "1. Open the app — a setup wizard appears automatically on first use.\n"
-            "2. Enter your name and career details (takes ~1 minute).\n"
-            "3. Upload your resume so the app can build your profile.\n"
-            "4. Review what was extracted — correct anything that looks off.\n"
-            "5. You're ready. Your profile is saved and reused on every run."
+    st.markdown(_DIV, unsafe_allow_html=True)
+
+    st.markdown("**Common questions**")
+
+    with st.expander("What should I upload during setup?", expanded=False):
+        st.caption(
+            "Your resume (.docx works best) or a LinkedIn PDF export. "
+            "LinkedIn adds your headline, experience, and education automatically."
         )
 
-        st.markdown(_DIV, unsafe_allow_html=True)
-
-        # ── Optimising a resume ──────────────────────────────────────────────
-        st.markdown("**How to optimise a resume**")
-        st.markdown(
-            "1. From **Home**, choose *Optimize My Resume*.\n"
-            "2. Upload your **.docx** or **.pdf** resume.\n"
-            "3. Paste or fetch the job description you're targeting.\n"
-            "4. Click **Continue** and choose a mode (Standard or Local AI).\n"
-            "5. Review every suggested change before accepting.\n"
-            "6. Download the updated **.docx** from the final screen."
+    with st.expander("Why didn't my LinkedIn parse correctly?", expanded=False):
+        st.caption(
+            "LinkedIn PDFs can have unusual layouts. Paste your LinkedIn "
+            "About section text directly for cleaner results."
         )
 
-        st.markdown(_DIV, unsafe_allow_html=True)
-
-        # ── Profile ──────────────────────────────────────────────────────────
-        st.markdown("**Managing your profile**")
-        st.markdown(
-            "- Open **Career Profile** from the sidebar at any time.\n"
-            "- Use the tabs (Personal · Education · Experience · Skills) "
-            "to add or edit information.\n"
-            "- The **completeness bar** shows exactly what's still missing.\n"
-            "- Upload more documents under **Documents → Add to library**."
+    with st.expander("How do I fix something extracted wrong?", expanded=False):
+        st.caption(
+            "During setup: click Edit in the relevant section. "
+            "After setup: open Career Profile and use the pencil icon."
         )
 
-        st.markdown(_DIV, unsafe_allow_html=True)
+    st.markdown(_DIV, unsafe_allow_html=True)
 
-        # ── Common questions ─────────────────────────────────────────────────
-        st.markdown("**Common questions**")
-
-        with st.expander("What should I upload during setup?", expanded=False):
-            st.caption(
-                "Your resume or CV works best (.docx gives the cleanest extraction). "
-                "A LinkedIn PDF export is also useful — it adds your headline, "
-                "experience, and education automatically."
-            )
-
-        with st.expander("Why didn't my LinkedIn parse correctly?", expanded=False):
-            st.caption(
-                "LinkedIn PDFs sometimes have unusual layouts. If extraction looks wrong, "
-                "paste your LinkedIn **About** section text into the text box instead — "
-                "that usually gives cleaner results."
-            )
-
-        with st.expander("How do I fix something that extracted wrong?", expanded=False):
-            st.caption(
-                "In the **Review** step during setup: click **Edit** in the relevant section "
-                "and correct the value directly. After setup: open **Career Profile** "
-                "and use the pencil button on any item."
-            )
-
-        with st.expander("What if my profile is incomplete after setup?", expanded=False):
-            st.caption(
-                "That's fine — you can continue and fill it in later. "
-                "Open **Career Profile** from the sidebar and use the tabs "
-                "to add education, experience, and skills manually."
-            )
-
-        with st.expander("Does Local AI work on the hosted version?", expanded=False):
-            st.caption(
-                "No — Local AI requires Ollama running on your own machine. "
-                "On the hosted version, use **Standard** mode with your own API key "
-                "(OpenAI, Anthropic, or Google Gemini)."
-            )
-
-        st.markdown(_DIV, unsafe_allow_html=True)
-
-        # ── Contact ──────────────────────────────────────────────────────────
-        st.markdown("**Still stuck? Contact support**")
-        st.caption("Happy to help — reach out directly.")
-
-        col_mail, col_li = st.columns(2)
-        with col_mail:
-            st.link_button(
-                "Email",
-                f"mailto:{CONTACT_EMAIL}",
-                use_container_width=True,
-            )
-        with col_li:
-            st.link_button(
-                "LinkedIn",
-                CONTACT_LINKEDIN,
-                use_container_width=True,
-            )
-
-        st.markdown(_DIV, unsafe_allow_html=True)
-
-        # ── Support ───────────────────────────────────────────────────────────
-        st.markdown("**Support future development**")
-        st.caption("If this saved you time, a coffee goes a long way.")
-        st.link_button(
-            "☕  Buy me a coffee",
-            DONATE_URL,
-            use_container_width=True,
-        )
+    st.markdown("**Contact support**")
+    col_mail, col_li = st.columns(2)
+    with col_mail:
+        st.link_button("Email", f"mailto:{CONTACT_EMAIL}", use_container_width=True)
+    with col_li:
+        st.link_button("LinkedIn", CONTACT_LINKEDIN, use_container_width=True)

@@ -1,9 +1,8 @@
 """
 Supabase-backed store for user_settings (provider, model, API key).
 
-API keys are stored base64-encoded in api_key_encrypted as a temporary
-measure. Replace with Supabase Vault / Edge Function encryption before
-public launch.
+API keys are stored base64-encoded as a temporary measure.
+Replace with Supabase Vault / Edge Function encryption before public launch.
 """
 from __future__ import annotations
 
@@ -23,6 +22,13 @@ _EMPTY_SETTINGS: dict = {
     "api_key_last4": "",
     "api_key_valid": False,
     "api_key_validation_message": "",
+}
+
+# Maps provider display name → column prefix in user_settings
+_PROVIDER_COL: dict[str, str] = {
+    "OpenAI": "openai",
+    "Anthropic": "anthropic",
+    "Gemini": "gemini",
 }
 
 
@@ -129,3 +135,91 @@ def _upsert(data: dict) -> None:
         ).execute()
     except Exception as exc:
         logger.warning("user_settings upsert failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Per-provider key operations
+# ---------------------------------------------------------------------------
+
+
+def save_provider_api_key(provider: str, model: str, api_key: str) -> None:
+    """Save an API key for a specific provider (base64-encoded)."""
+    col = _PROVIDER_COL.get(provider)
+    if not col:
+        return
+    encoded = base64.b64encode(api_key.encode()).decode() if api_key else ""
+    last4 = api_key[-4:] if len(api_key) >= 4 else ""
+    _upsert({
+        f"{col}_key_encrypted": encoded,
+        f"{col}_key_last4": last4,
+        f"{col}_key_valid": False,
+        "preferred_provider": provider,
+        "default_model": model,
+    })
+
+
+def get_provider_api_key(provider: str) -> str:
+    """Return the decrypted API key for a provider, or empty string."""
+    col = _PROVIDER_COL.get(provider)
+    if not col:
+        return ""
+    settings = get_user_settings()
+    encoded = settings.get(f"{col}_key_encrypted", "")
+    if not encoded:
+        return ""
+    try:
+        return base64.b64decode(encoded.encode()).decode()
+    except Exception:
+        return ""
+
+
+def get_provider_key_info(provider: str) -> dict:
+    """Return last4 and valid status for a provider's saved key."""
+    col = _PROVIDER_COL.get(provider)
+    if not col:
+        return {"last4": "", "valid": False}
+    settings = get_user_settings()
+    return {
+        "last4": settings.get(f"{col}_key_last4", ""),
+        "valid": settings.get(f"{col}_key_valid", False),
+    }
+
+
+def get_all_provider_key_info() -> dict[str, dict]:
+    """Return key status for all known providers in one DB call."""
+    settings = get_user_settings()
+    return {
+        provider: {
+            "last4": settings.get(f"{col}_key_last4", ""),
+            "valid": settings.get(f"{col}_key_valid", False),
+        }
+        for provider, col in _PROVIDER_COL.items()
+    }
+
+
+def mark_provider_key_valid(provider: str, valid: bool) -> None:
+    """Update validity flag for a provider's key after a test call."""
+    col = _PROVIDER_COL.get(provider)
+    if not col:
+        return
+    try:
+        get_supabase().table("user_settings").update(
+            {f"{col}_key_valid": valid}
+        ).eq("user_id", _uid()).execute()
+    except Exception as exc:
+        logger.warning("mark_provider_key_valid failed: %s", exc)
+
+
+def clear_provider_api_key(provider: str) -> None:
+    """Remove the saved key for a specific provider."""
+    col = _PROVIDER_COL.get(provider)
+    if not col:
+        return
+    try:
+        get_supabase().table("user_settings").update({
+            f"{col}_key_encrypted": "",
+            f"{col}_key_last4": "",
+            f"{col}_key_valid": False,
+        }).eq("user_id", _uid()).execute()
+    except Exception as exc:
+        logger.warning("clear_provider_api_key failed: %s", exc)

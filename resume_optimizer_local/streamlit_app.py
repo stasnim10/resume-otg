@@ -8,6 +8,7 @@ import json
 import logging
 import re
 import tempfile
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -98,7 +99,7 @@ from session_state import CAREER_STAGES, init_session_state, reset_flow
 from auth_state import is_authenticated, load_auth_into_session, sign_out
 from auth_screen import render_auth_screen
 from hosted_mode import is_hosted_web, show_local_ai_cards, show_private_mode
-from settings_screen import render_settings_screen
+from settings_screen import render_help_screen, render_settings_screen
 
 logging.basicConfig(
     level=logging.INFO,
@@ -453,6 +454,13 @@ def build_optimization_metrics_summary(before_report: dict, after_report: dict) 
 
 def apply_apple_theme() -> None:
     """Inject a restrained, editorial Apple-inspired visual system."""
+    # Load Inter — top SaaS/professional recommendation from ui-ux-pro-max
+    st.markdown(
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         """
         <style>
@@ -463,6 +471,19 @@ def apply_apple_theme() -> None:
         }
 
         /* Respect user preference */
+        /* Suppress all motion for users who prefer it */
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+          .apple-landing-card:hover,
+          [data-testid="stVerticalBlockBorderWrapper"]:has(button):hover {
+            transform: none !important;
+          }
+        }
+
         @media (prefers-reduced-motion: no-preference) {
           .apple-hero {
             animation: _fade-up 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -492,7 +513,7 @@ def apply_apple_theme() -> None:
           --panel-fill: #f7f7f9;
           --text: #1d1d1f;
           --muted: #6e6e73;
-          --muted-light: #86868b;
+          --muted-light: #5a5a5f;
           --line: rgba(0,0,0,0.05);
           --line-strong: rgba(0,0,0,0.08);
           --shadow-soft: 0 6px 18px rgba(0,0,0,0.04);
@@ -501,15 +522,15 @@ def apply_apple_theme() -> None:
           --green: #1f8f4e;
           --amber: #b7791f;
           --danger: #c9342f;
-          --font-main: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+          --font-main: "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
           /* Semantic tokens */
           --sidebar-bg: #fbfbfd;
           --input-fill: #ffffff;
           --input-fill-focus: #ffffff;
           --step-active-bg: #eaeaef;
           --alert-bg: #f0faf4;
-          --btn-primary-bg: var(--text);
-          --btn-primary-text: var(--bg);
+          --btn-primary-bg: #d97757;
+          --btn-primary-text: #ffffff;
         }
 
         .stApp {
@@ -529,7 +550,7 @@ def apply_apple_theme() -> None:
           border-bottom: 1px solid rgba(0,0,0,0.03);
         }
 
-        h1, h2, h3, h4, h5, h6, p, label, span, div {
+        h1, h2, h3, h4, h5, h6, p, label, li, a, button, input, textarea, select {
           color: var(--text);
           font-family: var(--font-main);
         }
@@ -772,6 +793,37 @@ def apply_apple_theme() -> None:
           margin-top: 0.9rem;
         }
 
+        /* ── Interactive container cursors & hover ── */
+        [data-testid="stVerticalBlockBorderWrapper"],
+        .apple-choice,
+        .apple-card,
+        .apple-panel {
+          cursor: default;
+          transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
+        }
+
+        /* Cards that act as clickable affordances get pointer + lift */
+        .apple-landing-card,
+        [data-testid="stVerticalBlockBorderWrapper"]:has(button) {
+          cursor: pointer;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"]:has(button):hover {
+          box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
+          border-color: rgba(0,0,0,0.12) !important;
+          transform: translateY(-1px);
+        }
+
+        /* ── Focus rings on non-button interactive elements ── */
+        [data-testid="stSelectbox"] > div:focus-within,
+        [data-testid="stMultiSelect"] > div:focus-within,
+        [data-testid="stTextInput"] > div:focus-within,
+        [data-testid="stTextArea"] > div:focus-within {
+          outline: 2px solid #d97757 !important;
+          outline-offset: 2px !important;
+          border-radius: 8px;
+        }
+
         .apple-landing-card {
           min-height: 380px;
           padding: 2.75rem;
@@ -782,6 +834,12 @@ def apply_apple_theme() -> None:
           display: flex;
           flex-direction: column;
           justify-content: space-between;
+          transition: box-shadow 200ms ease, transform 200ms ease;
+        }
+
+        .apple-landing-card:hover {
+          box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+          transform: translateY(-2px);
         }
 
         .apple-landing-card.featured {
@@ -994,6 +1052,26 @@ def apply_apple_theme() -> None:
           margin-top: 0.35rem;
         }
 
+        .builder-preview-block {
+          background: #f5f5f7;
+          border-radius: 14px;
+          padding: 1rem 1.25rem;
+          margin: 0.75rem 0;
+        }
+        .builder-preview-label {
+          font-size: 0.7rem;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #86868b;
+          margin-bottom: 0.4rem;
+        }
+        .builder-preview-body {
+          font-size: 0.9rem;
+          line-height: 1.6;
+          color: #1d1d1f;
+        }
+
         .apple-readiness-card {
           background: #f5f5f7;
           border: 1px solid var(--line);
@@ -1089,45 +1167,134 @@ def apply_apple_theme() -> None:
           transition: opacity 180ms ease, background-color 180ms ease, border-color 180ms ease;
         }
 
+        .stLinkButton > a {
+          border-radius: 999px !important;
+          min-height: 54px !important;
+          font-weight: 600 !important;
+          font-size: 1rem !important;
+          line-height: 1.2 !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          border: 1px solid var(--line-strong) !important;
+          box-shadow: none !important;
+          transition: opacity 180ms ease, background-color 180ms ease, border-color 180ms ease;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          text-decoration: none !important;
+          background: var(--surface) !important;
+          color: var(--text) !important;
+        }
+
+        .stLinkButton > a:hover {
+          opacity: 0.82;
+        }
+
+        .stLinkButton > a *,
+        .stLinkButton > a p,
+        .stLinkButton > a span,
+        .stLinkButton > a div {
+          color: var(--text) !important;
+          fill: var(--text) !important;
+          opacity: 1 !important;
+        }
+
         .stButton button:hover, .stDownloadButton button:hover {
           opacity: 0.82;
         }
 
         .stButton button:focus-visible,
         .stDownloadButton button:focus-visible {
-          outline: 2px solid var(--blue) !important;
+          outline: 2px solid #d97757 !important;
           outline-offset: 2px !important;
-          box-shadow: 0 0 0 4px rgba(0,113,227,0.18) !important;
+          box-shadow: 0 0 0 4px rgba(217,119,87,0.22) !important;
         }
 
-        .apple-primary button {
-          background: var(--btn-primary-bg) !important;
-          color: var(--btn-primary-text) !important;
-          border-color: var(--btn-primary-bg) !important;
+        .stApp .apple-primary button,
+        .stApp .apple-primary [data-testid="stDownloadButton"] button,
+        .apple-primary button,
+        .apple-primary [data-testid="stDownloadButton"] button {
+          background: #d97757 !important;
+          color: #ffffff !important;
+          border-color: #d97757 !important;
         }
 
+        .stApp .apple-primary button *,
+        .stApp .apple-primary button p,
+        .stApp .apple-primary button span,
+        .stApp .apple-primary button div,
+        .stApp .apple-primary [data-testid="stDownloadButton"] button *,
         .apple-primary button *,
         .apple-primary button p,
         .apple-primary button span,
-        .apple-primary button div {
-          color: var(--btn-primary-text) !important;
-          fill: var(--btn-primary-text) !important;
+        .apple-primary button div,
+        .apple-primary [data-testid="stDownloadButton"] button * {
+          color: #ffffff !important;
+          fill: #ffffff !important;
           opacity: 1 !important;
         }
 
-        .apple-secondary button {
-          background: transparent !important;
-          color: var(--blue) !important;
-          box-shadow: none !important;
-          border-color: var(--line-strong) !important;
+        .apple-primary button:disabled,
+        .apple-primary button[disabled] {
+          background: #ececf1 !important;
+          color: #8b8b93 !important;
+          border-color: #e1e1e6 !important;
+          opacity: 1 !important;
         }
 
+        .apple-primary button:disabled *,
+        .apple-primary button[disabled] *,
+        .apple-primary button:disabled p,
+        .apple-primary button[disabled] p,
+        .apple-primary button:disabled span,
+        .apple-primary button[disabled] span,
+        .apple-primary button:disabled div,
+        .apple-primary button[disabled] div {
+          color: #8b8b93 !important;
+          fill: #8b8b93 !important;
+          opacity: 1 !important;
+        }
+
+        .stApp .apple-secondary button,
+        .apple-secondary button {
+          background: #d97757 !important;
+          color: #ffffff !important;
+          box-shadow: none !important;
+          border-color: #d97757 !important;
+        }
+
+        .stApp .apple-secondary button *,
+        .stApp .apple-secondary button p,
+        .stApp .apple-secondary button span,
+        .stApp .apple-secondary button div,
         .apple-secondary button *,
         .apple-secondary button p,
         .apple-secondary button span,
         .apple-secondary button div {
-          color: var(--blue) !important;
-          fill: var(--blue) !important;
+          color: #ffffff !important;
+          fill: #ffffff !important;
+          opacity: 1 !important;
+        }
+
+        .apple-secondary button:disabled,
+        .apple-secondary button[disabled] {
+          background: transparent !important;
+          color: var(--muted) !important;
+          border-color: var(--line) !important;
+          opacity: 1 !important;
+        }
+
+        .apple-secondary button:disabled *,
+        .apple-secondary button[disabled] *,
+        .apple-secondary button:disabled p,
+        .apple-secondary button[disabled] p,
+        .apple-secondary button:disabled span,
+        .apple-secondary button[disabled] span,
+        .apple-secondary button:disabled div,
+        .apple-secondary button[disabled] div {
+          color: var(--muted) !important;
+          fill: var(--muted) !important;
           opacity: 1 !important;
         }
 
@@ -1166,7 +1333,7 @@ def apply_apple_theme() -> None:
             --panel-fill: #202126;
             --text: #f5f5f7;
             --muted: #b1b1b6;
-            --muted-light: #8e8e93;
+            --muted-light: #adadb2;
             --line: rgba(255,255,255,0.08);
             --line-strong: rgba(255,255,255,0.14);
             --shadow-soft: 0 6px 18px rgba(0,0,0,0.32);
@@ -1181,8 +1348,8 @@ def apply_apple_theme() -> None:
             --input-fill-focus: #2a2b31;
             --step-active-bg: #3a3b42;
             --alert-bg: #1e2521;
-            --btn-primary-bg: var(--text);
-            --btn-primary-text: var(--bg);
+            --btn-primary-bg: #d97757;
+            --btn-primary-text: #ffffff;
           }
 
           .stApp {
@@ -1298,6 +1465,24 @@ def apply_apple_theme() -> None:
             border-color: var(--line) !important;
           }
 
+          .stTextInput button,
+          .stSelectbox button,
+          .stMultiSelect button,
+          .stTextArea button {
+            background: var(--input-fill) !important;
+            color: var(--text) !important;
+            border-color: var(--line) !important;
+            box-shadow: none !important;
+          }
+
+          .stTextInput button *,
+          .stSelectbox button *,
+          .stMultiSelect button *,
+          .stTextArea button * {
+            color: var(--text) !important;
+            fill: var(--text) !important;
+          }
+
           .stTextArea textarea:focus,
           .stTextInput input:focus {
             background: var(--input-fill-focus) !important;
@@ -1306,36 +1491,125 @@ def apply_apple_theme() -> None:
             outline: none !important;
           }
 
-          /* Dark mode: only explicitly-wrapped primary buttons get the filled treatment */
+          /* Dark mode: primary buttons — .stApp prefix beats Streamlit emotion-cache specificity */
+          .stApp .apple-primary button,
           .apple-primary button {
-            background: var(--btn-primary-bg) !important;
-            color: var(--btn-primary-text) !important;
-            border-color: var(--btn-primary-bg) !important;
+            background: #d97757 !important;
+            color: #ffffff !important;
+            border-color: #d97757 !important;
           }
 
+          .stApp .apple-primary button *,
+          .stApp .apple-primary button p,
+          .stApp .apple-primary button span,
+          .stApp .apple-primary button div,
           .apple-primary button *,
           .apple-primary button p,
           .apple-primary button span,
           .apple-primary button div {
-            color: var(--btn-primary-text) !important;
-            fill: var(--btn-primary-text) !important;
+            color: #ffffff !important;
+            fill: #ffffff !important;
             opacity: 1 !important;
           }
 
-          /* Secondary buttons stay transparent with blue text in dark mode */
-          .apple-secondary button {
-            background: transparent !important;
-            color: var(--blue) !important;
-            border-color: var(--line-strong) !important;
+          .stApp .apple-primary button:hover,
+          .apple-primary button:hover {
+            background: #c9693f !important;
+            opacity: 1 !important;
           }
 
+          .apple-primary button:disabled,
+          .apple-primary button[disabled] {
+            background: #2c2d33 !important;
+            color: #d1d1d6 !important;
+            border-color: #3a3b42 !important;
+            opacity: 1 !important;
+          }
+
+          .apple-primary button:disabled *,
+          .apple-primary button[disabled] *,
+          .apple-primary button:disabled p,
+          .apple-primary button[disabled] p,
+          .apple-primary button:disabled span,
+          .apple-primary button[disabled] span,
+          .apple-primary button:disabled div,
+          .apple-primary button[disabled] div {
+            color: #d1d1d6 !important;
+            fill: #d1d1d6 !important;
+            opacity: 1 !important;
+          }
+
+          /* Secondary buttons — same Claude coral in dark mode */
+          .stApp .apple-secondary button,
+          .apple-secondary button {
+            background: #d97757 !important;
+            color: #ffffff !important;
+            border-color: #d97757 !important;
+          }
+
+          .stApp .apple-secondary button *,
+          .stApp .apple-secondary button p,
+          .stApp .apple-secondary button span,
+          .stApp .apple-secondary button div,
           .apple-secondary button *,
           .apple-secondary button p,
           .apple-secondary button span,
           .apple-secondary button div {
-            color: var(--blue) !important;
-            fill: var(--blue) !important;
+            color: #ffffff !important;
+            fill: #ffffff !important;
             opacity: 1 !important;
+          }
+
+          .apple-secondary button:disabled,
+          .apple-secondary button[disabled] {
+            background: transparent !important;
+            color: var(--muted) !important;
+            border-color: var(--line) !important;
+            opacity: 1 !important;
+          }
+
+          .apple-secondary button:disabled *,
+          .apple-secondary button[disabled] *,
+          .apple-secondary button:disabled p,
+          .apple-secondary button[disabled] p,
+          .apple-secondary button:disabled span,
+          .apple-secondary button[disabled] span,
+          .apple-secondary button:disabled div,
+          .apple-secondary button[disabled] div {
+            color: var(--muted) !important;
+            fill: var(--muted) !important;
+            opacity: 1 !important;
+          }
+
+          .stLinkButton > a {
+            background: var(--surface) !important;
+            color: var(--text) !important;
+            border-color: var(--line-strong) !important;
+          }
+
+          .stLinkButton > a *,
+          .stLinkButton > a p,
+          .stLinkButton > a span,
+          .stLinkButton > a div {
+            color: var(--text) !important;
+            fill: var(--text) !important;
+            opacity: 1 !important;
+          }
+
+          .stButton button:disabled,
+          .stDownloadButton button:disabled,
+          .stLinkButton > a[aria-disabled="true"] {
+            background: #202126 !important;
+            color: var(--muted) !important;
+            border-color: var(--line) !important;
+            opacity: 1 !important;
+          }
+
+          .stButton button:disabled *,
+          .stDownloadButton button:disabled *,
+          .stLinkButton > a[aria-disabled="true"] * {
+            color: var(--muted) !important;
+            fill: var(--muted) !important;
           }
 
           div[data-testid="stAlert"] {
@@ -1397,12 +1671,252 @@ def apply_apple_theme() -> None:
             grid-template-columns: 1fr;
           }
         }
+
+        /* ── Global font enforcement ── */
+        .stApp,
+        [data-testid="stSidebar"],
+        [data-testid="stHeader"],
+        .element-container,
+        .stMarkdown,
+        .stCaption {
+          font-family: var(--font-main) !important;
+        }
+        /* Restore Streamlit icon fonts — the global * override breaks Material Icons and
+           surfaces raw ligature names like `keyboard_arrow_right` as visible text.
+           Use .stApp-prefixed selectors so specificity beats .stApp * (0,0,1,0). */
+        .stApp [data-testid="stExpanderToggleIcon"],
+        .stApp [data-testid="stExpanderToggleIcon"] span,
+        .stApp [data-testid="stExpanderToggleIcon"] *,
+        .stApp [data-testid="stSidebarCollapseButton"],
+        .stApp [data-testid="stSidebarCollapseButton"] *,
+        .stApp [data-testid="collapsedControl"],
+        .stApp [data-testid="collapsedControl"] *,
+        .stApp button[aria-label="Collapse sidebar"],
+        .stApp button[aria-label="Collapse sidebar"] *,
+        .stApp button[aria-label="Expand sidebar"],
+        .stApp button[aria-label="Expand sidebar"] *,
+        .stApp .material-icons,
+        .stApp .material-symbols-outlined,
+        .stApp .material-symbols-rounded,
+        .stApp .material-symbols-sharp,
+        .stApp [class*="MaterialIcons"],
+        .stApp span[class*="-icon"],
+        .stApp span[class*="Icon"] {
+          font-family: "Material Symbols Rounded", "Material Symbols Outlined",
+                       "Material Icons" !important;
+          font-size: 1.25rem !important;
+          font-feature-settings: "liga" !important;
+          -webkit-font-feature-settings: "liga" !important;
+          speak: none !important;
+          text-rendering: optimizeLegibility !important;
+        }
+        /* Exclude the expander label text itself from the icon font */
+        details summary [data-testid="stExpanderTitle"],
+        details summary [data-testid="stExpanderHeader"] > div:last-child {
+          font-family: var(--font-main) !important;
+          font-size: inherit !important;
+          font-feature-settings: normal !important;
+          -webkit-font-feature-settings: normal !important;
+        }
+
+        /* Hide Streamlit's floating sidebar collapse control in-app.
+           It clashes with the custom shell and can render broken icon text. */
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="collapsedControl"],
+        button[aria-label="Collapse sidebar"],
+        button[aria-label="Expand sidebar"] {
+          display: none !important;
+        }
+
+        /* ── Tabs ── */
+        .stTabs [data-baseweb="tab-list"] {
+          gap: 0;
+          border-bottom: 1px solid var(--line) !important;
+          background: transparent !important;
+        }
+        .stTabs [data-baseweb="tab"] {
+          background: transparent !important;
+          border: none !important;
+          border-bottom: 2px solid transparent !important;
+          padding: 0.55rem 1.1rem !important;
+          font-size: 0.875rem !important;
+          font-weight: 500 !important;
+          color: var(--muted) !important;
+          border-radius: 0 !important;
+          font-family: var(--font-main) !important;
+        }
+        .stTabs [aria-selected="true"] {
+          color: var(--text) !important;
+          border-bottom-color: var(--text) !important;
+          font-weight: 600 !important;
+        }
+        .stTabs [data-baseweb="tab-highlight"],
+        .stTabs [data-baseweb="tab-border"] { display: none !important; }
+
+        /* ── Form labels — consistent sizing ── */
+        .stTextInput label, .stTextArea label,
+        .stSelectbox label, .stMultiSelect label,
+        .stCheckbox label span, .stRadio label span,
+        .stNumberInput label, [data-testid="stWidgetLabel"] {
+          font-size: 0.875rem !important;
+          font-weight: 600 !important;
+          color: var(--text) !important;
+          font-family: var(--font-main) !important;
+        }
+
+        /* ── Selectbox / multiselect dropdown text ── */
+        .stSelectbox [data-baseweb="select"] div,
+        .stMultiSelect [data-baseweb="select"] div,
+        [data-baseweb="popover"] li,
+        [data-baseweb="menu"] li {
+          font-family: var(--font-main) !important;
+          font-size: 0.875rem !important;
+        }
+
+        /* ── Caption / help ── */
+        .stCaption, [data-testid="stCaptionContainer"] p {
+          font-size: 0.8rem !important;
+          color: var(--muted) !important;
+          font-family: var(--font-main) !important;
+        }
+
+        /* ── Expander label ── */
+        [data-testid="stExpander"] summary {
+          font-size: 0.875rem !important;
+          font-weight: 500 !important;
+          font-family: var(--font-main) !important;
+        }
+
+        /* ── Sidebar layout ── */
+        [data-testid="stSidebar"] > div:first-child {
+          padding: 1rem 0.75rem !important;
+        }
+        [data-testid="stSidebar"] .stButton {
+          margin-bottom: 1px !important;
+        }
+        /* Sidebar nav buttons — compact, left-aligned, Claude-style */
+        [data-testid="stSidebar"] .stButton button {
+          min-height: 36px !important;
+          height: 36px !important;
+          font-size: 0.875rem !important;
+          font-weight: 500 !important;
+          border-radius: 8px !important;
+          padding: 0 0.75rem !important;
+          background: transparent !important;
+          border: none !important;
+          color: var(--text) !important;
+          text-align: left !important;
+          justify-content: flex-start !important;
+          box-shadow: none !important;
+          line-height: 36px !important;
+        }
+        [data-testid="stSidebar"] .stButton button:hover {
+          background: rgba(0,0,0,0.05) !important;
+        }
+
+        [data-testid="stSidebar"] .stLinkButton > a {
+          min-height: 36px !important;
+          height: 36px !important;
+          font-size: 0.875rem !important;
+          font-weight: 500 !important;
+          border-radius: 8px !important;
+          padding: 0 0.75rem !important;
+          line-height: 36px !important;
+        }
+
+        /* ── Progress bar — coral fill, smooth animation ── */
+        [data-testid="stProgressBar"] {
+          height: 6px !important;
+          border-radius: 999px !important;
+          background: rgba(217,119,87,0.15) !important;
+        }
+        [data-testid="stProgressBar"] > div {
+          border-radius: 999px !important;
+          background: #d97757 !important;
+          transition: width 0.35s cubic-bezier(0.4,0,0.2,1) !important;
+        }
+        [data-testid="stProgressBar"] > div > div {
+          border-radius: 999px !important;
+          background: #d97757 !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
 
+
+
+def render_coral_download_button(
+    label: str,
+    data: bytes,
+    file_name: str,
+    mime: str = "application/octet-stream",
+) -> None:
+    """Render a full-width coral-styled download button.
+
+    Uses CSS injection on st.download_button — avoids the base64-in-markdown
+    approach which breaks when Streamlit's markdown processor chokes on the
+    very long data URL string.
+    """
+    st.markdown(
+        """
+        <style>
+        [data-testid="stDownloadButton"] > button {
+            background: linear-gradient(135deg, #d97757 0%, #c9683f 100%) !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 9999px !important;
+            font-size: 1rem !important;
+            font-weight: 600 !important;
+            padding: 0 1.5rem !important;
+            width: 100% !important;
+            cursor: pointer !important;
+            box-shadow: 0 2px 12px rgba(217,119,87,0.35) !important;
+            transition: all 0.18s ease !important;
+            letter-spacing: 0.01em !important;
+            min-height: 54px !important;
+            height: 54px !important;
+            line-height: 1.2 !important;
+        }
+        [data-testid="stDownloadButton"] > button:hover {
+            background: linear-gradient(135deg, #c9683f 0%, #b85934 100%) !important;
+            box-shadow: 0 4px 18px rgba(217,119,87,0.45) !important;
+            transform: translateY(-1px) !important;
+        }
+        [data-testid="stDownloadButton"] > button * {
+            color: #ffffff !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.download_button(
+        label=label,
+        data=data,
+        file_name=file_name,
+        mime=mime,
+        use_container_width=True,
+    )
+
+
+_TITLE_SENTENCE_WORDS: frozenset[str] = frozenset({
+    "is", "are", "was", "were", "be", "been", "being",
+    "seeking", "looking", "hiring", "searching", "recruiting",
+    "for", "the", "a", "an", "will", "has", "have", "had",
+    "and", "or", "to", "with", "in", "of", "at", "on",
+    "our", "we", "you", "your", "they", "their", "us",
+    "this", "that", "which", "who", "where", "when",
+})
+
+
+def _is_clean_role_title(text: str) -> bool:
+    """Return True if text looks like a role title, not a sentence fragment."""
+    words = text.split()
+    if len(words) > 8:
+        return False
+    sentence_word_count = sum(1 for w in words if w.lower() in _TITLE_SENTENCE_WORDS)
+    return sentence_word_count == 0
 
 
 def detect_role_title(job_description: str) -> str:
@@ -1428,6 +1942,10 @@ def detect_role_title(job_description: str) -> str:
             "Marketer",
             "Developer",
             "Scientist",
+            "Director",
+            "Officer",
+            "Lead",
+            "Architect",
         ]
     )
     ignore_markers = [
@@ -1442,10 +1960,16 @@ def detect_role_title(job_description: str) -> str:
         "preferred",
     ]
     patterns = [
+        # Explicit label — most reliable
         r"(?im)^\s*(?:job title|title|role|position)\s*[:\-]\s*(.+)$",
+        # Standalone line that ends with a role suffix — likely a title heading
         rf"(?im)^\s*([A-Z][A-Za-z/&,\-\s]{{2,80}}(?:{role_suffixes}))\s*$",
-        rf"(?i)\bthe\s+([A-Z][A-Za-z/&,\-\s]{{1,80}}(?:{role_suffixes}))\s+(?:plays|is|will|works|supports|leads)\b",
-        rf"\b((?:Senior|Lead|Principal|Staff|Junior|Associate|Assistant)\s+[A-Z][A-Za-z/&,\-\s]{{1,80}}(?:{role_suffixes})|[A-Z][A-Za-z/&,\-\s]{{1,80}}(?:{role_suffixes}))\b",
+        # "the X plays/is/will..." — capture just the title part
+        rf"(?i)\bthe\s+([A-Z][A-Za-z/&,\-\s]{{1,60}}(?:{role_suffixes}))\s+(?:plays|is|will|works|supports|leads)\b",
+        # "seeking/hiring/looking for a [Title]" — captures just the title after the filler
+        rf"(?i)\b(?:seeking|hiring|recruiting|looking\s+for)\s+(?:a|an|the)?\s*([A-Z][A-Za-z/&,\-\s]{{1,60}}(?:{role_suffixes}))\b",
+        # Seniority-prefixed titles (strict — requires explicit seniority word to avoid greedy sentence match)
+        rf"\b((?:Senior|Lead|Principal|Staff|Junior|Associate|Assistant|VP of|Head of|Director of|Chief)\s+[A-Z][A-Za-z/&,\-\s]{{1,60}}(?:{role_suffixes}))\b",
     ]
     for pattern in patterns:
         for text_block in [top_section, job_description]:
@@ -1460,12 +1984,14 @@ def detect_role_title(job_description: str) -> str:
                     cleaned_match,
                     flags=re.IGNORECASE,
                 ).strip()
-                cleaned_match = re.sub(r"^the\s+", "", cleaned_match, flags=re.IGNORECASE).strip()
+                cleaned_match = re.sub(r"^(?:the|a|an)\s+", "", cleaned_match, flags=re.IGNORECASE).strip()
                 cleaned_match = re.sub(r"\s+-\s+remote$", "", cleaned_match, flags=re.IGNORECASE).strip()
                 lowered = cleaned_match.lower()
                 if any(marker in lowered for marker in ignore_markers):
                     continue
                 if len(cleaned_match) > 90:
+                    continue
+                if not _is_clean_role_title(cleaned_match):
                     continue
                 return cleaned_match
 
@@ -1476,8 +2002,62 @@ def detect_role_title(job_description: str) -> str:
         lowered = cleaned.lower()
         if any(marker in lowered for marker in ignore_markers):
             continue
+        if not _is_clean_role_title(cleaned):
+            continue
         if any(keyword.lower() in cleaned.lower() for keyword in ROLE_KEYWORDS):
             return cleaned
+
+    return ""
+
+
+def detect_company_name(job_description: str) -> str:
+    """Infer the company name from the pasted job description."""
+    if not job_description.strip():
+        return ""
+
+    top_section = job_description[:800]
+    _non_company_first_words = frozenset({
+        "the", "our", "we", "this", "your", "a", "an", "that", "it",
+        "they", "their", "us", "you", "as", "are", "is", "for", "in",
+        "at", "on", "about", "with", "and", "or", "to", "of", "from",
+        "if", "when", "what", "who", "how", "why", "all", "any",
+    })
+
+    # Company name: 1–5 capitalized words (allows & / , between them, no lowercase connectors)
+    _CN = r"(?:[A-Z][A-Za-z0-9&'.,\-]*(?:[ &]+[A-Z][A-Za-z0-9&'.,\-]*){0,4})"
+
+    def _clean_company(raw: str) -> str:
+        return " ".join(raw.split()).strip(" -.,:")
+
+    def _valid_company(name: str) -> bool:
+        if not name or len(name) < 2 or len(name) > 60:
+            return False
+        first = name.split()[0].lower()
+        if first in _non_company_first_words:
+            return False
+        words = name.split()
+        sentence_hits = sum(1 for w in words if w.lower() in _TITLE_SENTENCE_WORDS)
+        return sentence_hits == 0
+
+    patterns = [
+        # Explicit label: "Company: Acme Corp" (case-insensitive for the label only)
+        rf"(?m)^\s*(?:[Cc]ompany|[Ee]mployer|[Oo]rganiz[as]tion)\s*[:\-]\s*({_CN})",
+        # Section header on its own line: "About Stripe"
+        rf"(?m)^\s*[Aa]bout\s+({_CN})\s*$",
+        # "Join Acme Corp" — no (?i) so [A-Z] stays strict
+        rf"\b[Jj]oin\s+({_CN})\b",
+        # "[Company] is seeking/hiring/looking for" — no (?i)
+        rf"\b({_CN})\s+(?:[Ii]s\s+)?(?:seeking|hiring|recruiting|[Ll]ooking\s+for|[Ss]earching\s+for)\b",
+        # "[Company] is a/an [adjective]..."
+        rf"\b({_CN})\s+[Ii]s\s+(?:a|an)\s+[a-z]",
+    ]
+
+    for pattern in patterns:
+        matches = re.findall(pattern, top_section)
+        for raw in matches:
+            cleaned = _clean_company(raw)
+            if _valid_company(cleaned):
+                return cleaned
 
     return ""
 
@@ -1777,94 +2357,103 @@ def render_landing() -> None:
         unsafe_allow_html=True,
     )
 
-    col1, col2, col3 = st.columns(3, gap="large")
+    if is_returning_user:
+        # --- Returning users: 2-column layout (no builder card) ---
+        col1, col2 = st.columns(2, gap="large")
 
-    # --- Card 1: Optimize (primary / featured) ---
-    optimize_kicker = "Most Popular" if not is_returning_user else "Continue"
-    optimize_title = "Optimize my existing resume"
-    optimize_copy = (
-        "Upload your current resume, aim it at a job description, and improve it with guided review before export."
-        if not is_returning_user
-        else "Jump back into targeting a role with your current resume and saved context."
-    )
-    optimize_button = "Start Optimizing" if not is_returning_user else "Continue Optimizing"
-    with col1:
-        with st.container(border=True):
-            st.markdown(
-                f"""
-                <div class="apple-kicker">{optimize_kicker}</div>
-                <div class="apple-landing-card-title">{optimize_title}</div>
-                <div class="apple-landing-card-copy">{optimize_copy}</div>
-                """,
-                unsafe_allow_html=True,
-            )
-            if primary_button(optimize_button, use_container_width=True, key="landing-optimize"):
-                st.session_state.optimization_path = "fast_start"
-                st.session_state.execution_mode = None
-                _clear_tracker_linkage()
-                st.session_state.screen = "input"
-                st.rerun()
+        with col1:
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <div class="apple-kicker">Continue</div>
+                    <div class="apple-landing-card-title">Optimize my existing resume</div>
+                    <div class="apple-landing-card-copy">Jump back into targeting a role with your current resume and saved context.</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if primary_button("Continue Optimizing", use_container_width=True, key="landing-optimize"):
+                    st.session_state.optimization_path = "fast_start"
+                    st.session_state.execution_mode = None
+                    _clear_tracker_linkage()
+                    st.session_state.screen = "input"
+                    st.rerun()
 
-    # --- Card 2: Build ---
-    middle_kicker = "Build" if not is_returning_user else "Profile Powered"
-    middle_title = "Build my first resume" if not is_returning_user else "Build from your saved profile"
-    middle_copy = (
-        "Tell us about yourself in plain English, get a draft quickly, and let the app turn that into reusable profile memory."
-        if not is_returning_user
-        else "Use what the app already knows about you to create a fresh draft faster."
-    )
-    middle_button = "Build First Resume" if not is_returning_user else "Build from Profile"
-    with col2:
-        with st.container(border=True):
-            st.markdown(
-                f"""
-                <div class="apple-kicker">{middle_kicker}</div>
-                <div class="apple-landing-card-title">{middle_title}</div>
-                <div class="apple-landing-card-copy">{middle_copy}</div>
-                """,
-                unsafe_allow_html=True,
-            )
-            if secondary_button(middle_button, use_container_width=True, key="landing-builder"):
-                st.session_state.career_stage = profile.career_stage or "Student"
-                if profile_setup_complete:
-                    _start_profile_draft_flow()
-                    st.session_state.screen = "builder_input"
+        with col2:
+            with st.container(border=True):
+                if not profile_setup_complete:
+                    st.markdown(
+                        """
+                        <div class="apple-kicker">Profile Setup</div>
+                        <div class="apple-landing-card-title">Complete your profile foundation</div>
+                        <div class="apple-landing-card-copy">Add your identity, target roles, and reusable background once so every future draft starts from stronger context.</div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    if secondary_button("Complete Profile Setup", use_container_width=True, key="landing-import"):
+                        st.session_state.screen = "profile"
+                        st.rerun()
                 else:
-                    st.session_state.screen = "builder_input"
-                st.rerun()
+                    st.markdown(
+                        """
+                        <div class="apple-kicker">Job Tracker</div>
+                        <div class="apple-landing-card-title">Track your applications</div>
+                        <div class="apple-landing-card-copy">View all tracked jobs, update statuses, add notes, and jump back into an optimization.</div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    if secondary_button("Open Job Tracker", use_container_width=True, key="landing-import"):
+                        st.session_state.screen = "job_tracker"
+                        st.rerun()
 
-    # --- Card 3: Import / Profile / Workspace (context-sensitive) ---
-    if not is_returning_user:
-        import_kicker = "Import"
-        import_title = "Import resume or LinkedIn"
-        import_copy = "Bring in a resume, LinkedIn export, or notes so the app can build your profile and save reusable evidence."
-        import_button = "Import Materials"
-    elif not profile_setup_complete:
-        import_kicker = "Profile Setup"
-        import_title = "Complete your profile foundation"
-        import_copy = "Add your identity, target roles, and reusable background once so every future draft starts from stronger context."
-        import_button = "Complete Profile Setup"
     else:
-        import_kicker = "Job Tracker"
-        import_title = "Track your applications"
-        import_copy = "View all tracked jobs, update statuses, add notes, and jump back into an optimization."
-        import_button = "Open Job Tracker"
-    with col3:
-        with st.container(border=True):
-            st.markdown(
-                f"""
-                <div class="apple-kicker">{import_kicker}</div>
-                <div class="apple-landing-card-title">{import_title}</div>
-                <div class="apple-landing-card-copy">{import_copy}</div>
-                """,
-                unsafe_allow_html=True,
-            )
-            if secondary_button(import_button, use_container_width=True, key="landing-import"):
-                if is_returning_user and profile_setup_complete:
-                    st.session_state.screen = "job_tracker"
-                else:
+        # --- New users: 3-column layout ---
+        col1, col2, col3 = st.columns(3, gap="large")
+
+        with col1:
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <div class="apple-kicker">Most Popular</div>
+                    <div class="apple-landing-card-title">Optimize my existing resume</div>
+                    <div class="apple-landing-card-copy">Upload your current resume, aim it at a job description, and improve it with guided review before export.</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if primary_button("Start Optimizing", use_container_width=True, key="landing-optimize"):
+                    st.session_state.optimization_path = "fast_start"
+                    st.session_state.execution_mode = None
+                    _clear_tracker_linkage()
+                    st.session_state.screen = "input"
+                    st.rerun()
+
+        with col2:
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <div class="apple-kicker">Build</div>
+                    <div class="apple-landing-card-title">Build your resume from scratch</div>
+                    <div class="apple-landing-card-copy">Tell us about yourself in plain English, get a draft quickly, and let the app turn that into reusable profile memory.</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if secondary_button("Build First Resume", use_container_width=True, key="landing-builder"):
+                    st.session_state.career_stage = "Student"
+                    st.session_state.screen = "builder_input"
+                    st.rerun()
+
+        with col3:
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <div class="apple-kicker">Import</div>
+                    <div class="apple-landing-card-title">Import resume or LinkedIn</div>
+                    <div class="apple-landing-card-copy">Bring in a resume, LinkedIn export, or notes so the app can build your profile and save reusable evidence.</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if secondary_button("Import Materials", use_container_width=True, key="landing-import"):
                     st.session_state.screen = "profile"
-                st.rerun()
+                    st.rerun()
 
     render_shell_end()
 
@@ -2225,8 +2814,24 @@ def _build_profile_context(items: list[ProfileItem]) -> str:
 
 
 def _build_optimizer_prompt_from_state() -> str:
-    """Build the optimizer prompt, optionally enriched with selected profile evidence."""
+    """Build the optimizer prompt enriched with profile evidence and JD gap analysis."""
+    # Sync profile fields into session state when the session still has un-set defaults.
+    _profile = create_or_get_profile()
+    if _profile.career_stage and st.session_state.get("career_stage") == CAREER_STAGES[0]:
+        st.session_state.career_stage = _profile.career_stage
+    if not st.session_state.get("target_role") and _profile.target_roles:
+        st.session_state.target_role = _profile.target_roles[0]
+    if not st.session_state.get("target_industry") and _profile.target_industries:
+        st.session_state.target_industry = _profile.target_industries[0]
+
     profile_context = _build_profile_context(_get_selected_profile_items()) if st.session_state.get("use_career_profile") else ""
+
+    # Pull missing keywords/skills from the current fit report so the LLM knows
+    # exactly which JD signals are absent from the resume and should be incorporated.
+    fit_report = st.session_state.get("resume_fit_report") or {}
+    missing_keywords: list[str] = fit_report.get("missing_keywords", [])
+    missing_skills: list[str] = fit_report.get("missing_skills", [])
+
     return build_optimizer_prompt(
         st.session_state.resume_text,
         st.session_state.job_description,
@@ -2234,6 +2839,8 @@ def _build_optimizer_prompt_from_state() -> str:
         get_effective_target_role(st.session_state.job_description),
         get_effective_industry(st.session_state.job_description),
         profile_context=profile_context,
+        missing_keywords=missing_keywords,
+        missing_skills=missing_skills,
     )
 
 
@@ -3055,22 +3662,38 @@ def render_profile_build_resume_prompt_screen() -> None:
         "We can use your profile as the foundation—no need to re-enter your information.",
     )
 
-    with st.container(border=True):
-        st.markdown('<div style="text-align: center; padding: 2rem 1rem;">', unsafe_allow_html=True)
-        st.markdown('## 🎉 Your profile is ready to go!')
-        st.markdown(
-            '''
-            You've successfully built your career profile. Now you can:
-
-            1. **Build your first resume** using this profile (takes ~5 minutes)
-            2. **Go to your dashboard** to review and edit your profile anytime
-            '''
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div style="
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.75rem 1rem;
+            background: #f5f5f5;
+            border-radius: 8px;
+            margin-bottom: 1.75rem;
+        ">
+            <span style="
+                display: inline-flex; align-items: center; justify-content: center;
+                width: 1.25rem; height: 1.25rem;
+                background: #1a1a1a; border-radius: 50%; flex-shrink: 0;
+            ">
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                    <path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.5"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </span>
+            <span style="font-size: 0.875rem; font-weight: 500; color: #1a1a1a;">
+                Profile saved. Every future optimization will draw on it automatically.
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     col1, col2 = st.columns(2, gap="large")
     with col1:
-        if secondary_button("Go to Dashboard", use_container_width=True, key="profile-prompt-dashboard"):
+        if secondary_button("View Profile", use_container_width=True, key="profile-prompt-dashboard"):
             st.session_state.screen = "profile"
             st.rerun()
 
@@ -3830,6 +4453,9 @@ def render_input_screen() -> None:
             st.session_state.jd_role_hint = role_hint or detect_role_title(cleaned_text)
             st.session_state.target_role = st.session_state.jd_role_hint
             st.session_state.target_industry = detect_industry(cleaned_text)
+            detected_company = detect_company_name(cleaned_text)
+            if detected_company:
+                st.session_state.current_application_company = detected_company
             st.session_state.local_ai_job_signals = {}
             maybe_process_job_description_with_local_ai()
             st.success("Job description extracted and cleaned successfully. Review the text below before continuing.")
@@ -3853,6 +4479,9 @@ def render_input_screen() -> None:
         st.session_state.jd_role_hint = detect_role_title(cleaned_text)
         st.session_state.target_role = st.session_state.jd_role_hint
         st.session_state.target_industry = detect_industry(cleaned_text)
+        detected_company = detect_company_name(cleaned_text)
+        if detected_company:
+            st.session_state.current_application_company = detected_company
         st.session_state.local_ai_job_signals = {}
         maybe_process_job_description_with_local_ai()
         st.success("Job description cleaned and ready. Review the text below before continuing.")
@@ -4404,8 +5033,11 @@ def render_builder_stub_screen() -> None:
         ("Has job description", "Yes" if st.session_state.builder_job_description.strip() else "No"),
     ]
 
-    mode_col1, mode_col2, mode_col3 = st.columns(3, gap="large")
-    with mode_col1:
+    _b_show_private = show_local_ai_cards()
+    _b_cols = st.columns(3 if _b_show_private else 2, gap="large")
+    _b_idx = 0
+
+    with _b_cols[_b_idx]:
         with st.container(border=True):
             st.markdown('<div class="apple-kicker">Manual</div>', unsafe_allow_html=True)
             st.markdown('<div class="apple-choice-title">Copy the prompt and use your favorite AI.</div>', unsafe_allow_html=True)
@@ -4416,21 +5048,26 @@ def render_builder_stub_screen() -> None:
             if secondary_button("Use Manual Mode", use_container_width=True, key="builder-use-manual"):
                 st.session_state.builder_execution_mode = "manual"
                 st.rerun()
-    with mode_col2:
-        with st.container(border=True):
-            st.markdown('<div class="apple-kicker">100% Private</div>', unsafe_allow_html=True)
-            st.markdown('<div class="apple-choice-title">Run it on this device.</div>', unsafe_allow_html=True)
-            st.markdown(
-                '<div class="apple-choice-copy">Best if you want the draft to stay on your computer. The app uses Gemma 4 privately and still validates everything before review.</div>',
-                unsafe_allow_html=True,
-            )
-            button_wrapper = "apple-primary" if st.session_state.get("local_ai_ready", False) else "apple-secondary"
-            st.markdown(f'<div class="{button_wrapper}">', unsafe_allow_html=True)
-            if st.button("Use Private Mode", use_container_width=True, key="builder-use-local-ai"):
-                st.session_state.builder_execution_mode = "local_ai"
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-    with mode_col3:
+    _b_idx += 1
+
+    if _b_show_private:
+        with _b_cols[_b_idx]:
+            with st.container(border=True):
+                st.markdown('<div class="apple-kicker">100% Private</div>', unsafe_allow_html=True)
+                st.markdown('<div class="apple-choice-title">Run it on this device.</div>', unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="apple-choice-copy">Best if you want the draft to stay on your computer. The app uses Gemma 4 privately and still validates everything before review.</div>',
+                    unsafe_allow_html=True,
+                )
+                button_wrapper = "apple-primary" if st.session_state.get("local_ai_ready", False) else "apple-secondary"
+                st.markdown(f'<div class="{button_wrapper}">', unsafe_allow_html=True)
+                if st.button("Use Private Mode", use_container_width=True, key="builder-use-local-ai"):
+                    st.session_state.builder_execution_mode = "local_ai"
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+        _b_idx += 1
+
+    with _b_cols[_b_idx]:
         with st.container(border=True):
             st.markdown('<div class="apple-kicker">Standard</div>', unsafe_allow_html=True)
             st.markdown('<div class="apple-choice-title">Use a cloud provider.</div>', unsafe_allow_html=True)
@@ -4438,7 +5075,7 @@ def render_builder_stub_screen() -> None:
                 '<div class="apple-choice-copy">Best if you want the fastest hosted option using OpenAI, Anthropic, Gemini, or another supported provider.</div>',
                 unsafe_allow_html=True,
             )
-            if secondary_button("Use Standard (Cloud)", use_container_width=True, key="builder-use-api"):
+            if secondary_button("Use Full AI Optimization", use_container_width=True, key="builder-use-api"):
                 st.session_state.builder_execution_mode = "api"
                 st.rerun()
 
@@ -4667,14 +5304,25 @@ def render_builder_stub_screen() -> None:
         with col2:
             if primary_button("Run Builder via API", use_container_width=True, key="builder-run-api"):
                 try:
-                    with st.spinner(f"Sending prompt to {provider}..."):
-                        payload = optimize_with_provider(
-                            provider=provider,
-                            api_key=api_key,
-                            prompt=st.session_state.builder_prompt,
-                            model=model,
-                            base_url=base_url,
-                        )
+                    _bp = st.progress(0)
+                    _bs = st.empty()
+                    for _pct, _msg in [(15, "Preparing resume structure..."), (35, "Sending to AI..."), (55, "Building your first resume...")]:
+                        _bp.progress(_pct)
+                        _bs.caption(_msg)
+                        time.sleep(0.3)
+                    payload = optimize_with_provider(
+                        provider=provider,
+                        api_key=api_key,
+                        prompt=st.session_state.builder_prompt,
+                        model=model,
+                        base_url=base_url,
+                    )
+                    for _pct, _msg in [(80, "Formatting output..."), (100, "Done!")]:
+                        _bp.progress(_pct)
+                        _bs.caption(_msg)
+                        time.sleep(0.25)
+                    _bp.empty()
+                    _bs.empty()
                     st.session_state.builder_payload = payload
                     st.session_state.builder_validation_summary = build_builder_validation_summary(payload)
                     st.session_state.builder_output_docx_bytes = None
@@ -4682,6 +5330,8 @@ def render_builder_stub_screen() -> None:
                     st.session_state.screen = "builder_review"
                     st.rerun()
                 except Exception as error:
+                    _bp.empty()  # type: ignore[possibly-undefined]
+                    _bs.empty()  # type: ignore[possibly-undefined]
                     st.error(str(error))
         with col3:
             if secondary_button("Back to Landing", use_container_width=True, key="builder-back-landing-api"):
@@ -4766,36 +5416,60 @@ def render_builder_review_screen() -> None:
         unsafe_allow_html=True,
     )
 
-    st.text_area("Professional Summary", value=payload.get("summary", ""), height=120, disabled=True)
+    _summary_text = payload.get("summary", "")
+    if _summary_text:
+        st.markdown(
+            f'<div class="builder-preview-block">'
+            f'<div class="builder-preview-label">Professional Summary</div>'
+            f'<div class="builder-preview-body">{_summary_text}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
-    with st.expander("Education Preview", expanded=True):
-        for index, item in enumerate(payload.get("education", []), start=1):
-            st.markdown(f"**Education {index}**")
-            st.write(f"{item.get('school', '')} | {item.get('degree', '')} | {item.get('graduation_date', '')}")
-            if item.get("details"):
-                st.code("\n".join(item["details"]), language="text")
+    _education_items = payload.get("education", [])
+    if _education_items:
+        with st.expander("Education", expanded=True):
+            for item in _education_items:
+                _meta = " · ".join(filter(None, [
+                    item.get("school", ""),
+                    item.get("degree", ""),
+                    item.get("graduation_date", ""),
+                ]))
+                st.markdown(f"**{_meta}**" if _meta else "**Education entry**")
+                if item.get("details"):
+                    _bullets_md = "\n".join(f"- {d}" for d in item["details"] if d.strip())
+                    st.markdown(_bullets_md)
 
-    with st.expander("Experience Preview", expanded=True):
-        for index, item in enumerate(payload.get("experience", []), start=1):
-            st.markdown(f"**Experience {index}**")
-            st.write(
-                f"{item.get('title', '')} | {item.get('organization', '')} | "
-                f"{item.get('location', '')} | {item.get('dates', '')}"
-            )
-            if item.get("bullets"):
-                st.code("\n".join(item["bullets"]), language="text")
+    _experience_items = payload.get("experience", [])
+    if _experience_items:
+        with st.expander("Experience", expanded=True):
+            for item in _experience_items:
+                _title = item.get("title", "")
+                _org = item.get("organization", "")
+                _loc = item.get("location", "")
+                _dates = item.get("dates", "")
+                _meta = " · ".join(filter(None, [_org, _loc, _dates]))
+                st.markdown(f"**{_title}**" if _title else "**Role**")
+                if _meta:
+                    st.caption(_meta)
+                if item.get("bullets"):
+                    _bullets_md = "\n".join(f"- {b}" for b in item["bullets"] if b.strip())
+                    st.markdown(_bullets_md)
 
-    with st.expander("Projects Preview", expanded=False):
-        for index, item in enumerate(payload.get("projects", []), start=1):
-            st.markdown(f"**Project {index}: {item.get('name', '')}**")
-            if item.get("details"):
-                st.code("\n".join(item["details"]), language="text")
+    _projects = payload.get("projects", [])
+    if _projects:
+        with st.expander("Projects", expanded=False):
+            for item in _projects:
+                st.markdown(f"**{item.get('name', 'Project')}**")
+                if item.get("details"):
+                    _bullets_md = "\n".join(f"- {d}" for d in item["details"] if d.strip())
+                    st.markdown(_bullets_md)
 
-    with st.expander("Skills Preview", expanded=False):
-        st.code("\n".join(payload.get("skills", [])), language="text")
+    _skills = payload.get("skills", [])
+    if _skills:
+        with st.expander("Skills", expanded=False):
+            st.markdown(build_inline_chip_row(_skills), unsafe_allow_html=True)
 
-    with st.expander("Validated Builder Payload", expanded=False):
-        st.json(payload)
     st.markdown("</div>", unsafe_allow_html=True)
 
     _render_task_meta_card("Local AI Builder", st.session_state.get("local_ai_last_builder_meta", {}))
@@ -4857,38 +5531,42 @@ def render_mode_screen() -> None:
                 unsafe_allow_html=True,
             )
 
-    local_ai_col, fast_col, manual_col = st.columns(3, gap="large")
+    _show_private = show_local_ai_cards()
+    _mode_cols = st.columns(3 if _show_private else 2, gap="large")
+    _col_idx = 0
 
-    with local_ai_col:
-        with st.container(border=True):
-            st.markdown(
-                f"""
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <div class="apple-kicker">Recommended</div>
-                </div>
-                <div class="apple-choice-title">100% Private (On Your Device)</div>
-                <div class="apple-choice-copy">Private, guided, and beginner-friendly. The app will help you set up {DEFAULT_LOCAL_AI_LABEL} on this computer and keep your resume work local.</div>
-                """,
-                unsafe_allow_html=True,
-            )
-            if primary_button("Use Private Mode", use_container_width=True, key="mode-local-ai"):
-                logger.info("User selected private mode")
-                st.session_state.execution_mode = "local_ai"
-                st.session_state.optimization_path = "local_ai"
-                st.session_state.screen = "local_ai_setup"
-                st.rerun()
+    if _show_private:
+        with _mode_cols[_col_idx]:
+            with st.container(border=True):
+                st.markdown(
+                    f"""
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div class="apple-kicker">Recommended</div>
+                    </div>
+                    <div class="apple-choice-title">100% Private (On Your Device)</div>
+                    <div class="apple-choice-copy">Private, guided, and beginner-friendly. The app will help you set up {DEFAULT_LOCAL_AI_LABEL} on this computer and keep your resume work local.</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if primary_button("Use Private Mode", use_container_width=True, key="mode-local-ai"):
+                    logger.info("User selected private mode")
+                    st.session_state.execution_mode = "local_ai"
+                    st.session_state.optimization_path = "local_ai"
+                    st.session_state.screen = "local_ai_setup"
+                    st.rerun()
+        _col_idx += 1
 
-    with fast_col:
+    with _mode_cols[_col_idx]:
         with st.container(border=True):
             st.markdown(
                 """
-                <div class="apple-kicker">Standard</div>
-                <div class="apple-choice-title">Standard (Cloud)</div>
-                <div class="apple-choice-copy">Use OpenAI, Anthropic, Gemini, or another provider you already trust. Best if you want the standard hosted path.</div>
+                <div class="apple-kicker">Recommended</div>
+                <div class="apple-choice-title">Full AI Optimization</div>
+                <div class="apple-choice-copy">Use your OpenAI, Anthropic, or Gemini API key. Save it once and it auto-fills every run.</div>
                 """,
                 unsafe_allow_html=True,
             )
-            if secondary_button("Use Standard (Cloud)", use_container_width=True, key="mode-api"):
+            if primary_button("Use Full AI Optimization", use_container_width=True, key="mode-api"):
                 logger.info("User selected hosted API mode")
                 st.session_state.execution_mode = "api"
                 st.session_state.optimization_path = "fast_start"
@@ -4897,8 +5575,9 @@ def render_mode_screen() -> None:
                 st.session_state.api_prompt_override = st.session_state.generated_prompt or ""
                 st.session_state.screen = "api"
                 st.rerun()
+    _col_idx += 1
 
-    with manual_col:
+    with _mode_cols[_col_idx]:
         with st.container(border=True):
             st.markdown(
                 """
@@ -5051,7 +5730,7 @@ def render_local_ai_setup_screen() -> None:
             st.session_state.screen = "mode"
             st.rerun()
     with col2:
-        if secondary_button("Use Standard (Cloud) Instead", use_container_width=True, key="local-ai-setup-fallback"):
+        if secondary_button("Use Full AI Optimization Instead", use_container_width=True, key="local-ai-setup-fallback"):
             st.session_state.execution_mode = "api"
             st.session_state.optimization_path = "fast_start"
             st.session_state.generated_prompt = _build_optimizer_prompt_from_state()
@@ -5214,7 +5893,7 @@ def render_local_ai_run_screen() -> None:
                 st.session_state.screen = "local_ai_setup"
                 st.rerun()
         with action_col2:
-            if secondary_button("Use Standard (Cloud) Instead", use_container_width=True, key="local-ai-run-fallback"):
+            if secondary_button("Use Full AI Optimization Instead", use_container_width=True, key="local-ai-run-fallback"):
                 st.session_state.execution_mode = "api"
                 st.session_state.optimization_path = "fast_start"
                 st.session_state.generated_prompt = _build_optimizer_prompt_from_state()
@@ -5225,9 +5904,14 @@ def render_local_ai_run_screen() -> None:
         with action_col3:
             if primary_button("Draft Resume Improvements", use_container_width=True, key="local-ai-run-draft"):
                 try:
+                    _lai_progress = st.progress(0)
+                    _lai_status = st.empty()
+
                     current_job_signals = st.session_state.get("local_ai_job_signals", {})
                     if not current_job_signals:
                         cleaned_text = (st.session_state.get("jd_cleaning_result") or {}).get("cleaned_text", "")
+                        _lai_progress.progress(10)
+                        _lai_status.caption("Preparing job brief...")
                         with st.spinner("Private Mode is preparing the job brief first."):
                             current_job_signals = process_job_description(
                                 raw_job_description=st.session_state.job_description,
@@ -5237,6 +5921,12 @@ def render_local_ai_run_screen() -> None:
                             )
                         st.session_state.local_ai_job_signals = current_job_signals
                         st.session_state.local_ai_last_job_meta = get_last_task_meta("process_job_description")
+
+                    _lai_progress.progress(35)
+                    _lai_status.caption("Analyzing resume and keywords...")
+                    time.sleep(0.3)
+                    _lai_progress.progress(55)
+                    _lai_status.caption("Drafting resume improvements (this may take 10–30 s)...")
 
                     with st.spinner("Private Mode is drafting resume improvements and validating them. This may take 10-30 seconds."):
                         payload = draft_resume_improvements(
@@ -5251,14 +5941,24 @@ def render_local_ai_run_screen() -> None:
                         )
                     st.session_state.local_ai_last_draft_meta = get_last_task_meta("draft_resume_improvements")
                     st.session_state.local_ai_draft_error = ""
+                    _lai_progress.progress(90)
+                    _lai_status.caption("Validating changes...")
+                    time.sleep(0.3)
+                    _lai_progress.progress(100)
+                    _lai_status.caption("Done!")
+                    time.sleep(0.2)
+                    _lai_progress.empty()
+                    _lai_status.empty()
                     handle_validated_payload(payload)
                     st.rerun()
                 except Exception as error:
+                    _lai_progress.empty()  # type: ignore[possibly-undefined]
+                    _lai_status.empty()    # type: ignore[possibly-undefined]
                     st.session_state.local_ai_draft_error = _humanize_local_ai_error(error, "Resume drafting")
         st.caption("Drafting is the longest Private Mode step. Let it finish before clicking again.")
         if st.session_state.get("local_ai_draft_error"):
             st.warning(st.session_state.local_ai_draft_error)
-            st.info("You can retry, switch to Standard (Cloud), or use Manual Mode if you want more control.")
+            st.info("You can retry, switch to Full AI Optimization, or use Manual Mode if you want more control.")
 
     render_shell_end()
 
@@ -5685,16 +6385,96 @@ def render_api_screen() -> None:
                 st.session_state.custom_api_key = api_key
                 st.caption("If this path returns malformed JSON, retry once or use Manual Mode.")
         else:
-            api_key = st.text_input(
-                provider_config["key_label"],
-                type="password",
-                placeholder=provider_config["placeholder"],
-            )
-            model = st.selectbox("Model", provider_config["models"], index=0)
-            st.markdown(
-                '<div class="apple-section-copy">Your key is used only for this session and is not stored.</div>',
-                unsafe_allow_html=True,
-            )
+            # ── Per-provider saved key logic ──────────────────────────
+            _is_hosted_auth = is_hosted_web() and is_authenticated()
+            _key_info: dict = {"last4": "", "valid": False}
+            _saved_key_val = ""
+            _api_settings: dict = {}
+            if _is_hosted_auth:
+                try:
+                    from supabase_settings_store import (
+                        get_provider_api_key,
+                        get_provider_key_info,
+                        get_user_settings,
+                    )
+                    _key_info = get_provider_key_info(provider)
+                    _api_settings = get_user_settings()
+                    if _key_info.get("last4"):
+                        _saved_key_val = get_provider_api_key(provider)
+                except Exception:
+                    pass
+
+            # Reset change-key mode when provider changes
+            if st.session_state.get("_api_last_provider") != provider:
+                st.session_state["_api_last_provider"] = provider
+                st.session_state["_api_chg_mode"] = False
+
+            _has_saved = bool(_key_info.get("last4"))
+            _in_chg_mode = bool(st.session_state.get("_api_chg_mode"))
+
+            if _has_saved and not _in_chg_mode:
+                # Show saved key status pill
+                _valid = _key_info.get("valid", False)
+                _dot_color = "#2d9b5a" if _valid else "#b45309"
+                _status_label = "Verified" if _valid else "Not tested"
+                st.markdown(
+                    f'<div style="display:flex;align-items:center;gap:0.75rem;'
+                    f'padding:0.75rem 1rem;background:#f9fafb;border:1px solid #e5e7eb;'
+                    f'border-radius:10px;margin:0.25rem 0 0.5rem;">'
+                    f'<span style="font-size:0.8rem;color:#6b7280;font-weight:500;">'
+                    f'{provider_config["key_label"]}</span>'
+                    f'<code style="font-size:0.9rem;font-weight:600;color:#111827;">'
+                    f'····{_key_info["last4"]}</code>'
+                    f'<span style="font-size:0.75rem;color:{_dot_color};font-weight:500;">'
+                    f'● {_status_label}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                if st.button("Change key", key="api-chg-key"):
+                    st.session_state["_api_chg_mode"] = True
+                    st.rerun()
+                api_key = _saved_key_val
+                _save_key_on_run = False
+            else:
+                api_key = st.text_input(
+                    provider_config["key_label"],
+                    type="password",
+                    placeholder=provider_config["placeholder"],
+                )
+                _save_key_on_run = (
+                    st.checkbox(
+                        "Save to my account for future runs",
+                        value=True,
+                        key="api-save-key-cb",
+                        help="Stored encrypted. Remove anytime in Settings → AI Settings.",
+                    )
+                    if _is_hosted_auth
+                    else False
+                )
+                if _has_saved:
+                    if st.button("Cancel", key="api-cancel-chg"):
+                        st.session_state["_api_chg_mode"] = False
+                        st.rerun()
+                _note = (
+                    "Saved encrypted to your account. Remove anytime in Settings."
+                    if (_is_hosted_auth and _save_key_on_run)
+                    else "Key used only for this session and not stored."
+                )
+                st.markdown(
+                    f'<div class="apple-section-copy">{_note}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            # Model — pre-select saved preference
+            _models = provider_config["models"]
+            _saved_model = _api_settings.get("default_model", _models[0])
+            _model_idx = _models.index(_saved_model) if _saved_model in _models else 0
+            model = st.selectbox("Model", _models, index=_model_idx)
+
+            # Stash for Run button handler
+            st.session_state["_api_save_key_on_run"] = _save_key_on_run
+            st.session_state["_api_run_key"] = api_key
+            st.session_state["_api_run_model"] = model
 
         st.markdown(
             '<div class="apple-section-copy">After the provider responds, the same JSON validator and exact-match review still run before export.</div>',
@@ -5763,17 +6543,52 @@ def render_api_screen() -> None:
     with col2:
         if primary_button("Run Optimization", use_container_width=True, key="api-run-optimization"):
             try:
-                with st.spinner(f"Sending prompt to {provider}..."):
-                    payload = optimize_with_provider(
-                        provider=provider,
-                        api_key=api_key,
-                        prompt=prompt_to_send,
-                        model=model,
-                        base_url=base_url,
-                    )
+                # Save key if user opted in (first-time entry)
+                if (
+                    provider != "Advanced Custom Endpoint"
+                    and st.session_state.get("_api_save_key_on_run")
+                    and api_key.strip()
+                ):
+                    try:
+                        from supabase_settings_store import save_provider_api_key
+                        save_provider_api_key(provider, model, api_key.strip())
+                        st.session_state["_api_chg_mode"] = False
+                        st.session_state["_api_save_key_on_run"] = False
+                    except Exception:
+                        pass
+
+                _progress = st.progress(0)
+                _status = st.empty()
+                _opt_stages = [
+                    (12, "Analyzing resume structure..."),
+                    (28, "Matching job description keywords..."),
+                    (48, "Sending prompt to the AI..."),
+                ]
+                for _pct, _msg in _opt_stages:
+                    _progress.progress(_pct)
+                    _status.caption(_msg)
+                    time.sleep(0.35)
+
+                payload = optimize_with_provider(
+                    provider=provider,
+                    api_key=api_key,
+                    prompt=prompt_to_send,
+                    model=model,
+                    base_url=base_url,
+                )
+
+                for _pct, _msg in [(72, "Processing AI response..."), (88, "Validating changes..."), (100, "Done!")]:
+                    _progress.progress(_pct)
+                    _status.caption(_msg)
+                    time.sleep(0.25)
+
+                _progress.empty()
+                _status.empty()
                 handle_validated_payload(payload)
                 st.rerun()
             except Exception as error:
+                _progress.empty()  # type: ignore[possibly-undefined]
+                _status.empty()    # type: ignore[possibly-undefined]
                 st.error(str(error))
     with col3:
         if secondary_button("Switch to Manual Mode", use_container_width=True, key="api-switch-manual"):
@@ -5818,7 +6633,7 @@ def render_review_screen() -> None:
 
     if manual_review_count:
         review_attention_items.append(
-            f"{manual_review_count} replacement(s) still need a quick human check before you export."
+            "Take a screenshot of the points below and ask your AI to rewrite the output in the correct format."
         )
     if review_warnings:
         review_attention_items.extend(str(warning) for warning in review_warnings[:3] if str(warning).strip())
@@ -5882,11 +6697,14 @@ def render_review_screen() -> None:
             )
 
         with st.container(border=True):
-            st.markdown('<div class="apple-kicker">Why It Improved</div>', unsafe_allow_html=True)
-            st.markdown(
-                '<div class="apple-section-title">What the optimizer strengthened</div>',
-                unsafe_allow_html=True,
-            )
+            if score_delta > 0:
+                _why_kicker = "Why It Improved"
+                _why_title = "What the optimizer strengthened"
+            else:
+                _why_kicker = "What Changed"
+                _why_title = "How the optimizer repositioned this draft"
+            st.markdown(f'<div class="apple-kicker">{_why_kicker}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="apple-section-title">{_why_title}</div>', unsafe_allow_html=True)
 
             if strongest_metrics:
                 metric_cols = st.columns(min(3, len(strongest_metrics)), gap="large")
@@ -5900,8 +6718,23 @@ def render_review_screen() -> None:
                             f"{delta:+d} {suffix}".strip(),
                         )
             else:
+                # Flat score — explain why and what to do next
+                new_kw = [k for k in optimized_report.get("matched_keywords", [])
+                          if k not in baseline_report.get("matched_keywords", [])]
+                still_missing = optimized_report.get("missing_keywords", [])
+                _flat_msg = (
+                    "The automated score stayed flat — this resume already had strong keyword coverage "
+                    "so the optimizer focused on clarity and phrasing. "
+                )
+                if still_missing:
+                    _flat_msg += (
+                        f"To push the score higher, run again with a prompt that emphasises: "
+                        f"**{', '.join(still_missing[:6])}**."
+                    )
+                elif new_kw:
+                    _flat_msg += f"The draft added {len(new_kw)} new keyword match{'es' if len(new_kw) != 1 else ''}: {', '.join(new_kw[:6])}."
                 st.markdown(
-                    '<div class="apple-section-copy">The score stayed flat, so this draft is more about clarity and positioning than a visible score jump.</div>',
+                    f'<div class="apple-section-copy">{_flat_msg}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -5932,37 +6765,35 @@ def render_review_screen() -> None:
 
             st.caption(f"{total_changes} total edit(s) were proposed across your draft.")
 
-        with st.container(border=True):
-            st.markdown('<div class="apple-kicker">What Needs Attention</div>', unsafe_allow_html=True)
-            st.markdown(
-                '<div class="apple-section-title">Anything worth checking before you send it</div>',
-                unsafe_allow_html=True,
-            )
-
-            if review_attention_items:
-                for attention_item in review_attention_items:
-                    st.markdown(f"- {attention_item}")
-            else:
+        if review_attention_items:
+            with st.container(border=True):
+                st.markdown('<div class="apple-kicker">What Needs Attention</div>', unsafe_allow_html=True)
                 st.markdown(
-                    '<div class="apple-section-copy">No blocking issues were flagged. You can still inspect the exact edits if you want a closer look.</div>',
+                    '<div class="apple-section-title">We found a few edits that need attention.</div>',
                     unsafe_allow_html=True,
                 )
+                st.markdown(
+                    '<div class="apple-section-copy">Your resume file is fine. A few of the AI-generated edits were unclear, so the app could not place them safely.</div>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    '<div class="apple-section-copy">What to do next: ask the AI to rewrite those edits more clearly, then run it again. Take a screenshot of the points below and ask your AI to rewrite the output in correct format.</div>',
+                    unsafe_allow_html=True,
+                )
+
+                for attention_item in review_attention_items:
+                    st.markdown(f"- {attention_item}")
 
         st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
         action_col1, action_col2 = st.columns(2, gap="large")
 
         with action_col1:
             if ready_for_export and st.session_state.output_docx_bytes and st.session_state.output_filename:
-                primary_download_button(
+                render_coral_download_button(
                     "Download Resume",
-                    data=io.BytesIO(st.session_state.output_docx_bytes),
+                    data=st.session_state.output_docx_bytes,
                     file_name=st.session_state.output_filename,
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True,
-                    on_click=lambda: logger.info(
-                        "Optimized resume downloaded: filename=%s",
-                        st.session_state.output_filename,
-                    ),
                 )
             else:
                 secondary_button("Download Resume", key="review-dl-disabled", use_container_width=True, disabled=True)
@@ -5973,78 +6804,114 @@ def render_review_screen() -> None:
                 st.session_state.show_review_changes = True
                 st.rerun()
 
-        # ===== Share & Support =====
-        st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
+        # ===== Success confirmation strip =====
         st.markdown(
             """
+            <style>
+            @keyframes slideInBanner {
+                from { opacity: 0; transform: translateY(8px); }
+                to   { opacity: 1; transform: translateY(0); }
+            }
+            .resume-ready-banner {
+                animation: slideInBanner 0.45s cubic-bezier(0.16,1,0.3,1) both;
+                margin: 0.75rem 0 1rem;
+            }
+            </style>
+            <div class="resume-ready-banner">
             <div style="
-                background: linear-gradient(135deg, #fff8f0 0%, #fff3e6 100%);
-                border: 1px solid #fddcb5;
-                border-radius: 12px;
+                background: linear-gradient(135deg, #d97757 0%, #c9683f 60%, #b85934 100%);
+                border-radius: 14px;
                 padding: 1.25rem 1.5rem;
-                text-align: center;
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                flex-wrap: wrap;
+                box-shadow: 0 4px 20px rgba(217,119,87,0.30);
             ">
-                <div style="font-size: 1.35rem; margin-bottom: 0.35rem;">🎉</div>
-                <div style="font-weight: 700; font-size: 1rem; color: #1a1a1a; margin-bottom: 0.3rem;">
-                    Resume optimized!
+                <span style="
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 2rem;
+                    height: 2rem;
+                    background: rgba(255,255,255,0.20);
+                    border-radius: 50%;
+                    flex-shrink: 0;
+                    backdrop-filter: blur(4px);
+                ">
+                    <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+                        <path d="M1.5 5L4.5 8L10.5 1.5" stroke="white" stroke-width="2.2"
+                              stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 1rem; font-weight: 700; color: #fff; line-height: 1.3;">
+                        Resume optimized and ready to download.
+                    </div>
                 </div>
-                <div style="font-size: 0.85rem; color: #555; margin-bottom: 0; line-height: 1.5;">
-                    If this saved you time, share it with a friend or support future development.
+                <div style="font-size: 0.82rem; color: rgba(255,255,255,0.85); white-space: nowrap; flex-shrink: 0;">
+                    Found this useful?&nbsp;
+                    <a href="https://buy.stripe.com/cNiaEZ4KwgLJdtA2C0dMI01" target="_blank"
+                       style="color: #fff; font-weight: 700; text-decoration: none;
+                              border-bottom: 1.5px solid rgba(255,255,255,0.55);
+                              padding-bottom: 1px;">
+                        Support development
+                    </a>
+                    &nbsp;·&nbsp;
+                    <a href="https://resume-optimizer-otg.streamlit.app" target="_blank"
+                       style="color: #fff; font-weight: 700; text-decoration: none;
+                              border-bottom: 1.5px solid rgba(255,255,255,0.55);
+                              padding-bottom: 1px;">
+                        Share
+                    </a>
                 </div>
+            </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        st.markdown("<div style='margin-top: 0.75rem;'></div>", unsafe_allow_html=True)
-        share_col1, share_col2 = st.columns(2, gap="medium")
-        with share_col1:
-            st.link_button(
-                "☕  Buy me a coffee",
-                "https://buy.stripe.com/cNiaEZ4KwgLJdtA2C0dMI01",
-                use_container_width=True,
-            )
-        with share_col2:
-            st.link_button(
-                "🔗  Share with a friend",
-                "https://resume-optimizer-otg.streamlit.app",
-                use_container_width=True,
-            )
-
-        # ===== Bottom Actions =====
-        st.markdown("<div style='margin-top: 1.5rem;'></div>", unsafe_allow_html=True)
-        bottom_col1, bottom_col2 = st.columns(2, gap="large")
-
-        with bottom_col1:
-            if secondary_button("Start Over", use_container_width=True, key="review-start-over-summary"):
-                logger.info("User started a new optimization from success state")
-                reset_flow()
-                st.rerun()
-
-        with bottom_col2:
-            if secondary_button("Back", use_container_width=True, key="review-back-summary"):
-                previous_screen = "manual" if st.session_state.execution_mode == "manual" else "api"
-                st.session_state.screen = previous_screen
-                st.rerun()
 
         # ── Save to Job Tracker ────────────────────────────────────────────────
         _tracker_auto = st.session_state.get("tracker_auto_saved_to")
         _tracker_pending = st.session_state.get("tracker_pending_save")
 
-        if _tracker_auto:
-            # Optimize Again ran — confirm silently with a small note
-            st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
-            st.success(
-                "Optimization run saved to Job Tracker. "
-                "[View in Tracker](#)"
-                if False  # placeholder; button below handles the nav
-                else "Optimization run saved to Job Tracker."
-            )
-            vc, _ = st.columns([1.5, 6])
-            with vc:
-                if st.button("View in Tracker", key="review-view-tracker", use_container_width=True):
+        # ===== Bottom Actions =====
+        bottom_spacer, bottom_col1, bottom_col2, bottom_col3, _ = st.columns([0.45, 1.6, 1.6, 1.6, 0.45], gap="medium")
+
+        with bottom_col1:
+            if _tracker_auto:
+                if secondary_button("View in Tracker", key="review-view-tracker", use_container_width=True):
                     st.session_state.active_job_detail_id = _tracker_auto
                     st.session_state.screen = "job_detail"
                     st.rerun()
+
+        with bottom_col2:
+            if secondary_button("Start Over", use_container_width=True, key="review-start-over-summary"):
+                logger.info("User started a new optimization from success state")
+                reset_flow()
+                st.rerun()
+
+        with bottom_col3:
+            if secondary_button("Back", use_container_width=True, key="review-back-summary"):
+                previous_screen = "manual" if st.session_state.execution_mode == "manual" else "api"
+                st.session_state.screen = previous_screen
+                st.rerun()
+
+        if _tracker_auto:
+            st.markdown(
+                """
+                <div style="display:flex; align-items:center; gap:0.5rem;
+                            font-size:0.85rem; color:#555; padding:0.5rem 0;">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <circle cx="7" cy="7" r="6.25" stroke="#22c55e" stroke-width="1.5"/>
+                        <path d="M4.5 7L6 8.5L9.5 5" stroke="#22c55e" stroke-width="1.5"
+                              stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Saved to Job Tracker.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
         elif _tracker_pending:
             st.markdown("<div style='height:1.5rem;'></div>", unsafe_allow_html=True)
@@ -6130,25 +6997,42 @@ def render_review_screen() -> None:
                         st.session_state.tracker_pending_save = None
                         st.rerun()
 
-        if st.session_state.is_first_optimization:
+        if st.session_state.is_first_optimization and not _profile_setup_complete():
             st.markdown("<div style='height:2rem;'></div>", unsafe_allow_html=True)
-            with st.container(border=True):
-                st.markdown('<div class="apple-kicker">Level Up Your Results</div>', unsafe_allow_html=True)
-                st.markdown('<div class="apple-section-title">Build your Career Profile</div>', unsafe_allow_html=True)
-                st.markdown(
-                    '<div class="apple-section-copy">Save your experiences once. Future optimizations will automatically include your full background.</div>',
-                    unsafe_allow_html=True,
-                )
-                profile_col1, profile_col2 = st.columns(2)
-                with profile_col1:
-                    if primary_button("Build Profile", use_container_width=True, key="success-build-profile"):
-                        st.session_state.is_first_optimization = False
-                        st.session_state.screen = "profile_welcome"
-                        st.rerun()
-                with profile_col2:
-                    if secondary_button("Skip for now", use_container_width=True, key="success-skip-profile"):
-                        st.session_state.is_first_optimization = False
-                        logger.info("User declined profile building prompt on first optimization")
+            st.markdown(
+                """
+                <div style="
+                    border-left: 3px solid #1a1a1a;
+                    padding: 1.1rem 1.25rem;
+                    background: #fafafa;
+                    border-radius: 0 8px 8px 0;
+                ">
+                    <div style="font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em;
+                                text-transform: uppercase; color: #888; margin-bottom: 0.4rem;">
+                        One-time setup
+                    </div>
+                    <div style="font-size: 1rem; font-weight: 600; color: #1a1a1a; margin-bottom: 0.35rem;">
+                        Make every future run stronger
+                    </div>
+                    <div style="font-size: 0.875rem; color: #555; line-height: 1.6;">
+                        Save your experience once. The optimizer will draw on your full background
+                        automatically — no copy-pasting between runs.
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown("<div style='height:0.75rem;'></div>", unsafe_allow_html=True)
+            profile_col1, profile_col2 = st.columns([1, 1], gap="medium")
+            with profile_col1:
+                if primary_button("Set up Career Profile", use_container_width=True, key="success-build-profile"):
+                    st.session_state.is_first_optimization = False
+                    st.session_state.screen = "profile_welcome"
+                    st.rerun()
+            with profile_col2:
+                if secondary_button("Maybe later", use_container_width=True, key="success-skip-profile"):
+                    st.session_state.is_first_optimization = False
+                    logger.info("User declined profile building prompt on first optimization")
         return
 
     # ===== DETAILED REVIEW MODE (show_review_changes = True) =====
@@ -6247,55 +7131,138 @@ def main() -> None:
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     with st.sidebar:
-      if _in_onboarding:
-        # Minimal sidebar during onboarding — just a skip escape hatch
-        st.markdown("### Resume Builder OTG")
-        st.caption("Complete setup to unlock all features.")
-        if secondary_button("Skip setup →", key="ob-sidebar-skip", use_container_width=True):
-            from profile_store import complete_onboarding as _co
-            _co()
-            st.session_state.screen = "landing"
-            st.rerun()
-      else:
-        profile = create_or_get_profile()
-        profile_is_ready = _profile_setup_complete()
-        st.markdown("### Resume Optimizer")
-        st.caption(
-            "A calmer way to tailor resumes with AI-guided review before export."
-            if not profile.full_name.strip()
-            else f"Welcome back, {profile.full_name.strip()}."
+        st.markdown(
+            '<p style="font-size:0.95rem;font-weight:700;margin:0 0 1rem 0.25rem;'
+            'letter-spacing:-0.01em;">Resume Optimizer</p>',
+            unsafe_allow_html=True,
         )
-        st.write("Choose a destination, then move through one clear workflow at a time.")
-        st.markdown("#### Navigate")
-        if secondary_button("Home", use_container_width=True, key="sidebar-home"):
-            st.session_state.screen = "landing"
-            st.rerun()
-        if secondary_button("Career Profile", use_container_width=True, key="sidebar-profile"):
-            st.session_state.screen = "profile"
-            st.rerun()
-        if secondary_button("Job Tracker", use_container_width=True, key="sidebar-job-tracker"):
-            st.session_state.screen = "job_tracker"
-            st.rerun()
-        if secondary_button("Profile Tools", use_container_width=True, key="sidebar-profile-tools"):
-            st.session_state.screen = "profile"
-            st.rerun()
-        st.markdown("#### Utility")
-        if secondary_button("Start Over", use_container_width=True, key="sidebar-start-over"):
-            reset_flow()
-            st.rerun()
-        if secondary_button("Settings", use_container_width=True, key="sidebar-settings"):
-            st.session_state.screen = "settings"
-            st.rerun()
-        if is_hosted_web():
-            user_email = st.session_state.get("auth_user_email", "")
-            if user_email:
-                st.caption(f"Signed in as {user_email}")
-            if secondary_button("Sign Out", use_container_width=True, key="sidebar-sign-out"):
-                sign_out()
+
+        if _in_onboarding:
+            if secondary_button("Skip setup", key="ob-sidebar-skip", use_container_width=True):
+                from profile_store import complete_onboarding as _co
+                _co()
+                st.session_state.screen = "landing"
+                st.rerun()
+        else:
+            # ── Primary nav ──────────────────────────────────────────────
+            if secondary_button("Home", use_container_width=True, key="sidebar-home"):
+                st.session_state.screen = "landing"
+                st.rerun()
+            if secondary_button("Career Profile", use_container_width=True, key="sidebar-profile"):
+                st.session_state.screen = "profile"
+                st.rerun()
+            if secondary_button("Job Tracker", use_container_width=True, key="sidebar-job-tracker"):
+                st.session_state.screen = "job_tracker"
+                st.rerun()
+            if secondary_button("Need Help", use_container_width=True, key="sidebar-need-help"):
+                st.session_state.screen = "help"
+                st.rerun()
+            if secondary_button("Settings", use_container_width=True, key="sidebar-settings"):
+                st.session_state.screen = "settings"
+                st.session_state.settings_open_help = False
                 st.rerun()
 
-        render_support_button()
-        render_help_section()
+            # ── Footer: user + support ────────────────────────────────
+            st.markdown(
+                '<hr style="border:none;border-top:1px solid var(--line,#e5e5e5);margin:0.5rem 0;">',
+                unsafe_allow_html=True,
+            )
+            if is_hosted_web():
+                user_email = st.session_state.get("auth_user_email", "")
+                if user_email:
+                    st.markdown(
+                        f'<p style="font-size:0.78rem;color:#888;margin:0.25rem 0.25rem 0.4rem;'
+                        f'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+                        f'{user_email}</p>',
+                        unsafe_allow_html=True,
+                    )
+                if secondary_button("Sign Out", use_container_width=True, key="sidebar-sign-out"):
+                    sign_out()
+                    st.rerun()
+            render_support_button()
+            components.html(
+                """
+                <script>
+                const doc = window.parent && window.parent.document ? window.parent.document : document;
+
+                const hideSidebarArtifacts = () => {
+                  const candidates = Array.from(doc.querySelectorAll("button, div, span"));
+                  candidates.forEach((node) => {
+                    const text = (node.innerText || node.textContent || "").trim();
+                    if (!text || !text.includes("keyboard_double_arrow_right")) return;
+                    const clickable = node.closest("button, [role='button'], [data-testid='collapsedControl'], [data-testid='stSidebarCollapseButton']");
+                    const target = clickable || node;
+                    if (target instanceof HTMLElement) {
+                      target.style.display = "none";
+                      const wrapper = target.parentElement;
+                      if (wrapper && wrapper.childElementCount === 1) {
+                        wrapper.style.display = "none";
+                      }
+                    }
+                  });
+                };
+
+                const CLAUDE_CORAL = "#d97757";
+                const CLAUDE_CORAL_HOVER = "#c9683f";
+                const isDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+                const applyCoralStyle = (btn) => {
+                  btn.style.setProperty("background-color", CLAUDE_CORAL, "important");
+                  btn.style.setProperty("background", CLAUDE_CORAL, "important");
+                  btn.style.setProperty("color", "#ffffff", "important");
+                  btn.style.setProperty("border-color", CLAUDE_CORAL, "important");
+                  btn.querySelectorAll("p, span, div").forEach((el) => {
+                    el.style.setProperty("color", "#ffffff", "important");
+                  });
+                  if (!btn._coralHooked) {
+                    btn._coralHooked = true;
+                    btn.addEventListener("mouseenter", () => {
+                      btn.style.setProperty("background-color", CLAUDE_CORAL_HOVER, "important");
+                      btn.style.setProperty("background", CLAUDE_CORAL_HOVER, "important");
+                    });
+                    btn.addEventListener("mouseleave", () => {
+                      btn.style.setProperty("background-color", CLAUDE_CORAL, "important");
+                      btn.style.setProperty("background", CLAUDE_CORAL, "important");
+                    });
+                  }
+                };
+
+                const applyButtonStyles = () => {
+                  // All primary/secondary wrappers — includes st.button and st.download_button
+                  doc.querySelectorAll(
+                    ".apple-primary button, .apple-primary a[download], " +
+                    ".apple-secondary button, .apple-secondary a[download], " +
+                    ".apple-primary [data-testid='stDownloadButton'] button, " +
+                    ".apple-secondary [data-testid='stDownloadButton'] button"
+                  ).forEach(applyCoralStyle);
+
+                  // Also target stDownloadButton directly when inside our wrappers
+                  doc.querySelectorAll(
+                    ".apple-primary [data-testid='stDownloadButton'], " +
+                    ".apple-secondary [data-testid='stDownloadButton']"
+                  ).forEach((wrapper) => {
+                    wrapper.querySelectorAll("button, a").forEach(applyCoralStyle);
+                  });
+                };
+
+                const runFixes = () => {
+                  hideSidebarArtifacts();
+                  applyButtonStyles();
+                };
+
+                // Run immediately and after Streamlit renders
+                runFixes();
+                setTimeout(runFixes, 100);
+                setTimeout(runFixes, 400);
+                setTimeout(runFixes, 1200);
+
+                // Watch for DOM changes (Streamlit re-renders buttons dynamically)
+                const observer = new MutationObserver(() => applyButtonStyles());
+                observer.observe(doc.body, { childList: true, subtree: true });
+                </script>
+                """,
+                height=0,
+            )
 
     screen = st.session_state.screen
     # NOTE: _prev_rendered_screen is updated at the END of the routing block so that
@@ -6360,6 +7327,8 @@ def main() -> None:
             st.rerun()
     elif screen == "settings":
         render_settings_screen()
+    elif screen == "help":
+        render_help_screen()
     elif screen == "manual":
         render_manual_screen()
     elif screen == "api":

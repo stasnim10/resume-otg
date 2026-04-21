@@ -14,6 +14,7 @@ SECTION_HEADERS = {
     "about": "general",
     "summary": "general",
     "profile": "general",
+    "top skills": "skills",
     "education": "education",
     "experience": "experience",
     "experiences": "experience",
@@ -26,18 +27,52 @@ SECTION_HEADERS = {
     "leadership experience": "leadership",
     "activities": "activity",
     "extracurriculars": "activity",
+    "volunteer experience": "activity",
+    "volunteering": "activity",
     "certifications": "certification",
     "licenses & certifications": "certification",
     "licenses and certifications": "certification",
     "courses": "certification",
+    "honors & awards": "award",
+    "honors and awards": "award",
+    "awards": "award",
+    "publications": "general",
+    "recommendations": "general",
+    "languages": "skills",
+    "interests": "general",
     "skills": "skills",
     "technical skills": "skills",
+    "core competencies": "skills",
+    "competencies": "skills",
 }
 
 DATE_PATTERN = re.compile(
-    r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}|"
+    r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{4}|"
     r"\b\d{4}\s*[-–]\s*(?:present|\d{4})\b|"
     r"\b\d{4}\b",
+    flags=re.IGNORECASE,
+)
+
+_MONTH_ABBR_MAP = {
+    "january": "01", "jan": "01",
+    "february": "02", "feb": "02",
+    "march": "03", "mar": "03",
+    "april": "04", "apr": "04",
+    "may": "05",
+    "june": "06", "jun": "06",
+    "july": "07", "jul": "07",
+    "august": "08", "aug": "08",
+    "september": "09", "sep": "09", "sept": "09",
+    "october": "10", "oct": "10",
+    "november": "11", "nov": "11",
+    "december": "12", "dec": "12",
+}
+
+_LINKEDIN_NOISE = re.compile(
+    r"^(?:page\s+\d+|linkedin|see\s+(?:all|more|profile|connections)|"
+    r"\d+\s+connections?|\d+\s+followers?|message|connect|follow|"
+    r"profile\s+strength|all\s+filters|contact\s+info|"
+    r"show\s+all\s+\d+|load\s+more|www\.linkedin\.com)$",
     flags=re.IGNORECASE,
 )
 
@@ -63,9 +98,59 @@ _VERB_HEAVY_WORDS = {
 }
 
 
+def _normalize_date(token: str) -> str:
+    """Normalize a single date token to MM/YYYY."""
+    token = token.strip()
+    if not token or token.lower() == "present":
+        return token
+    if re.match(r"^\d{2}/\d{4}$", token):
+        return token
+    m = re.match(r"^([A-Za-z]+)\.?\s+(\d{4})$", token)
+    if m:
+        month_num = _MONTH_ABBR_MAP.get(m.group(1).lower().rstrip("."), "")
+        if month_num:
+            return f"{month_num}/{m.group(2)}"
+    if re.match(r"^\d{4}$", token):
+        return token
+    return token
+
+
+def _parse_date_range(date_line: str) -> tuple[str, str, bool]:
+    """Parse a date range into (start_date, end_date, is_current).
+
+    Handles: "January 2020 – Present · 4 yrs", "Jan 2020 - Dec 2022",
+             "2020 – 2022", "Jun 2022", "(4 months)"
+    """
+    if not date_line:
+        return "", "", False
+    # Strip LinkedIn duration noise
+    cleaned = re.sub(r"[·•]\s*\d+\s*(?:yrs?|years?|mos?|months?).*$", "", date_line, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\(\d+\s*(?:yrs?|years?|mos?|months?)[^)]*\)", "", cleaned, flags=re.IGNORECASE)
+    cleaned = cleaned.strip("·•–-—  ")
+
+    is_current = bool(re.search(r"\bpresent\b", cleaned, flags=re.IGNORECASE))
+    parts = re.split(r"\s*[–—-]\s*", cleaned, maxsplit=1)
+    start_raw = parts[0].strip() if parts else ""
+    end_raw   = parts[1].strip() if len(parts) > 1 else ""
+
+    def _first_token(s: str) -> str:
+        m = re.search(
+            r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{4}",
+            s, flags=re.IGNORECASE,
+        )
+        if m:
+            return _normalize_date(m.group(0))
+        m2 = re.search(r"\b\d{4}\b", s)
+        return m2.group(0) if m2 else ""
+
+    start_date = _first_token(start_raw)
+    end_date   = "" if is_current else _first_token(end_raw)
+    return start_date, end_date, is_current
+
+
 def _normalize_lines(raw_text: str) -> list[str]:
     lines = [line.strip() for line in raw_text.replace("\r", "").split("\n")]
-    return [line for line in lines if line]
+    return [line for line in lines if line and not _LINKEDIN_NOISE.match(line)]
 
 
 def _extract_contact_basics(lines: list[str]) -> dict[str, str]:
@@ -217,11 +302,12 @@ def _guess_organization(title: str, lines: list[str]) -> str:
     return ""
 
 
-def _extract_dates(lines: list[str]) -> str:
+def _extract_dates(lines: list[str]) -> tuple[str, str, bool]:
+    """Return (start_date, end_date, is_current) from the first date-like line."""
     for line in lines[:4]:
         if _looks_like_date_line(line):
-            return line.strip()
-    return ""
+            return _parse_date_range(line.strip())
+    return "", "", False
 
 
 def _strip_metadata_lines(lines: list[str], organization: str, dates: str) -> list[str]:
@@ -285,17 +371,18 @@ def _build_generic_item(item_type: str, chunk: list[str]) -> ProfileItem:
     if _looks_like_invalid_title(title):
         title = ""
     organization = _guess_organization(title, chunk[1:])
-    dates = _extract_dates(chunk[1:])
-    detail_lines = _strip_metadata_lines(chunk[1:], organization, dates)
+    start_date, end_date, is_current = _extract_dates(chunk[1:])
+    date_line = next((ln for ln in chunk[1:4] if _looks_like_date_line(ln)), "")
+    detail_lines = _strip_metadata_lines(chunk[1:], organization, date_line)
     description = "\n".join(detail_lines).strip()
     bullets = [line for line in detail_lines if len(line.split()) > 2][:6]
     keywords = _extract_keywords(chunk)
 
-    # Improved confidence scoring
+    has_dates = bool(start_date or end_date)
     confidence = 0.4
     if organization:
         confidence += 0.15
-    if dates:
+    if has_dates:
         confidence += 0.15
     if description and len(description) > 20:
         confidence += 0.15
@@ -303,16 +390,16 @@ def _build_generic_item(item_type: str, chunk: list[str]) -> ProfileItem:
         confidence += 0.1
     if len(keywords) >= 3:
         confidence += 0.1
-
-    # High confidence when we have multiple signals
-    if organization and description and (dates or len(bullets) >= 2):
+    if organization and description and (has_dates or len(bullets) >= 2):
         confidence = max(confidence, 0.8)
 
     return ProfileItem(
         item_type=item_type,
         title=title or (organization if not _looks_like_invalid_title(organization) else ""),
         organization=organization,
-        start_date=dates,
+        start_date=start_date,
+        end_date=end_date,
+        is_current=is_current,
         description=description,
         bullets=bullets,
         keywords=keywords,
