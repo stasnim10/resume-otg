@@ -20,7 +20,7 @@ def render_auth_screen() -> None:
         .auth-sub { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
         </style>
         <div class="auth-wrap">
-          <div class="auth-title">Resume Builder OTG</div>
+          <div class="auth-title">Resume OTG</div>
           <div class="auth-sub">Sign in to continue to your account.</div>
         </div>
         """,

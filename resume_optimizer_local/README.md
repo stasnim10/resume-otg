@@ -1,4 +1,4 @@
-# Resume Optimizer - Complete Suite 🚀
+# Resume OTG - Complete Suite 🚀
 
 A deterministic resume optimization tool available in **two versions**: Desktop (offline) and Web (browser-based). Upload a .docx resume and provide JSON replacement payload for summary and bullet points.
 
@@ -193,7 +193,7 @@ __pycache__/
 ```bash
 git init
 git add .
-git commit -m "Initial commit: Resume Optimizer offline tool"
+git commit -m "Initial commit: Resume OTG offline tool"
 git branch -M main
 git remote add origin https://github.com/YOUR_USERNAME/resume-optimizer-local.git
 git push -u origin main

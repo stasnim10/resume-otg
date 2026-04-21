@@ -1,5 +1,5 @@
 """
-Resume Optimizer - Local Desktop Application
+Resume OTG - Local Desktop Application
 Tkinter-based GUI for deterministic resume optimization
 """
 import tkinter as tk
@@ -16,7 +16,7 @@ class ResumeOptimizerApp:
     
     def __init__(self, root):
         self.root = root
-        self.root.title("Resume Optimizer")
+        self.root.title("Resume OTG")
         self.root.geometry("1000x1400")
         
         self.resume_path = None
@@ -29,7 +29,7 @@ class ResumeOptimizerApp:
     def _setup_ui(self):
         """Setup tkinter UI with two distinct phases"""
         # Title
-        title = ttk.Label(self.root, text="Resume Optimizer", font=("Arial", 16, "bold"))
+        title = ttk.Label(self.root, text="Resume OTG", font=("Arial", 16, "bold"))
         title.pack(pady=5)
         
         subtitle = ttk.Label(self.root, text="Local, offline, no API", font=("Arial", 10))
@@ -45,7 +45,7 @@ class ResumeOptimizerApp:
         phase1_label = ttk.Label(main_frame, text="PHASE 1: Resume Optimization", font=("Arial", 13, "bold"), foreground="blue")
         phase1_label.pack(anchor="w", pady=(10, 10))
         
-        phase1_box = ttk.LabelFrame(main_frame, text="Resume Optimizer", padding="8")
+        phase1_box = ttk.LabelFrame(main_frame, text="Resume OTG", padding="8")
         phase1_box.pack(fill="x", pady=8)
         
         # Step 1: Resume Upload

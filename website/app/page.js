@@ -40,9 +40,9 @@ export default function HomePage() {
         <header className="site-header">
           <a className="brand-mark" href="#top">
             <div className="brand-lockup">
-              <Image src="/logo.jpeg" alt="Resume Builder OTG logo" width={44} height={44} />
+              <Image src="/logo.jpeg" alt="Resume OTG logo" width={44} height={44} />
               <div>
-                <p className="brand-name">Resume Builder OTG</p>
+                <p className="brand-name">Resume OTG</p>
                 <p className="brand-subtitle">Resume optimization that feels guided, not chaotic.</p>
               </div>
             </div>
@@ -60,10 +60,10 @@ export default function HomePage() {
 
       <section className="hero-simple" id="top">
         <div className="hero-simple-copy">
-          <p className="eyebrow">Resume Builder OTG</p>
+          <p className="eyebrow">Resume OTG</p>
           <h1>Build stronger applications with a calmer workflow.</h1>
           <p className="hero-simple-body">
-            Resume Builder OTG helps users move from onboarding to profile creation to resume
+            Resume OTG helps users move from onboarding to profile creation to resume
             optimization without feeling lost, overloaded, or forced to trust hidden AI output.
           </p>
           <div className="hero-actions">
@@ -79,7 +79,7 @@ export default function HomePage() {
         <div className="hero-simple-visual">
           <Image
             src="/hero-image.png"
-            alt="Resume Builder OTG hero artwork"
+            alt="Resume OTG hero artwork"
             width={1478}
             height={831}
             className="hero-image"

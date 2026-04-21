@@ -1,6 +1,6 @@
-# Resume Builder OTG Website
+# Resume OTG Website
 
-Marketing website for Resume Builder OTG, built with Next.js for easy deployment on Vercel's free tier.
+Marketing website for Resume OTG, built with Next.js for easy deployment on Vercel's free tier.
 
 ## Run locally
 

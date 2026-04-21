@@ -7,7 +7,7 @@ const contactEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "tasnimsimum@gmail
 const donateUrl = "https://buy.stripe.com/cNiaEZ4KwgLJdtA2C0dMI01";
 
 const shareMessage =
-  `I’ve been using Resume Builder OTG to build and optimize applications with a calmer workflow. ` +
+  `I’ve been using Resume OTG to build and optimize applications with a calmer workflow. ` +
   `You can try it here: ${appUrl}`;
 
 export function SupportActions() {
@@ -28,7 +28,7 @@ export function SupportActions() {
       <div className="support-button-row">
         <a
           className="button button-secondary"
-          href={`mailto:${contactEmail}?subject=${encodeURIComponent("Need help with Resume Builder OTG")}`}
+          href={`mailto:${contactEmail}?subject=${encodeURIComponent("Need help with Resume OTG")}`}
         >
           Need Help?
         </a>

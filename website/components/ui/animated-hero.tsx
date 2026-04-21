@@ -85,7 +85,7 @@ function AnimatedHero() {
               transition={{ duration: 0.6, delay: 0.22, ease }}
               className="text-lg md:text-xl leading-relaxed tracking-tight text-muted-foreground max-w-2xl text-center"
             >
-              Resume Builder OTG turns your resume and job descriptions into cleaner, more
+              Resume OTG turns your resume and job descriptions into cleaner, more
               targeted applications — with guided onboarding, explainable AI edits, and a
               review flow you stay in control of every step of the way.
             </motion.p>

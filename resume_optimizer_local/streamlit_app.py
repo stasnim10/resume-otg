@@ -1,5 +1,5 @@
 """
-Streamlit prototype for the Resume Optimizer MVP.
+Streamlit app for Resume OTG.
 """
 from __future__ import annotations
 
@@ -2326,7 +2326,7 @@ def render_landing() -> None:
             local_ai_cta_route = "local_ai_setup"
             st.session_state.local_ai_ready = False
 
-    hero_eyebrow = "Welcome Back" if is_returning_user else "Resume Optimizer"
+    hero_eyebrow = "Welcome Back" if is_returning_user else "Resume OTG"
     hero_title = f"Welcome back, {profile.full_name.strip()}." if is_returning_user and profile.full_name.strip() else "Make resume tailoring feel beautifully simple."
     hero_copy = (
         "Pick up where you left off, build from your saved profile, or jump back into an application already in progress."
@@ -7089,7 +7089,7 @@ def render_review_screen() -> None:
 def main() -> None:
     """Run the Streamlit app."""
     logger.info("Streamlit app started")
-    st.set_page_config(page_title="Resume Optimizer", layout="wide")
+    st.set_page_config(page_title="Resume OTG", layout="wide")
     init_session_state()
 
     # ── Auth gate (hosted web only) ──────────────────────────────────────────
@@ -7133,7 +7133,7 @@ def main() -> None:
     with st.sidebar:
         st.markdown(
             '<p style="font-size:0.95rem;font-weight:700;margin:0 0 1rem 0.25rem;'
-            'letter-spacing:-0.01em;">Resume Optimizer</p>',
+            'letter-spacing:-0.01em;">Resume OTG</p>',
             unsafe_allow_html=True,
         )
 
