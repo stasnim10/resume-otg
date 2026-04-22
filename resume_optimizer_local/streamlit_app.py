@@ -524,13 +524,54 @@ def apply_apple_theme() -> None:
           --danger: #c9342f;
           --font-main: "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
           /* Semantic tokens */
-          --sidebar-bg: #fbfbfd;
+          --sidebar-bg: #f5f5f7;
           --input-fill: #ffffff;
           --input-fill-focus: #ffffff;
           --step-active-bg: #eaeaef;
           --alert-bg: #f0faf4;
           --btn-primary-bg: #d97757;
           --btn-primary-text: #ffffff;
+          --header-bg: rgba(245,245,247,0.94);
+          --card-border: rgba(0,0,0,0.06);
+          --focus-blue: rgba(0,113,227,0.5);
+          --focus-blue-halo: rgba(0,113,227,0.18);
+          --disabled-bg: #ececf1;
+          --disabled-text: #8b8b93;
+          --disabled-border: #e1e1e6;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --bg: #0e0f12;
+            --surface: #16181b;
+            --surface-muted: #1d2024;
+            --panel-fill: #181b1f;
+            --text: #f5f5f7;
+            --muted: #b0b3ba;
+            --muted-light: #d0d4db;
+            --line: rgba(255,255,255,0.08);
+            --line-strong: rgba(255,255,255,0.16);
+            --shadow-soft: 0 10px 30px rgba(0,0,0,0.28);
+            --shadow-raised: 0 14px 36px rgba(0,0,0,0.36);
+            --blue: #4ea1ff;
+            --green: #4ac26b;
+            --amber: #e3a54b;
+            --danger: #ff7b72;
+            --sidebar-bg: #121417;
+            --input-fill: #101215;
+            --input-fill-focus: #181c20;
+            --step-active-bg: #20242a;
+            --alert-bg: #112017;
+            --btn-primary-bg: #d97757;
+            --btn-primary-text: #ffffff;
+            --header-bg: rgba(14,15,18,0.94);
+            --card-border: rgba(255,255,255,0.10);
+            --focus-blue: rgba(78,161,255,0.55);
+            --focus-blue-halo: rgba(78,161,255,0.20);
+            --disabled-bg: #24272c;
+            --disabled-text: #8a8f98;
+            --disabled-border: rgba(255,255,255,0.10);
+          }
         }
 
         .stApp {
@@ -546,8 +587,8 @@ def apply_apple_theme() -> None:
         }
 
         [data-testid="stHeader"] {
-          background: rgba(245,245,247,0.94);
-          border-bottom: 1px solid rgba(0,0,0,0.03);
+          background: var(--header-bg);
+          border-bottom: 1px solid var(--line);
         }
 
         h1, h2, h3, h4, h5, h6, p, label, li, a, button, input, textarea, select {
@@ -614,7 +655,7 @@ def apply_apple_theme() -> None:
           align-items: center;
           gap: 0.42rem;
           padding: 0.5rem 0.9rem;
-          background: #ffffff;
+          background: var(--surface);
           border: 1px solid var(--line);
           border-radius: 999px;
           font-size: 0.86rem;
@@ -629,7 +670,7 @@ def apply_apple_theme() -> None:
           width: fit-content;
           padding: 0.5rem 0.8rem;
           margin: 0 auto 2.2rem auto;
-          background: #e8e8ed;
+          background: var(--step-active-bg);
           border-radius: 999px;
         }
 
@@ -653,13 +694,13 @@ def apply_apple_theme() -> None:
         }
 
         .apple-step:hover {
-          background: rgba(255,255,255,0.45);
+          background: var(--surface-muted);
         }
 
         .apple-step.active {
-          background: #ffffff;
+          background: var(--surface);
           color: var(--text);
-          border-color: rgba(0,0,0,0.03);
+          border-color: var(--line);
           box-shadow: var(--shadow-soft);
         }
 
@@ -719,7 +760,7 @@ def apply_apple_theme() -> None:
         }
 
         .apple-choice-selected {
-          border-color: rgba(0,0,0,0.08);
+          border-color: var(--line-strong);
           box-shadow: var(--shadow-soft);
         }
 
@@ -809,8 +850,8 @@ def apply_apple_theme() -> None:
         }
 
         [data-testid="stVerticalBlockBorderWrapper"]:has(button):hover {
-          box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
-          border-color: rgba(0,0,0,0.12) !important;
+          box-shadow: var(--shadow-soft) !important;
+          border-color: var(--line-strong) !important;
           transform: translateY(-1px);
         }
 
@@ -828,7 +869,7 @@ def apply_apple_theme() -> None:
           min-height: 380px;
           padding: 2.75rem;
           border-radius: 30px;
-          background: #ffffff;
+          background: var(--surface);
           border: 1px solid var(--line);
           box-shadow: none;
           display: flex;
@@ -838,7 +879,7 @@ def apply_apple_theme() -> None:
         }
 
         .apple-landing-card:hover {
-          box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+          box-shadow: var(--shadow-raised);
           transform: translateY(-2px);
         }
 
@@ -849,12 +890,13 @@ def apply_apple_theme() -> None:
         }
 
         .apple-landing-card.featured .apple-kicker {
-          color: rgba(255,255,255,0.55) !important;
+          color: var(--bg) !important;
+          opacity: 0.7 !important;
         }
 
         .apple-landing-card.featured .apple-landing-card-title,
         .apple-landing-card.featured .apple-landing-card-copy {
-          color: rgba(255,255,255,0.92) !important;
+          color: var(--bg) !important;
         }
 
         /* Button inside the featured card gets an inverted (light) style */
@@ -901,7 +943,7 @@ def apply_apple_theme() -> None:
           margin-top: 1rem;
           padding: 0.9rem 1rem;
           border-radius: 16px;
-          background: #f5f5f7;
+          background: var(--bg);
           border: 1px solid var(--line);
         }
 
@@ -910,21 +952,21 @@ def apply_apple_theme() -> None:
           font-weight: 700;
           letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: #6e6e73;
+          color: var(--muted);
           margin-bottom: 0.35rem;
         }
 
         .apple-landing-status-copy {
           font-size: 0.92rem;
           line-height: 1.45;
-          color: #4b5563;
+          color: var(--text);
         }
 
         .apple-running-card {
           margin-top: 1rem;
           padding: 1rem 1.1rem;
           border-radius: 18px;
-          background: #f5f5f7;
+          background: var(--bg);
           border: 1px solid var(--line);
         }
 
@@ -969,7 +1011,7 @@ def apply_apple_theme() -> None:
           padding: 0.42rem 0.75rem;
           border-radius: 999px;
           border: 1px solid var(--line);
-          background: #ffffff;
+          background: var(--surface);
           font-size: 0.82rem;
           color: var(--muted);
           line-height: 1;
@@ -980,7 +1022,7 @@ def apply_apple_theme() -> None:
           padding: 1.45rem 1.5rem;
           border-radius: 20px;
           border: 1px solid var(--line);
-          background: #f5f5f7;
+          background: var(--bg);
         }
 
         .instruction-panel-title {
@@ -1016,7 +1058,7 @@ def apply_apple_theme() -> None:
         }
 
         .apple-summary-grid {
-          background: #ffffff;
+          background: var(--surface);
           border: 1px solid var(--line);
           border-radius: 24px;
           padding: 2rem;
@@ -1053,7 +1095,7 @@ def apply_apple_theme() -> None:
         }
 
         .builder-preview-block {
-          background: #f5f5f7;
+          background: var(--bg);
           border-radius: 14px;
           padding: 1rem 1.25rem;
           margin: 0.75rem 0;
@@ -1063,17 +1105,17 @@ def apply_apple_theme() -> None:
           font-weight: 600;
           letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: #86868b;
+          color: var(--muted);
           margin-bottom: 0.4rem;
         }
         .builder-preview-body {
           font-size: 0.9rem;
           line-height: 1.6;
-          color: #1d1d1f;
+          color: var(--text);
         }
 
         .apple-readiness-card {
-          background: #f5f5f7;
+          background: var(--bg);
           border: 1px solid var(--line);
           border-radius: 20px;
           padding: 1.25rem 1.35rem;
@@ -1085,7 +1127,7 @@ def apply_apple_theme() -> None:
           justify-content: space-between;
           gap: 1rem;
           padding: 0.5rem 0;
-          border-bottom: 1px solid rgba(0,0,0,0.04);
+          border-bottom: 1px solid var(--line);
           font-size: 0.94rem;
         }
 
@@ -1109,8 +1151,8 @@ def apply_apple_theme() -> None:
         }
 
         [data-testid="stVerticalBlockBorderWrapper"] {
-          background-color: #ffffff !important;
-          border: 1px solid rgba(0,0,0,0.06) !important;
+          background-color: var(--surface) !important;
+          border: 1px solid var(--card-border) !important;
           border-radius: 32px !important;
           padding: 1.5rem !important;
           box-shadow: none !important;
@@ -1132,7 +1174,7 @@ def apply_apple_theme() -> None:
 
         .stTextArea textarea,
         .stTextInput input {
-          background: #f2f2f5 !important;
+          background: var(--input-fill) !important;
           border: 1px solid transparent !important;
           color: var(--text) !important;
           box-shadow: none !important;
@@ -1141,15 +1183,15 @@ def apply_apple_theme() -> None:
 
         .stTextArea textarea:focus,
         .stTextInput input:focus {
-          background: #ebebf0 !important;
-          border-color: rgba(0,113,227,0.5) !important;
-          box-shadow: 0 0 0 3px rgba(0,113,227,0.18) !important;
+          background: var(--input-fill-focus) !important;
+          border-color: var(--focus-blue) !important;
+          box-shadow: 0 0 0 3px var(--focus-blue-halo) !important;
           outline: none !important;
         }
 
         .stSelectbox > div > div,
         .stMultiSelect > div > div {
-          background: #f2f2f5 !important;
+          background: var(--input-fill) !important;
           border: 1px solid transparent !important;
         }
 
@@ -1204,6 +1246,20 @@ def apply_apple_theme() -> None:
           opacity: 0.82;
         }
 
+        .stApp button[kind="primary"],
+        .stApp [data-testid="stBaseButton-primary"] button {
+          background: var(--btn-primary-bg) !important;
+          color: var(--btn-primary-text) !important;
+          border-color: var(--btn-primary-bg) !important;
+        }
+
+        .stApp button[kind="primary"] *,
+        .stApp [data-testid="stBaseButton-primary"] button * {
+          color: var(--btn-primary-text) !important;
+          fill: var(--btn-primary-text) !important;
+          opacity: 1 !important;
+        }
+
         .stButton button:focus-visible,
         .stDownloadButton button:focus-visible {
           outline: 2px solid #d97757 !important;
@@ -1237,9 +1293,9 @@ def apply_apple_theme() -> None:
 
         .apple-primary button:disabled,
         .apple-primary button[disabled] {
-          background: #ececf1 !important;
-          color: #8b8b93 !important;
-          border-color: #e1e1e6 !important;
+          background: var(--disabled-bg) !important;
+          color: var(--disabled-text) !important;
+          border-color: var(--disabled-border) !important;
           opacity: 1 !important;
         }
 
@@ -1251,8 +1307,8 @@ def apply_apple_theme() -> None:
         .apple-primary button[disabled] span,
         .apple-primary button:disabled div,
         .apple-primary button[disabled] div {
-          color: #8b8b93 !important;
-          fill: #8b8b93 !important;
+          color: var(--disabled-text) !important;
+          fill: var(--disabled-text) !important;
           opacity: 1 !important;
         }
 
@@ -1300,9 +1356,9 @@ def apply_apple_theme() -> None:
 
         div[data-testid="stAlert"] {
           border-radius: 20px;
-          border: 1px solid rgba(0,0,0,0.04);
+          border: 1px solid var(--line);
           box-shadow: none;
-          background: #f6faf7;
+          background: var(--alert-bg);
         }
 
         div[data-testid="stAlert"] [data-testid="stMarkdownContainer"] p {
@@ -1321,317 +1377,8 @@ def apply_apple_theme() -> None:
 
         div[data-baseweb="notification"] {
           border-radius: 20px !important;
-          border: 1px solid rgba(0,0,0,0.04) !important;
+          border: 1px solid var(--line) !important;
           box-shadow: none !important;
-        }
-
-        @media (prefers-color-scheme: dark) {
-          :root {
-            --bg: #111214;
-            --surface: #1c1c1f;
-            --surface-muted: #242428;
-            --panel-fill: #202126;
-            --text: #f5f5f7;
-            --muted: #b1b1b6;
-            --muted-light: #adadb2;
-            --line: rgba(255,255,255,0.08);
-            --line-strong: rgba(255,255,255,0.14);
-            --shadow-soft: 0 6px 18px rgba(0,0,0,0.32);
-            --shadow-raised: 0 8px 20px rgba(0,0,0,0.4);
-            --blue: #4c9fff;
-            --green: #30d158;
-            --amber: #ffd60a;
-            --danger: #ff453a;
-            /* Semantic tokens — dark overrides */
-            --sidebar-bg: #16171a;
-            --input-fill: #23242a;
-            --input-fill-focus: #2a2b31;
-            --step-active-bg: #3a3b42;
-            --alert-bg: #1e2521;
-            --btn-primary-bg: #d97757;
-            --btn-primary-text: #ffffff;
-          }
-
-          .stApp {
-            background: var(--bg);
-            color: var(--text);
-          }
-
-          [data-testid="stSidebar"] {
-            background: var(--sidebar-bg);
-            border-right: 1px solid var(--line);
-          }
-
-          [data-testid="stHeader"] {
-            background: rgba(17,18,20,0.94);
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-          }
-
-          .apple-stepper {
-            background: var(--panel-fill);
-          }
-
-          .apple-step.active {
-            background: var(--step-active-bg);
-            color: var(--text);
-            border-color: var(--line);
-          }
-
-          .apple-step:hover {
-            background: rgba(255,255,255,0.04);
-          }
-
-          /* Featured card in dark mode: light fill so it pops against the dark bg,
-             but inner text and button must be dark to stay readable. */
-          .apple-landing-card.featured {
-            background: var(--text) !important;
-            border-color: transparent !important;
-          }
-
-          .apple-landing-card.featured .apple-kicker {
-            color: rgba(0,0,0,0.45) !important;
-          }
-
-          .apple-landing-card.featured .apple-landing-card-title,
-          .apple-landing-card.featured .apple-landing-card-copy {
-            color: rgba(0,0,0,0.88) !important;
-          }
-
-          .apple-landing-card.featured .stButton button {
-            background: rgba(0,0,0,0.12) !important;
-            color: #1d1d1f !important;
-            border-color: rgba(0,0,0,0.16) !important;
-          }
-
-          .apple-landing-card.featured .stButton button:hover {
-            background: rgba(0,0,0,0.18) !important;
-            opacity: 1 !important;
-          }
-
-          .apple-landing-card.featured .stButton button * {
-            color: #1d1d1f !important;
-          }
-
-          .apple-chip,
-          .apple-landing-card:not(.featured),
-          .apple-panel,
-          .apple-card,
-          .apple-choice,
-          [data-testid="stVerticalBlockBorderWrapper"] {
-            background: var(--surface) !important;
-            border-color: var(--line) !important;
-            color: var(--text) !important;
-          }
-
-          .apple-readiness-card {
-            background: var(--panel-fill) !important;
-            border-color: var(--line) !important;
-          }
-
-          .apple-landing-status,
-          .apple-running-card,
-          .apple-summary-grid {
-            background: var(--panel-fill) !important;
-            border-color: var(--line) !important;
-          }
-
-          .apple-landing-status-kicker {
-            color: var(--muted-light) !important;
-          }
-
-          .apple-landing-status-copy,
-          .apple-running-copy {
-            color: var(--muted) !important;
-          }
-
-          .apple-readiness-row {
-            border-bottom: 1px solid var(--line);
-          }
-
-          .apple-readiness-key {
-            color: var(--muted) !important;
-          }
-
-          .apple-readiness-value {
-            color: var(--text) !important;
-          }
-
-          .stTextArea textarea,
-          .stTextInput input,
-          .stSelectbox > div > div,
-          .stMultiSelect > div > div {
-            background: var(--input-fill) !important;
-            color: var(--text) !important;
-            border-color: var(--line) !important;
-          }
-
-          .stTextInput button,
-          .stSelectbox button,
-          .stMultiSelect button,
-          .stTextArea button {
-            background: var(--input-fill) !important;
-            color: var(--text) !important;
-            border-color: var(--line) !important;
-            box-shadow: none !important;
-          }
-
-          .stTextInput button *,
-          .stSelectbox button *,
-          .stMultiSelect button *,
-          .stTextArea button * {
-            color: var(--text) !important;
-            fill: var(--text) !important;
-          }
-
-          .stTextArea textarea:focus,
-          .stTextInput input:focus {
-            background: var(--input-fill-focus) !important;
-            border-color: rgba(76,159,255,0.7) !important;
-            box-shadow: 0 0 0 3px rgba(76,159,255,0.22) !important;
-            outline: none !important;
-          }
-
-          /* Dark mode: primary buttons — .stApp prefix beats Streamlit emotion-cache specificity */
-          .stApp .apple-primary button,
-          .apple-primary button {
-            background: #d97757 !important;
-            color: #ffffff !important;
-            border-color: #d97757 !important;
-          }
-
-          .stApp .apple-primary button *,
-          .stApp .apple-primary button p,
-          .stApp .apple-primary button span,
-          .stApp .apple-primary button div,
-          .apple-primary button *,
-          .apple-primary button p,
-          .apple-primary button span,
-          .apple-primary button div {
-            color: #ffffff !important;
-            fill: #ffffff !important;
-            opacity: 1 !important;
-          }
-
-          .stApp .apple-primary button:hover,
-          .apple-primary button:hover {
-            background: #c9693f !important;
-            opacity: 1 !important;
-          }
-
-          .apple-primary button:disabled,
-          .apple-primary button[disabled] {
-            background: #2c2d33 !important;
-            color: #d1d1d6 !important;
-            border-color: #3a3b42 !important;
-            opacity: 1 !important;
-          }
-
-          .apple-primary button:disabled *,
-          .apple-primary button[disabled] *,
-          .apple-primary button:disabled p,
-          .apple-primary button[disabled] p,
-          .apple-primary button:disabled span,
-          .apple-primary button[disabled] span,
-          .apple-primary button:disabled div,
-          .apple-primary button[disabled] div {
-            color: #d1d1d6 !important;
-            fill: #d1d1d6 !important;
-            opacity: 1 !important;
-          }
-
-          /* Secondary buttons — same Claude coral in dark mode */
-          .stApp .apple-secondary button,
-          .apple-secondary button {
-            background: #d97757 !important;
-            color: #ffffff !important;
-            border-color: #d97757 !important;
-          }
-
-          .stApp .apple-secondary button *,
-          .stApp .apple-secondary button p,
-          .stApp .apple-secondary button span,
-          .stApp .apple-secondary button div,
-          .apple-secondary button *,
-          .apple-secondary button p,
-          .apple-secondary button span,
-          .apple-secondary button div {
-            color: #ffffff !important;
-            fill: #ffffff !important;
-            opacity: 1 !important;
-          }
-
-          .apple-secondary button:disabled,
-          .apple-secondary button[disabled] {
-            background: transparent !important;
-            color: var(--muted) !important;
-            border-color: var(--line) !important;
-            opacity: 1 !important;
-          }
-
-          .apple-secondary button:disabled *,
-          .apple-secondary button[disabled] *,
-          .apple-secondary button:disabled p,
-          .apple-secondary button[disabled] p,
-          .apple-secondary button:disabled span,
-          .apple-secondary button[disabled] span,
-          .apple-secondary button:disabled div,
-          .apple-secondary button[disabled] div {
-            color: var(--muted) !important;
-            fill: var(--muted) !important;
-            opacity: 1 !important;
-          }
-
-          .stLinkButton > a {
-            background: var(--surface) !important;
-            color: var(--text) !important;
-            border-color: var(--line-strong) !important;
-          }
-
-          .stLinkButton > a *,
-          .stLinkButton > a p,
-          .stLinkButton > a span,
-          .stLinkButton > a div {
-            color: var(--text) !important;
-            fill: var(--text) !important;
-            opacity: 1 !important;
-          }
-
-          .stButton button:disabled,
-          .stDownloadButton button:disabled,
-          .stLinkButton > a[aria-disabled="true"] {
-            background: #202126 !important;
-            color: var(--muted) !important;
-            border-color: var(--line) !important;
-            opacity: 1 !important;
-          }
-
-          .stButton button:disabled *,
-          .stDownloadButton button:disabled *,
-          .stLinkButton > a[aria-disabled="true"] * {
-            color: var(--muted) !important;
-            fill: var(--muted) !important;
-          }
-
-          div[data-testid="stAlert"] {
-            background: var(--alert-bg);
-            border-color: var(--line);
-          }
-
-          div[data-baseweb="notification"] {
-            background: var(--surface) !important;
-            border-color: var(--line) !important;
-          }
-
-          [data-testid="stMarkdownContainer"] p,
-          [data-testid="stMarkdownContainer"] li,
-          [data-testid="stCaptionContainer"],
-          .stCaption,
-          label,
-          .stMetric label,
-          .stMetric [data-testid="stMetricValue"],
-          .stMetric [data-testid="stMetricDelta"] {
-            color: var(--text) !important;
-          }
         }
 
         /* Featured card: highlight the first column on the landing page */
@@ -1810,8 +1557,24 @@ def apply_apple_theme() -> None:
           box-shadow: none !important;
           line-height: 36px !important;
         }
+        /* ✨ Force sidebar buttons to respect day/night mode text colors ✨ */
+        .stApp [data-testid="stSidebar"] .apple-secondary button,
+        .stApp [data-testid="stSidebar"] .apple-secondary button *,
+        .stApp [data-testid="stSidebar"] .apple-secondary button p,
+        .stApp [data-testid="stSidebar"] .apple-secondary button div,
+        .stApp [data-testid="stSidebar"] .apple-primary button,
+        .stApp [data-testid="stSidebar"] .apple-primary button *,
+        .stApp [data-testid="stSidebar"] .apple-primary button p,
+        .stApp [data-testid="stSidebar"] .apple-primary button div {
+          background: transparent !important;
+          border-color: transparent !important;
+          color: var(--text) !important;
+          fill: var(--text) !important;
+          box-shadow: none !important;
+          opacity: 1 !important;
+        }
         [data-testid="stSidebar"] .stButton button:hover {
-          background: rgba(0,0,0,0.05) !important;
+          background: var(--line) !important;
         }
 
         [data-testid="stSidebar"] .stLinkButton > a {
@@ -1838,6 +1601,25 @@ def apply_apple_theme() -> None:
         [data-testid="stProgressBar"] > div > div {
           border-radius: 999px !important;
           background: #d97757 !important;
+        }
+
+        /* ULTIMATE SIDEBAR OVERRIDE: ID-level specificity beats all other rules */
+        #root [data-testid="stSidebar"] button,
+        #root [data-testid="stSidebar"] button *,
+        #root [data-testid="stSidebar"] button p,
+        #root [data-testid="stSidebar"] button span,
+        #root [data-testid="stSidebar"] button div {
+          color: var(--text) !important;
+          fill: var(--text) !important;
+          background-color: transparent !important;
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+
+        #root [data-testid="stSidebar"] button:hover {
+          background-color: var(--line) !important;
+          background: var(--line) !important;
         }
         </style>
         """,
@@ -6251,10 +6033,10 @@ def render_instruction_panel(title: str, steps: list[str]) -> None:
 
           @media (prefers-color-scheme: dark) {{
             :root {{
-              --instruction-bg: #202126;
+              --instruction-bg: #181b1f;
               --instruction-border: rgba(255,255,255,0.08);
               --instruction-title: #f5f5f7;
-              --instruction-copy: #b1b1b6;
+              --instruction-copy: #b0b3ba;
             }}
           }}
         </style>
@@ -7204,9 +6986,9 @@ def main() -> None:
 
                 const CLAUDE_CORAL = "#d97757";
                 const CLAUDE_CORAL_HOVER = "#c9683f";
-                const isDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
 
                 const applyCoralStyle = (btn) => {
+                  if (btn.closest("[data-testid='stSidebar']")) return;
                   btn.style.setProperty("background-color", CLAUDE_CORAL, "important");
                   btn.style.setProperty("background", CLAUDE_CORAL, "important");
                   btn.style.setProperty("color", "#ffffff", "important");

@@ -36,6 +36,25 @@ def _inject_jt_css() -> None:
             --jt-divider: #eceef2;
             --jt-coral: #d97757;
             --jt-coral-hover: #c9683f;
+            --jt-input-bg: #ffffff;
+            --jt-input-border: rgba(0,0,0,0.10);
+            --jt-icon-text: #111111;
+            --jt-danger: #c0392b;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --jt-card-bg: #16181b;
+                --jt-card-border: rgba(255,255,255,0.10);
+                --jt-text-strong: #f5f5f7;
+                --jt-text-muted: #a1a1aa;
+                --jt-text-faint: #73737c;
+                --jt-divider: rgba(255,255,255,0.10);
+                --jt-input-bg: #111214;
+                --jt-input-border: rgba(255,255,255,0.14);
+                --jt-icon-text: #ffffff;
+                --jt-danger: #ff7b72;
+            }
         }
 
         div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -68,8 +87,9 @@ def _inject_jt_css() -> None:
         div[data-testid="stTextInput"] input,
         div[data-testid="stSelectbox"] > div > div {
             border-radius: 10px !important;
-            border: 1.5px solid rgba(0,0,0,0.10) !important;
-            background: #ffffff !important;
+            border: 1.5px solid var(--jt-input-border) !important;
+            background: var(--jt-input-bg) !important;
+            color: var(--jt-text-strong) !important;
             font-size: 0.85rem !important;
             min-height: 44px !important;
             height: 44px !important;
@@ -84,7 +104,7 @@ def _inject_jt_css() -> None:
 
         .jt-selection-copy,
         .jt-visible-copy {
-            color: #8b8b93;
+            color: var(--jt-text-muted);
             font-size: 0.8rem;
             font-weight: 600;
             padding-bottom: 0.5rem;
@@ -125,9 +145,9 @@ def _inject_jt_css() -> None:
             font-weight: 600 !important;
             text-decoration: none !important;
         }
-        .jt-inline-tool button { color: #5a5a5f !important; }
-        .jt-inline-tool button:hover { color: #111111 !important; text-decoration: underline !important; }
-        .jt-inline-tool-danger button { color: #c0392b !important; }
+        .jt-inline-tool button { color: var(--jt-text-muted) !important; }
+        .jt-inline-tool button:hover { color: var(--jt-text-strong) !important; text-decoration: underline !important; }
+        .jt-inline-tool-danger button { color: var(--jt-danger) !important; }
         .jt-inline-tool-danger button:hover { text-decoration: underline !important; }
 
         /* ✨ FIX: STRICT 40x40 CIRCLES ✨ */
@@ -139,10 +159,10 @@ def _inject_jt_css() -> None:
             height: 40px !important;
         }
 
-        .jt-icon button,
-        .jt-icon-active button,
-        .jt-icon [data-testid^="stBaseButton"] button,
-        .jt-icon-active [data-testid^="stBaseButton"] button {
+        .stApp .jt-icon button,
+        .stApp .jt-icon-active button,
+        .stApp .jt-icon [data-testid^="stBaseButton"] button,
+        .stApp .jt-icon-active [data-testid^="stBaseButton"] button {
             width: 40px !important;
             height: 40px !important;
             min-width: 40px !important;
@@ -157,30 +177,30 @@ def _inject_jt_css() -> None:
             align-items: center !important;
             justify-content: center !important;
             background: var(--jt-coral) !important;
-            color: #111111 !important;
+            color: var(--jt-icon-text) !important;
             flex-shrink: 0 !important;
         }
-        .jt-icon button:hover,
-        .jt-icon [data-testid^="stBaseButton"] button:hover {
+        .stApp .jt-icon button:hover,
+        .stApp .jt-icon [data-testid^="stBaseButton"] button:hover {
             background: var(--jt-coral-hover) !important;
         }
-        .jt-icon-active button,
-        .jt-icon-active [data-testid^="stBaseButton"] button {
+        .stApp .jt-icon-active button,
+        .stApp .jt-icon-active [data-testid^="stBaseButton"] button {
             background: var(--jt-coral-hover) !important;
-            border: 2px solid #111111 !important;
+            border: 2px solid var(--jt-icon-text) !important;
         }
-        .jt-icon button p,
-        .jt-icon-active button p {
+        .stApp .jt-icon button p,
+        .stApp .jt-icon-active button p {
             margin: 0 !important;
             padding: 0 !important;
-            color: #111111 !important;
+            color: var(--jt-icon-text) !important;
             font-size: 1.15rem !important;
             line-height: 0 !important;
         }
 
         /* ✨ EXPLICIT COLUMN TYPOGRAPHY ✨ */
         .jt-title-link {
-            color: #111111 !important;
+            color: var(--jt-text-strong) !important;
             font-size: 17px !important;
             font-weight: 700 !important;
             letter-spacing: -0.02em !important;
@@ -190,7 +210,7 @@ def _inject_jt_css() -> None:
             display: block;
         }
         .jt-row-company {
-            color: #111111 !important;
+            color: var(--jt-text-strong) !important;
             font-size: 17px !important;
             font-weight: 700 !important;
             letter-spacing: -0.02em !important;
@@ -200,7 +220,7 @@ def _inject_jt_css() -> None:
             display: block;
         }
         .jt-card-meta-text {
-            color: #8b8b93 !important;
+            color: var(--jt-text-muted) !important;
             font-size: 12px !important;
             margin-top: 0.15rem;
             white-space: nowrap;
