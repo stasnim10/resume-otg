@@ -7,6 +7,7 @@ st.session_state so auth tokens don't bleed across concurrent users.
 from __future__ import annotations
 
 import logging
+import os
 
 import streamlit as st
 from supabase import Client, create_client
@@ -17,9 +18,13 @@ logger = logging.getLogger(__name__)
 def get_supabase() -> Client:
     """Return the per-user-session Supabase client, restoring auth tokens."""
     if "_sb_client" not in st.session_state:
+        supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+        supabase_anon_key = st.secrets.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+        if not supabase_url or not supabase_anon_key:
+            raise RuntimeError("Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_ANON_KEY.")
         st.session_state._sb_client = create_client(
-            st.secrets["SUPABASE_URL"],
-            st.secrets["SUPABASE_ANON_KEY"],
+            supabase_url,
+            supabase_anon_key,
         )
 
     client: Client = st.session_state._sb_client

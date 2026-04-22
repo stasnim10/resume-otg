@@ -921,9 +921,16 @@ def create_or_update_profile_from_optimization(
 def _is_hosted() -> bool:
     try:
         import streamlit as st
-        return str(st.secrets.get("HOSTED_WEB", "false")).lower() == "true"
+        import os
+
+        value = st.secrets.get("HOSTED_WEB")
+        if value is None:
+            value = os.environ.get("HOSTED_WEB", "false")
+        return str(value).lower() == "true"
     except Exception:
-        return False
+        import os
+
+        return str(os.environ.get("HOSTED_WEB", "false")).lower() == "true"
 
 
 def _apply_supabase_override() -> None:

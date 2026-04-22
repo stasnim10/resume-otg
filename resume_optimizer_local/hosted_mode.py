@@ -8,14 +8,19 @@ When HOSTED_WEB=true in Streamlit secrets:
 """
 from __future__ import annotations
 
+import os
+
 
 def is_hosted_web() -> bool:
     """Return True when the app is running in hosted (cloud) mode."""
     try:
         import streamlit as st
-        return str(st.secrets.get("HOSTED_WEB", "false")).lower() == "true"
+        value = st.secrets.get("HOSTED_WEB")
+        if value is None:
+            value = os.environ.get("HOSTED_WEB", "false")
+        return str(value).lower() == "true"
     except Exception:
-        return False
+        return str(os.environ.get("HOSTED_WEB", "false")).lower() == "true"
 
 
 def show_private_mode() -> bool:
