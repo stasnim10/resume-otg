@@ -11,8 +11,29 @@ import os
 
 import streamlit as st
 from supabase import Client, create_client
+from supabase.lib.client_options import ClientOptions
 
 logger = logging.getLogger(__name__)
+
+
+class StreamlitSessionStorage:
+    """Supabase Auth storage backed by Streamlit session state."""
+
+    _STATE_KEY = "_sb_auth_storage"
+
+    def _storage(self) -> dict[str, str]:
+        if self._STATE_KEY not in st.session_state:
+            st.session_state[self._STATE_KEY] = {}
+        return st.session_state[self._STATE_KEY]
+
+    def get_item(self, key: str) -> str | None:
+        return self._storage().get(key)
+
+    def set_item(self, key: str, value: str) -> None:
+        self._storage()[key] = value
+
+    def remove_item(self, key: str) -> None:
+        self._storage().pop(key, None)
 
 
 def get_config_value(key: str, default: str = "") -> str:
@@ -36,6 +57,7 @@ def get_supabase() -> Client:
         st.session_state._sb_client = create_client(
             supabase_url,
             supabase_anon_key,
+            options=ClientOptions(storage=StreamlitSessionStorage()),
         )
 
     client: Client = st.session_state._sb_client
