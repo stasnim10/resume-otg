@@ -11,7 +11,6 @@ import os
 
 import streamlit as st
 from supabase import Client, create_client
-from supabase.lib.client_options import ClientOptions
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +53,13 @@ def get_supabase() -> Client:
         supabase_anon_key = get_config_value("SUPABASE_ANON_KEY")
         if not supabase_url or not supabase_anon_key:
             raise RuntimeError("Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_ANON_KEY.")
-        st.session_state._sb_client = create_client(
+        client = create_client(
             supabase_url,
             supabase_anon_key,
-            options=ClientOptions(storage=StreamlitSessionStorage()),
         )
+        client.auth._storage = StreamlitSessionStorage()
+        client.auth.initialize_from_storage()
+        st.session_state._sb_client = client
 
     client: Client = st.session_state._sb_client
 
