@@ -9,9 +9,10 @@ import base64
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from auth_state import (
-    get_google_oauth_url,
+    get_google_browser_config,
     send_password_reset_email,
     sign_in_with_password,
     sign_up_with_password,
@@ -109,16 +110,80 @@ def _render_google_sign_in() -> None:
     st.markdown("#### Continue with Google")
     st.caption("Use your Google account for a faster sign-in.")
     try:
-        oauth_url = get_google_oauth_url()
+        supabase_url, supabase_anon_key = get_google_browser_config()
     except Exception as exc:
         st.info(f"Google sign-in is unavailable right now: {exc}")
         return
 
-    st.link_button(
-        "Continue with Google",
-        oauth_url,
-        use_container_width=True,
-        type="secondary",
+    components.html(
+        f"""
+        <div style="width:100%;">
+          <button id="google-login-button" type="button" style="
+            width:100%;
+            min-height:54px;
+            border-radius:999px;
+            border:1px solid rgba(127,127,127,0.22);
+            background:#ffffff;
+            color:#111111;
+            font-weight:600;
+            font-size:1rem;
+            cursor:pointer;
+          ">
+            Continue with Google
+          </button>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script>
+          const topWindow = window.top || window.parent || window;
+          const currentUrl = new URL(topWindow.location.href);
+          const hashParams = new URLSearchParams((topWindow.location.hash || '').replace(/^#/, ''));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          const hashError = hashParams.get('error_description') || hashParams.get('error');
+
+          if (hashError) {{
+            currentUrl.hash = '';
+            currentUrl.searchParams.set('oauth_error', hashError);
+            topWindow.location.replace(currentUrl.toString());
+          }} else if (accessToken && refreshToken) {{
+            currentUrl.hash = '';
+            currentUrl.searchParams.set('sb_access_token', accessToken);
+            currentUrl.searchParams.set('sb_refresh_token', refreshToken);
+            topWindow.location.replace(currentUrl.toString());
+          }}
+
+          const supabaseClient = supabase.createClient(
+            {supabase_url!r},
+            {supabase_anon_key!r},
+            {{
+              auth: {{
+                flowType: 'implicit',
+                detectSessionInUrl: false,
+                persistSession: false,
+              }},
+            }}
+          );
+
+          async function loginWithGoogle() {{
+            const redirectUrl = new URL(topWindow.location.href);
+            redirectUrl.search = '';
+            redirectUrl.hash = '';
+            await supabaseClient.auth.signInWithOAuth({{
+              provider: 'google',
+              options: {{
+                redirectTo: redirectUrl.toString(),
+                queryParams: {{
+                  access_type: 'offline',
+                  prompt: 'select_account',
+                }},
+              }},
+            }});
+          }}
+
+          document.getElementById('google-login-button').addEventListener('click', loginWithGoogle);
+        </script>
+        """,
+        height=72,
     )
     st.markdown(
         "<div style='text-align:center; color:#777; font-size:0.9rem; margin:0.6rem 0 1.1rem 0;'>or use email</div>",

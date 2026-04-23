@@ -49,20 +49,49 @@ def sign_up_with_password(email: str, password: str) -> bool:
     return False
 
 
-def get_google_oauth_url() -> str:
-    """Build the Supabase OAuth URL for Google sign-in."""
-    redirect_to = _get_oauth_redirect_url()
-    resp = get_supabase().auth.sign_in_with_oauth(
-        {
-            "provider": "google",
-            "options": {
-                "redirect_to": redirect_to,
-                "scopes": "email profile",
-                "query_params": {"access_type": "offline", "prompt": "select_account"},
-            },
-        }
-    )
-    return resp.url
+def get_google_browser_config() -> tuple[str, str]:
+    """Return the browser-safe Supabase config needed for Google sign-in."""
+    supabase_url = get_config_value("SUPABASE_URL")
+    supabase_anon_key = get_config_value("SUPABASE_ANON_KEY")
+    if not supabase_url or not supabase_anon_key:
+        raise RuntimeError("Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_ANON_KEY.")
+    return supabase_url, supabase_anon_key
+
+
+def handle_google_token_callback() -> bool:
+    """
+    Complete a browser-managed Google sign-in when tokens return via query params.
+
+    Returns True when the callback was handled and triggered a rerun.
+    """
+    query_params = st.query_params
+    access = query_params.get("sb_access_token")
+    refresh = query_params.get("sb_refresh_token")
+    oauth_error = query_params.get("oauth_error")
+
+    if oauth_error:
+        st.session_state.auth_notice_error = f"Google sign-in failed: {oauth_error}"
+        _clear_auth_query_params()
+        return False
+
+    if not (access and refresh):
+        return False
+
+    try:
+        resp = get_supabase().auth.set_session(access, refresh)
+        session = getattr(resp, "session", None)
+        user = getattr(resp, "user", None) or getattr(session, "user", None)
+        if session and user:
+            _store_session(session, user)
+            st.session_state.auth_notice_success = "Signed in with Google."
+            _clear_auth_query_params()
+            st.rerun()
+        raise ValueError("Google sign-in returned no usable session.")
+    except Exception as exc:
+        logger.warning("Browser token callback failed: %s", exc)
+        st.session_state.auth_notice_error = f"Google sign-in failed: {exc}"
+        _clear_auth_query_params()
+        return False
 
 
 def handle_oauth_callback() -> bool:
@@ -272,6 +301,9 @@ def _get_oauth_redirect_url() -> str:
 
 def _clear_auth_query_params() -> None:
     for key in (
+        "sb_access_token",
+        "sb_refresh_token",
+        "oauth_error",
         "code",
         "error",
         "error_code",

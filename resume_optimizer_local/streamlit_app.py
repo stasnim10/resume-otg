@@ -97,6 +97,7 @@ from shell import (
 )
 from session_state import CAREER_STAGES, init_session_state, reset_flow
 from auth_state import (
+    handle_google_token_callback,
     handle_oauth_callback,
     handle_password_recovery_callback,
     is_authenticated,
@@ -6883,6 +6884,7 @@ def main() -> None:
     # ── Auth gate (hosted web only) ──────────────────────────────────────────
     if is_hosted_web():
         st.session_state.hosted_web_mode = True
+        handle_google_token_callback()
         handle_oauth_callback()
         handle_password_recovery_callback()
         load_auth_into_session()
