@@ -16,7 +16,6 @@
   --radius-lg: 28px;
   --radius-md: 20px;
   --max-width: 1180px;
-  --font-display: "Instrument Serif", Georgia, serif;
   --font-body: "Plus Jakarta Sans", "Inter", "SF Pro Text", "Segoe UI", sans-serif;
 }
 
@@ -130,14 +129,14 @@ a {
 .hero-simple h1,
 .section h2 {
   margin: 0;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.035em;
 }
 
 .hero-simple h1 {
   max-width: 10ch;
-  font-family: var(--font-display);
-  font-size: clamp(3.2rem, 6.5vw, 5.6rem);
-  line-height: 0.98;
+  font-size: clamp(2.9rem, 5.8vw, 5rem);
+  font-weight: 800;
+  line-height: 1;
 }
 
 .hero-simple-body,
@@ -225,9 +224,9 @@ a {
 }
 
 .section-heading h2 {
-  font-family: var(--font-display);
   font-size: clamp(2.4rem, 4.6vw, 4rem);
-  line-height: 1.02;
+  font-weight: 700;
+  line-height: 1.04;
 }
 
 .section-heading p {
@@ -266,6 +265,7 @@ a {
 .flow-card h3 {
   margin: 0 0 10px;
   font-size: 1.05rem;
+  font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
@@ -299,7 +299,7 @@ a {
   max-width: 20ch;
   font-size: 1.08rem;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .product-note-list {

@@ -49,7 +49,11 @@ For hosted deployment, configure these secrets:
 SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
 SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"
 HOSTED_WEB = "true"
+SUPABASE_OAUTH_REDIRECT_TO = "https://your-app-url.streamlit.app"
 ```
+
+Also enable the Google provider in Supabase Auth and add the same redirect URL to
+both Supabase Auth redirect settings and your Google OAuth client configuration.
 
 ## Repository Structure
 

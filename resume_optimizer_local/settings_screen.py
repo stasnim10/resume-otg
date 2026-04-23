@@ -8,7 +8,7 @@ from __future__ import annotations
 import streamlit as st
 
 from auth_state import sign_out
-from help_widget import CONTACT_EMAIL, DONATE_URL
+from help_widget import DONATE_URL, SUPPORT_FORM_URL
 from help_widget import render_help_section
 from shell import render_shell_end, render_shell_start
 from ui_helpers import primary_button, secondary_button
@@ -263,7 +263,7 @@ def _render_help_tab() -> None:
         f"""
         If you still feel stuck after trying the guided steps above, reach out directly.
 
-        - Email: [{CONTACT_EMAIL}](mailto:{CONTACT_EMAIL})
+        - Support Form: [Open the support form]({SUPPORT_FORM_URL})
         - Having a great experience? Consider [supporting the project]({DONATE_URL})
         """
     )

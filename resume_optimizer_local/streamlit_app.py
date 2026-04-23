@@ -96,7 +96,13 @@ from shell import (
     render_progress_stepper,
 )
 from session_state import CAREER_STAGES, init_session_state, reset_flow
-from auth_state import is_authenticated, load_auth_into_session, sign_out
+from auth_state import (
+    handle_oauth_callback,
+    handle_password_recovery_callback,
+    is_authenticated,
+    load_auth_into_session,
+    sign_out,
+)
 from auth_screen import render_auth_screen
 from hosted_mode import is_hosted_web, show_local_ai_cards, show_private_mode
 from settings_screen import render_help_screen, render_settings_screen
@@ -6877,8 +6883,10 @@ def main() -> None:
     # ── Auth gate (hosted web only) ──────────────────────────────────────────
     if is_hosted_web():
         st.session_state.hosted_web_mode = True
+        handle_oauth_callback()
+        handle_password_recovery_callback()
         load_auth_into_session()
-        if not is_authenticated():
+        if st.session_state.get("auth_recovery_mode", False) or not is_authenticated():
             apply_apple_theme()
             render_auth_screen()
             st.stop()

@@ -3,7 +3,7 @@ Help panel — layered in-product coaching, rendered inside the sidebar.
 
 Layer 1: Contextual hints live inline on each screen (via _help_hint in onboarding_screen.py).
 Layer 2: Task-based guided help — this module. Short steps for each workflow.
-Layer 3: Direct contact — email + LinkedIn at the bottom.
+Layer 3: Direct contact — support form + LinkedIn at the bottom.
 
 Usage (inside a `with st.sidebar:` block):
     from help_widget import render_help_section
@@ -14,7 +14,7 @@ from __future__ import annotations
 import streamlit as st
 
 # ── Contact details ────────────────────────────────────────────────────────────
-CONTACT_EMAIL    = "tasnimsimum@gmail.com"
+SUPPORT_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf6mVr-SiJGt25xf-IqyigH1tP7gLDUqKALsL0s7LkVuf-vhw/viewform?usp=sharing&ouid=102555120417784611033"
 CONTACT_LINKEDIN = "https://www.linkedin.com/in/simum-tasnim/"
 DONATE_URL       = "https://buy.stripe.com/cNiaEZ4KwgLJdtA2C0dMI01"
 # ──────────────────────────────────────────────────────────────────────────────
@@ -125,8 +125,8 @@ def render_help_section() -> None:
     st.markdown(_DIV, unsafe_allow_html=True)
 
     st.markdown("**Contact support**")
-    col_mail, col_li = st.columns(2)
-    with col_mail:
-        st.link_button("Email", f"mailto:{CONTACT_EMAIL}", use_container_width=True)
+    col_support, col_li = st.columns(2)
+    with col_support:
+        st.link_button("Support Form", SUPPORT_FORM_URL, use_container_width=True)
     with col_li:
         st.link_button("LinkedIn", CONTACT_LINKEDIN, use_container_width=True)

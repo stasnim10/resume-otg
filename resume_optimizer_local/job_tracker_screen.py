@@ -618,8 +618,8 @@ def render_job_tracker_screen() -> None:
     head1, head2 = st.columns([5.2, 1.2])
     with head1:
         st.markdown(
-            '<div style="font-size:2rem;font-weight:800;color:#111111;margin-bottom:0.25rem;">Job Tracker</div>'
-            '<div style="font-size:0.9rem;color:#8b8b93;margin-bottom:1rem;">Track applications, update status fast, and keep the list tight and easy to scan.</div>',
+            '<div style="font-size:2rem;font-weight:800;color:var(--jt-text-strong);margin-bottom:0.25rem;">Job Tracker</div>'
+            '<div style="font-size:0.9rem;color:var(--jt-text-muted);margin-bottom:1rem;">Track applications, update status fast, and keep the list tight and easy to scan.</div>',
             unsafe_allow_html=True,
         )
     with head2:

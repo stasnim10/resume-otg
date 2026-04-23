@@ -3,12 +3,13 @@
 import { useState } from "react";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://resume-optimizer-otg.streamlit.app";
-const contactEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "tasnimsimum@gmail.com";
+const supportFormUrl =
+  "https://docs.google.com/forms/d/e/1FAIpQLSf6mVr-SiJGt25xf-IqyigH1tP7gLDUqKALsL0s7LkVuf-vhw/viewform?usp=sharing&ouid=102555120417784611033";
 const donateUrl = "https://buy.stripe.com/cNiaEZ4KwgLJdtA2C0dMI01";
 
 const shareMessage =
-  `I’ve been using Resume OTG to build and optimize applications with a calmer workflow. ` +
-  `You can try it here: ${appUrl}`;
+  "I’ve been using Resume OTG to build and optimize my applications. " +
+  "You can try it here: www.resumeotg.app";
 
 export function SupportActions() {
   const [copied, setCopied] = useState(false);
@@ -26,10 +27,7 @@ export function SupportActions() {
   return (
     <div className="support-simple">
       <div className="support-button-row">
-        <a
-          className="button button-secondary"
-          href={`mailto:${contactEmail}?subject=${encodeURIComponent("Need help with Resume OTG")}`}
-        >
+        <a className="button button-secondary" href={supportFormUrl} target="_blank" rel="noreferrer">
           Need Help?
         </a>
         <a className="button button-support" href={donateUrl} target="_blank" rel="noreferrer">

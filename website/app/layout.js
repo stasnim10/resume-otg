@@ -1,26 +1,4 @@
 import "./globals.css";
-import { Instrument_Serif, Inter, Plus_Jakarta_Sans } from "next/font/google";
-
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-});
-
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-jakarta",
-  display: "swap",
-});
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://resume-optimizer-otg.streamlit.app";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://resume-builder-otg.vercel.app";
@@ -58,7 +36,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${instrumentSerif.variable} ${inter.variable} ${plusJakartaSans.variable}`}>
+    <html lang="en">
       <body>{children}</body>
     </html>
   );
