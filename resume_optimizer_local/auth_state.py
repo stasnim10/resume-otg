@@ -7,7 +7,7 @@ across Streamlit reruns without re-authenticating on every page interaction.
 from __future__ import annotations
 
 import logging
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import streamlit as st
 
@@ -56,6 +56,21 @@ def get_google_browser_config() -> tuple[str, str]:
     if not supabase_url or not supabase_anon_key:
         raise RuntimeError("Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_ANON_KEY.")
     return supabase_url, supabase_anon_key
+
+
+def get_google_implicit_oauth_url() -> str:
+    """Build a browser-friendly implicit Google OAuth URL through Supabase."""
+    supabase_url, _supabase_anon_key = get_google_browser_config()
+    query = urlencode(
+        {
+            "provider": "google",
+            "redirect_to": _get_oauth_redirect_url(),
+            "scopes": "email profile",
+            "access_type": "offline",
+            "prompt": "select_account",
+        }
+    )
+    return f"{supabase_url.rstrip('/')}/auth/v1/authorize?{query}"
 
 
 def handle_google_token_callback() -> bool:
