@@ -21,7 +21,7 @@ from auth_state import (
 
 def render_auth_screen() -> None:
     """Full-page login / sign-up form."""
-    logo_path = Path(__file__).resolve().parent.parent / "assets" / "Resume_Optimizer_Logo.jpeg"
+    logo_path = Path(__file__).resolve().parent.parent / "assets" / "Resume_Optimizer_Logo.png"
     st.markdown(
         """
         <style>
@@ -63,7 +63,7 @@ def render_auth_screen() -> None:
         logo_bytes = base64.b64encode(logo_path.read_bytes()).decode("utf-8")
         logo_markup = (
             '<div class="auth-logo-wrap">'
-            f'<img class="auth-logo-image" src="data:image/jpeg;base64,{logo_bytes}" alt="Resume OTG logo" />'
+            f'<img class="auth-logo-image" src="data:image/png;base64,{logo_bytes}" alt="Resume OTG logo" />'
             "</div>"
         )
     st.markdown(

@@ -7,12 +7,11 @@ across Streamlit reruns without re-authenticating on every page interaction.
 from __future__ import annotations
 
 import logging
-import os
 from urllib.parse import urlsplit, urlunsplit
 
 import streamlit as st
 
-from supabase_client import get_supabase
+from supabase_client import get_config_value, get_supabase
 
 logger = logging.getLogger(__name__)
 
@@ -250,9 +249,7 @@ def _get_oauth_redirect_url() -> str:
     `SUPABASE_OAUTH_REDIRECT_TO` can override the detected app URL when the
     deployment sits behind a custom proxy/CDN.
     """
-    configured = st.secrets.get("SUPABASE_OAUTH_REDIRECT_TO") or os.environ.get(
-        "SUPABASE_OAUTH_REDIRECT_TO"
-    )
+    configured = get_config_value("SUPABASE_OAUTH_REDIRECT_TO")
     if configured:
         return configured
 
