@@ -334,6 +334,21 @@ RULES
 7. Return only valid JSON. No markdown fences. No explanation before or after the JSON.
 8. Every match_anchor must exactly match one full paragraph from the resume text below.
 9. If no changes are needed for a section, omit it. Return {{}} only if no changes are needed at all.
+10. If you are not fully confident that a section's anchor can be copied EXACTLY, omit that section instead of guessing.
+
+ANCHOR MATCHING IS CRITICAL
+- Export will fail if a single match_anchor differs from the resume by even one character.
+- Copy each match_anchor directly from RESUME TEXT. Do not normalize spacing, punctuation, symbols, capitalization, or abbreviations.
+- Do not shorten, paraphrase, merge, split, or clean an anchor.
+- Do not create a "better" anchor. Use only the original resume paragraph exactly as written.
+- If a paragraph contains unusual punctuation, spacing, slashes, pipes, colons, or inconsistent formatting, preserve it exactly.
+
+SECTION-SAFETY RULES
+- summary_replacement is optional and high-risk. Include it only if you can copy the current summary paragraph EXACTLY from the resume.
+- If the summary is spread across multiple lines or is ambiguous, omit summary_replacement.
+- Do not convert a skills paragraph into a summary paragraph or a summary paragraph into a skills paragraph.
+- Keep each replacement aligned to the same section type it came from: summary stays summary, bullet stays bullet, skills stays skills.
+- It is better to return fewer replacements than to return a single unsafe anchor.
 
 BULLET-WRITING REQUIREMENTS
 Each rewritten bullet must:
@@ -375,6 +390,7 @@ TOP-LEVEL RULES
 - All top-level keys are optional. Include only sections that genuinely need updating.
 - Each replacement object must contain both match_anchor and replacement_text.
 - Do not include comments, analysis, or extra keys.
+- Before finalizing the JSON, double-check that every match_anchor appears verbatim inside RESUME TEXT exactly once.
 
 RESUME TEXT
 {resume_text}

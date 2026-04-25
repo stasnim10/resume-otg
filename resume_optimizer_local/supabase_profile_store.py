@@ -49,6 +49,23 @@ def _jl(value) -> list:
     return []
 
 
+def _encode_execution_mode(mode: str) -> str:
+    """Store execution mode inside an existing text column without schema changes."""
+    normalized = str(mode or "").strip().lower()
+    if normalized not in {"api", "local_ai", "manual"}:
+        return ""
+    return f"meta://execution-mode/{normalized}"
+
+
+def _decode_execution_mode(value: str) -> str:
+    """Recover execution mode from the encoded sentinel value."""
+    text = str(value or "").strip()
+    prefix = "meta://execution-mode/"
+    if not text.startswith(prefix):
+        return ""
+    return text[len(prefix):]
+
+
 def _profile_from_row(row: dict) -> CareerProfile:
     return CareerProfile(
         id=row.get("id"),
@@ -594,6 +611,7 @@ def save_optimization_result(
         )
 
     delta = (match_after or 0) - (match_before or 0)
+    execution_mode = str(kwargs.get("execution_mode", "") or "").strip()
     row = {
         "job_id": str(job_id),
         "user_id": uid,
@@ -602,7 +620,7 @@ def save_optimization_result(
         "delta": delta,
         "improvements": improvements or [],
         "resume_storage_path": resume_used_id or "",
-        "cover_letter_storage_path": "",
+        "cover_letter_storage_path": _encode_execution_mode(execution_mode),
         "profile_item_ids": [],
         "run_at": now,
     }
@@ -642,6 +660,7 @@ def get_optimization_history(user_id: str = "local-user") -> list[dict]:
                 "improvements": _jl(r.get("improvements", [])),
                 "run_at": r.get("run_at", ""),
                 "resume_path": r.get("resume_storage_path", ""),
+                "execution_mode": _decode_execution_mode(r.get("cover_letter_storage_path", "")),
             })
         return result
     except Exception as exc:

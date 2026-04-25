@@ -115,7 +115,7 @@ def _render_provider_section(
     key_info: dict,
     use_supabase: bool,
 ) -> None:
-    from ai_gateway import PROVIDER_CONFIG
+    from ai_gateway import get_provider_models
 
     last4 = key_info.get("last4", "")
     key_valid = key_info.get("valid", False)
@@ -145,6 +145,13 @@ def _render_provider_section(
 
     # ── Model preference ──────────────────────────────────────────────────
     models = provider_config["models"]
+    saved_api_key = ""
+    if use_supabase and last4:
+        try:
+            from supabase_settings_store import get_provider_api_key
+            saved_api_key = get_provider_api_key(provider)
+        except Exception:
+            saved_api_key = ""
     _chg_state = f"settings_chg_{provider}"
     if _chg_state not in st.session_state:
         st.session_state[_chg_state] = False
@@ -159,6 +166,10 @@ def _render_provider_section(
         )
 
         saved_model = st.session_state.get(f"settings_model_{provider}", models[0])
+        if new_key.strip():
+            models = get_provider_models(provider, new_key.strip())
+        elif saved_api_key:
+            models = get_provider_models(provider, saved_api_key)
         if saved_model not in models:
             saved_model = models[0]
         model = st.selectbox(
@@ -167,6 +178,7 @@ def _render_provider_section(
             index=models.index(saved_model),
             key=f"settings_model_sel_{provider}",
         )
+        st.session_state[f"settings_model_{provider}"] = model
 
         c1, c2 = st.columns(2)
         with c1:

@@ -93,7 +93,7 @@ def render_help_section() -> None:
     st.markdown("**How to optimize a resume**")
     st.markdown(
         "1. From **Home**, choose *Optimize My Resume*.\n"
-        "2. Upload your **.docx** or **.pdf** resume.\n"
+        "2. Upload your **.docx** resume.\n"
         "3. Paste the job description you're targeting.\n"
         "4. Choose **Full AI Optimization** and enter your API key.\n"
         "5. Review every change before accepting.\n"
@@ -106,7 +106,7 @@ def render_help_section() -> None:
 
     with st.expander("What should I upload during setup?", expanded=False):
         st.caption(
-            "Your resume (.docx works best) or a LinkedIn PDF export. "
+            "Your resume (.docx works best for resume optimization) or a LinkedIn PDF export for profile extraction. "
             "LinkedIn adds your headline, experience, and education automatically."
         )
 

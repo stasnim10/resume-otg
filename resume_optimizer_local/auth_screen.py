@@ -22,7 +22,7 @@ from auth_state import (
 
 def render_auth_screen() -> None:
     """Full-page login / sign-up form."""
-    logo_path = Path(__file__).resolve().parent.parent / "assets" / "Resume_Optimizer_Logo.png"
+    logo_path = Path(__file__).resolve().parent / "assets" / "Resume_Optimizer_Logo.png"
     st.markdown(
         """
         <style>

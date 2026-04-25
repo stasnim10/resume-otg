@@ -10,12 +10,13 @@ import re
 import tempfile
 import time
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
 
-from ai_gateway import PROVIDER_CONFIG, optimize_with_provider
+from ai_gateway import PROVIDER_CONFIG, get_provider_models, optimize_with_provider
 from docx_handler import apply_replacements, build_resume_from_scratch, extract_text
 from jd_cleaning import clean_job_description
 from jd_fetcher import fetch_job_description_from_url, looks_like_url
@@ -1848,6 +1849,16 @@ def detect_company_name(job_description: str) -> str:
             if _valid_company(cleaned):
                 return cleaned
 
+    for line in job_description.splitlines()[:12]:
+        cleaned = _clean_company(line)
+        lowered = cleaned.lower()
+        if not cleaned or len(cleaned) > 60:
+            continue
+        if any(marker in lowered for marker in ("responsibilities", "requirements", "about the role", "about you", "what you'll")):
+            continue
+        if _valid_company(cleaned) and len(cleaned.split()) <= 5 and not _is_clean_role_title(cleaned):
+            return cleaned
+
     return ""
 
 
@@ -1961,20 +1972,33 @@ def get_effective_industry(job_description: str) -> str:
 
 def save_uploaded_resume(uploaded_file) -> None:
     """Store uploaded resume data and extracted plain text in session state."""
+    _progress = st.progress(0)
+    _status = st.empty()
+    _progress.progress(10)
+    _status.caption("Uploading your resume...")
+    time.sleep(0.15)
+
     resume_bytes = uploaded_file.getvalue()
 
     # Determine file suffix based on uploaded filename
     filename_lower = uploaded_file.name.lower()
-    if filename_lower.endswith('.pdf'):
-        suffix = ".pdf"
-    else:
-        suffix = ".docx"
+    if not filename_lower.endswith(".docx"):
+        _progress.empty()
+        _status.empty()
+        raise ValueError("Resume uploads now support only .docx files. Please upload the Word version of your resume.")
+    suffix = ".docx"
+
+    _progress.progress(38)
+    _status.caption("Reading the document structure...")
+    time.sleep(0.15)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
         temp_file.write(resume_bytes)
         temp_path = temp_file.name
 
     try:
+        _progress.progress(68)
+        _status.caption("Extracting resume text...")
         resume_text = extract_text(temp_path)
     finally:
         Path(temp_path).unlink(missing_ok=True)
@@ -1995,6 +2019,11 @@ def save_uploaded_resume(uploaded_file) -> None:
     st.session_state.local_ai_job_signals = {}
     st.session_state.local_ai_profile_summary = ""
     st.session_state.local_ai_profile_headline = ""
+    _progress.progress(100)
+    _status.caption("Resume ready.")
+    time.sleep(0.2)
+    _progress.empty()
+    _status.empty()
 
 
 def analyze_payload(payload: dict) -> dict:
@@ -2002,6 +2031,7 @@ def analyze_payload(payload: dict) -> dict:
     if not st.session_state.resume_bytes or not st.session_state.resume_name:
         raise ValueError("Upload a resume before validating output.")
 
+    resume_name = (st.session_state.resume_name or "").lower()
     with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_file:
         temp_file.write(st.session_state.resume_bytes)
         temp_path = temp_file.name
@@ -2055,10 +2085,105 @@ def ensure_export_file_ready() -> None:
     if st.session_state.output_docx_bytes or not st.session_state.validated_payload:
         return
 
+    _progress = st.progress(0)
+    _status = st.empty()
+    _progress.progress(18)
+    _status.caption("Preparing your export...")
+    time.sleep(0.15)
     output_bytes, _message = build_output_docx(st.session_state.validated_payload)
     original_name = Path(st.session_state.resume_name)
     st.session_state.output_docx_bytes = output_bytes
     st.session_state.output_filename = f"{original_name.stem}_Optimized{original_name.suffix}"
+
+
+def _build_anchor_repair_prompt(original_prompt: str, payload: dict, review_details: dict) -> str:
+    """Ask the model to repair anchor matching while keeping the JSON schema intact."""
+    results = review_details.get("results", [])
+    problem_items = [item for item in results if item.get("status") != "matched"]
+    paragraph_lines = [
+        f"{index}. {paragraph}"
+        for index, paragraph in enumerate((review_details.get("paragraphs") or [])[:80], start=1)
+        if str(paragraph).strip()
+    ]
+    issue_lines: list[str] = []
+    for index, item in enumerate(problem_items[:12], start=1):
+        issue_lines.append(
+            f"{index}. Section: {item.get('section', 'Unknown')} | "
+            f'Current match_anchor: "{str(item.get("match_anchor", "")).strip()}" | '
+            f'Status: {item.get("status", "unknown")}'
+        )
+        suggestions = item.get("suggestions") or []
+        if suggestions:
+            best = suggestions[0]
+            issue_lines.append(
+                f'   Best exact paragraph candidate: "{str(best.get("text", "")).strip()}" '
+                f'(similarity {best.get("score", 0)})'
+            )
+
+    return (
+        "Repair the existing Resume OTG optimization JSON.\n\n"
+        "Your job is to keep the same schema, but fix any match anchors so they copy exact paragraph text from the resume.\n\n"
+        "Rules:\n"
+        "1. Return ONLY valid JSON. No markdown, no explanation.\n"
+        "2. Every match_anchor must be copied EXACTLY from one paragraph in RESUME PARAGRAPHS.\n"
+        "3. Do not paraphrase the anchor. Do not combine multiple paragraphs. Do not shorten it.\n"
+        "4. Keep replacement_text as close as possible to the current JSON.\n"
+        "5. If one replacement cannot be repaired confidently, remove that replacement instead of guessing.\n"
+        "6. Preserve the original schema keys: summary_replacement, bullet_replacements, skills_replacements.\n\n"
+        f"ORIGINAL OPTIMIZATION PROMPT:\n{original_prompt.strip()}\n\n"
+        f"CURRENT JSON TO REPAIR:\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n\n"
+        f"ANCHOR PROBLEMS:\n{chr(10).join(issue_lines) if issue_lines else 'No explicit issues provided.'}\n\n"
+        f"RESUME PARAGRAPHS:\n{chr(10).join(paragraph_lines)}"
+    )
+
+
+def _attempt_exact_match_repair(
+    *,
+    provider: str,
+    api_key: str,
+    prompt: str,
+    model: str,
+    base_url: str,
+    payload: dict,
+    review_details: dict,
+) -> tuple[dict, dict]:
+    """Retry once with a repair prompt when anchors cannot be placed safely."""
+    original_stats = review_details.get("stats", {})
+    original_issue_count = int(original_stats.get("unmatched_replacements", 0)) + int(
+        original_stats.get("duplicate_replacements", 0)
+    )
+    if original_issue_count <= 0:
+        return payload, review_details
+
+    repair_prompt = _build_anchor_repair_prompt(prompt, payload, review_details)
+    repaired_payload = optimize_with_provider(
+        provider=provider,
+        api_key=api_key,
+        prompt=repair_prompt,
+        model=model,
+        base_url=base_url,
+    )
+    repaired_review = analyze_payload(repaired_payload)
+    repaired_stats = repaired_review.get("stats", {})
+    repaired_issue_count = int(repaired_stats.get("unmatched_replacements", 0)) + int(
+        repaired_stats.get("duplicate_replacements", 0)
+    )
+
+    if repaired_issue_count < original_issue_count:
+        if repaired_stats.get("ready_for_export", False):
+            st.session_state.ai_repair_notice = (
+                "Resume OTG detected placement issues in the first AI draft and automatically repaired the output before export."
+            )
+        else:
+            st.session_state.ai_repair_notice = (
+                "Resume OTG automatically repaired part of the AI output, but a few edits still need manual review before export."
+            )
+        return repaired_payload, repaired_review
+
+    st.session_state.ai_repair_notice = (
+        "Resume OTG automatically tried one repair pass after the first AI draft, but some edits still could not be placed safely."
+    )
+    return payload, review_details
 
 
 def render_landing() -> None:
@@ -2147,6 +2272,7 @@ def render_landing() -> None:
     )
 
     if is_returning_user:
+        _render_landing_metric_cards(optimization_history)
         # --- Returning users: 2-column layout (no builder card) ---
         col1, col2 = st.columns(2, gap="large")
 
@@ -2245,6 +2371,199 @@ def render_landing() -> None:
                     st.rerun()
 
     render_shell_end()
+
+
+def _safe_parse_iso_datetime(value: str) -> datetime | None:
+    """Parse stored ISO timestamps safely."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _format_minutes_saved(total_minutes: int) -> str:
+    """Human-friendly estimated time saved label."""
+    if total_minutes < 60:
+        return f"{total_minutes} min"
+    hours = total_minutes // 60
+    minutes = total_minutes % 60
+    if minutes == 0:
+        return f"{hours} hr"
+    return f"{hours} hr {minutes} min"
+
+
+def _history_mode_bucket(row: dict) -> str:
+    """Map saved optimization history rows into a user-facing mode bucket."""
+    mode = str(row.get("execution_mode", "") or "").strip().lower()
+    if mode in {"api", "local_ai"}:
+        return "ai"
+    if mode == "manual":
+        return "manual"
+
+    # Backfill older history rows created before execution_mode was stored.
+    # Treat them as manual runs by default so the split matches the user's
+    # lived usage instead of showing confusing inferred AI counts.
+    return "manual"
+
+
+def _get_landing_metrics_baseline(
+    optimization_history: list[dict],
+) -> tuple[int, int, int]:
+    """Freeze the initial history totals so current-session runs can be layered on top."""
+    current_user = st.session_state.get("auth_user_id") or "local-user"
+    baseline_user = st.session_state.get("landing_metrics_baseline_user")
+    if baseline_user != current_user:
+        st.session_state.landing_metrics_baseline_user = current_user
+        st.session_state.landing_metrics_baseline_total = len(optimization_history)
+        st.session_state.landing_metrics_baseline_ai = sum(
+            1 for row in optimization_history if _history_mode_bucket(row) == "ai"
+        )
+        st.session_state.landing_metrics_baseline_manual = sum(
+            1 for row in optimization_history if _history_mode_bucket(row) == "manual"
+        )
+        st.session_state.landing_metrics_session_ai = 0
+        st.session_state.landing_metrics_session_manual = 0
+    return (
+        int(st.session_state.get("landing_metrics_baseline_total", len(optimization_history)) or 0),
+        int(st.session_state.get("landing_metrics_baseline_ai", 0) or 0),
+        int(st.session_state.get("landing_metrics_baseline_manual", 0) or 0),
+    )
+
+
+def _record_completed_optimization_for_landing(mode: str) -> None:
+    """Track completed runs in-session so the landing cards update immediately."""
+    normalized = str(mode or "").strip().lower()
+    if normalized in {"api", "local_ai"}:
+        st.session_state.landing_metrics_session_ai = int(
+            st.session_state.get("landing_metrics_session_ai", 0) or 0
+        ) + 1
+        return
+    st.session_state.landing_metrics_session_manual = int(
+        st.session_state.get("landing_metrics_session_manual", 0) or 0
+    ) + 1
+
+
+def _render_metric_card(title: str, value: str, delta: str, tone: str = "neutral") -> None:
+    """Render a consistent custom metric card."""
+    tone_map = {
+        "green": {
+            "border": "#22c55e",
+            "badge_bg": "linear-gradient(135deg, #16a34a 0%, #4ade80 100%)",
+        },
+        "orange": {
+            "border": "#d97757",
+            "badge_bg": "linear-gradient(135deg, #d97757 0%, #f59e0b 100%)",
+        },
+        "blue": {
+            "border": "#3b82f6",
+            "badge_bg": "linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)",
+        },
+        "neutral": {
+            "border": "#c7bba8",
+            "badge_bg": "linear-gradient(135deg, #7c6f64 0%, #b7a38c 100%)",
+        },
+    }
+    styles = tone_map.get(tone, tone_map["neutral"])
+    st.markdown(
+        f"""
+        <div style="
+            background: #ffffff;
+            padding: 22px 22px 20px 22px;
+            border-radius: 18px;
+            box-shadow: 0 8px 24px rgba(17, 24, 39, 0.06);
+            border: 1px solid rgba(215, 119, 87, 0.10);
+            border-top: 4px solid {styles["border"]};
+            min-height: 172px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            margin: 6px 0 10px 0;
+        ">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                <div style="
+                    color: #7b7280;
+                    font-size: 12px;
+                    font-weight: 700;
+                    letter-spacing: 0.09em;
+                    text-transform: uppercase;
+                    line-height: 1.4;
+                ">{title}</div>
+                <div style="
+                    background: {styles["badge_bg"]};
+                    color: #fff;
+                    padding: 6px 10px;
+                    border-radius: 999px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    white-space: nowrap;
+                    line-height: 1;
+                ">{delta}</div>
+            </div>
+            <div style="
+                color: #1f2937;
+                font-size: 2rem;
+                font-weight: 800;
+                line-height: 1.1;
+                margin-top: 14px;
+                word-break: break-word;
+            ">{value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_landing_metric_cards(optimization_history: list[dict]) -> None:
+    """Show cumulative value cards for returning users."""
+    baseline_total, baseline_ai, baseline_manual = _get_landing_metrics_baseline(optimization_history)
+    session_ai = int(st.session_state.get("landing_metrics_session_ai", 0) or 0)
+    session_manual = int(st.session_state.get("landing_metrics_session_manual", 0) or 0)
+    current_mode = str(st.session_state.get("execution_mode") or "").strip().lower()
+    if (
+        session_ai == 0
+        and session_manual == 0
+        and st.session_state.get("validated_payload")
+        and current_mode in {"api", "local_ai"}
+    ):
+        session_ai = 1
+    if not optimization_history and not (session_ai or session_manual):
+        return
+
+    history_total = len(optimization_history)
+    history_ai = sum(1 for row in optimization_history if _history_mode_bucket(row) == "ai")
+    history_manual = sum(1 for row in optimization_history if _history_mode_bucket(row) == "manual")
+
+    total_runs = max(history_total, baseline_total + session_ai + session_manual)
+    ai_runs = max(history_ai, baseline_ai + session_ai)
+    manual_runs = max(history_manual, baseline_manual + session_manual)
+    total_minutes_saved = total_runs * 30
+    total_match_gain = sum(
+        max(0, int(row.get("match_after", 0) or 0) - int(row.get("match_before", 0) or 0))
+        for row in optimization_history
+    )
+
+    now = datetime.now()
+    runs_this_month = 0
+    for row in optimization_history:
+        created_at = _safe_parse_iso_datetime(str(row.get("created_at", "")))
+        if created_at and created_at.year == now.year and created_at.month == now.month:
+            runs_this_month += 1
+    runs_this_month = max(runs_this_month, session_ai + session_manual)
+
+    avg_gain = round(total_match_gain / total_runs) if total_runs else 0
+
+    st.markdown("<div style='height: 0.4rem;'></div>", unsafe_allow_html=True)
+    metric_cols = st.columns(4, gap="medium")
+    with metric_cols[0]:
+        _render_metric_card("Resumes Optimized", f"{total_runs}", f"+{runs_this_month} this month", tone="orange")
+    with metric_cols[1]:
+        _render_metric_card("AI Mode Runs", f"{ai_runs}", "Full AI + Private", tone="green")
+    with metric_cols[2]:
+        _render_metric_card("Manual Runs", f"{manual_runs}", "Bring your own AI", tone="blue")
+    with metric_cols[3]:
+        _render_metric_card("Estimated Time Saved", _format_minutes_saved(total_minutes_saved), "Based on 30 min per run", tone="neutral")
 
 
 def _profile_setup_complete() -> bool:
@@ -2874,31 +3193,43 @@ def _save_current_application(status: str = "matched") -> int:
     if not job_description:
         raise ValueError("Add a job description before saving an application workspace.")
 
+    user_id = st.session_state.get("auth_user_id") or "local-user"
+    target_role = get_fresh_detected_target_role(job_description)
+    company = (
+        st.session_state.get("current_application_company", "").strip()
+        or detect_company_name(job_description)
+    )
+    if company:
+        st.session_state.current_application_company = company
+
     application = upsert_application(
+        user_id=st.session_state.get("auth_user_id") or "local-user",
         application_id=st.session_state.get("current_application_id"),
-        job_title=get_effective_target_role(job_description),
-        company=st.session_state.get("current_application_company", ""),
+        job_title=target_role,
+        company=company,
         job_description=job_description,
-        role_family=get_effective_target_role(job_description),
+        role_family=target_role,
         industry=get_effective_industry(job_description),
         job_url=st.session_state.jd_source_url,
         status=status,
     )
-    st.session_state.current_application_id = application.id
-    if application.id is not None:
+    application_id = application.id if hasattr(application, "id") else application
+    st.session_state.current_application_id = application_id
+    if application_id is not None:
         link_profile_items_to_application(
-            application.id,
+            application_id,
             [item_id for item_id in st.session_state.get("selected_profile_item_ids", []) if isinstance(item_id, int)],
+            user_id=user_id,
         )
     logger.info(
         "Application saved: id=%s, job_title=%s, company=%s, status=%s, selected_items=%s",
-        application.id,
-        application.job_title,
-        application.company,
+        application_id,
+        target_role,
+        company,
         status,
         len(st.session_state.get("selected_profile_item_ids", [])),
     )
-    return application.id or 0
+    return int(application_id) if isinstance(application_id, int) else 0
 
 
 def _load_application_into_session(application_id: int) -> None:
@@ -4040,7 +4371,7 @@ def render_application_match_screen() -> None:
         render_shell_end()
         return
 
-    target_role = get_effective_target_role(job_description)
+    target_role = get_fresh_detected_target_role(job_description)
     target_industry = get_effective_industry(job_description)
     job_signals, ranked_results = rank_profile_items(active_items, job_description, target_role=target_role, target_industry=target_industry)
 
@@ -4061,7 +4392,7 @@ def render_application_match_screen() -> None:
         )
         st.session_state.current_application_company = company
         signal_rows = [
-            ("Target role", target_role or "Not detected"),
+            ("Target role", target_role or "Not detected yet"),
             ("Company", company or "Not set yet"),
             ("Industry", target_industry or "Not detected"),
             ("Top keywords", ", ".join(job_signals.get("keywords", [])[:8]) or "No clear keywords yet"),
@@ -4087,7 +4418,12 @@ def render_application_match_screen() -> None:
                 st.markdown(f"**{item.title or 'Untitled item'}**")
                 st.markdown(f'<div class="apple-minor-copy">{item.item_type.title()} · {item.organization or "Organization not specified"} · Score {result["score"]:.1f}</div>', unsafe_allow_html=True)
                 if item.description:
-                    st.markdown(item.description)
+                    st.markdown(format_preview_text(item.description, max_len=240))
+                with st.expander("Show details", expanded=False):
+                    if item.description:
+                        st.markdown(item.description)
+                    if item.bullets:
+                        st.markdown("\n".join(f"- {bullet}" for bullet in item.bullets[:6] if bullet.strip()))
                 if result["reasons"]:
                     st.markdown(f'<div class="apple-minor-copy">Why selected: {" | ".join(result["reasons"][:3])}</div>', unsafe_allow_html=True)
                 if item.skills:
@@ -4290,11 +4626,11 @@ def render_input_screen() -> None:
             st.markdown(
                 """
                 <div class="apple-section-title">Upload your resume</div>
-                <div class="apple-section-copy">Use a <code>.docx</code> or <code>.pdf</code> file. We preserve the document structure so the finished export still feels like your original resume, just sharper.</div>
+                <div class="apple-section-copy">Use your original <code>.docx</code> resume so the finished export can preserve your document structure and formatting.</div>
                 """,
                 unsafe_allow_html=True,
             )
-            uploaded_file = st.file_uploader("Upload Resume (.docx or .pdf)", type=["docx", "pdf"], label_visibility="collapsed")
+            uploaded_file = st.file_uploader("Upload Resume (.docx)", type=["docx"], label_visibility="collapsed")
             if uploaded_file is not None:
                 save_uploaded_resume(uploaded_file)
                 st.success(f"Loaded `{uploaded_file.name}`")
@@ -4309,19 +4645,32 @@ def render_input_screen() -> None:
                     if secondary_button("Extract Profile in Private Mode", use_container_width=True, key="input-local-ai-profile"):
                         try:
                             profile = create_or_get_profile()
-                            with st.spinner("Local AI is extracting reusable profile evidence from your resume. This may take 10-20 seconds."):
-                                profile_result = extract_or_create_profile(
-                                    resume_text=st.session_state.resume_text or "",
-                                    existing_profile_summary=profile.summary,
-                                    model_name=_get_local_ai_model_name(),
-                                    base_url=st.session_state.get("local_ai_base_url", OLLAMA_BASE_URL),
-                                )
+                            _profile_progress = st.progress(0)
+                            _profile_status = st.empty()
+                            _profile_progress.progress(15)
+                            _profile_status.caption("Preparing your profile context...")
+                            time.sleep(0.2)
+                            _profile_progress.progress(42)
+                            _profile_status.caption("Extracting reusable profile evidence...")
+                            profile_result = extract_or_create_profile(
+                                resume_text=st.session_state.resume_text or "",
+                                existing_profile_summary=profile.summary,
+                                model_name=_get_local_ai_model_name(),
+                                base_url=st.session_state.get("local_ai_base_url", OLLAMA_BASE_URL),
+                            )
                             st.session_state.local_ai_last_profile_meta = get_last_task_meta("extract_or_create_profile")
                             suggestion_count = _save_local_ai_profile_suggestions(profile_result)
+                            _profile_progress.progress(100)
+                            _profile_status.caption("Profile suggestions ready.")
+                            time.sleep(0.2)
+                            _profile_progress.empty()
+                            _profile_status.empty()
                             st.success(f"Prepared {suggestion_count} profile suggestions.")
                             st.session_state.screen = "profile_review"
                             st.rerun()
                         except Exception as error:
+                            _profile_progress.empty()  # type: ignore[possibly-undefined]
+                            _profile_status.empty()  # type: ignore[possibly-undefined]
                             st.warning(f"Private Mode could not extract profile suggestions yet. {error}")
                     st.caption("Heads up: Private Mode tasks can take a few seconds. Wait for the loading message before clicking elsewhere.")
                 else:
@@ -4390,18 +4739,12 @@ def render_input_screen() -> None:
     if st.session_state.jd_role_hint and not st.session_state.target_role.strip():
         st.session_state.target_role = st.session_state.jd_role_hint
 
-    col1, col2, col3 = st.columns([0.7, 0.9, 1.1], gap="large")
+    col1, col2 = st.columns([0.8, 1.2], gap="large")
     with col1:
         if secondary_button("Back", use_container_width=True, key="input-back"):
             st.session_state.screen = "landing"
             st.rerun()
     with col2:
-        active_profile_items = [item for item in list_profile_items() if item.visibility == "active"]
-        if secondary_button("Use Career Profile", use_container_width=True, disabled=not bool(job_description.strip() and active_profile_items), key="input-use-profile"):
-            st.session_state.use_career_profile = True
-            st.session_state.screen = "application_match"
-            st.rerun()
-    with col3:
         can_continue = bool(
             st.session_state.resume_text
             and job_description.strip()
@@ -5056,7 +5399,17 @@ def render_builder_stub_screen() -> None:
                     placeholder=provider_config["placeholder"],
                     key="builder-api-key",
                 )
-                model = st.selectbox("Model", provider_config["models"], index=0, key="builder-model")
+                _builder_models = get_provider_models(provider, api_key.strip())
+                _builder_saved_model = st.session_state.get("builder_selected_model", _builder_models[0])
+                if _builder_saved_model not in _builder_models:
+                    _builder_saved_model = _builder_models[0]
+                model = st.selectbox(
+                    "Model",
+                    _builder_models,
+                    index=_builder_models.index(_builder_saved_model),
+                    key="builder-model",
+                )
+                st.session_state.builder_selected_model = model
                 st.markdown(
                     '<div class="apple-section-copy">Your key is used only for this session and is not stored.</div>',
                     unsafe_allow_html=True,
@@ -5158,6 +5511,9 @@ def render_builder_review_screen() -> None:
         "Review your foundation.",
         "Your draft is structurally valid and ready to be converted into a .docx file.",
     )
+    fallback_notice = st.session_state.get("ai_fallback_notice", "")
+    if fallback_notice:
+        st.info(fallback_notice)
 
     st.markdown('<div class="apple-summary-grid">', unsafe_allow_html=True)
     st.markdown('<div class="apple-summary-label">Builder Summary</div>', unsafe_allow_html=True)
@@ -5271,11 +5627,28 @@ def render_builder_review_screen() -> None:
     with col2:
         if primary_button("Generate Resume .docx", use_container_width=True, key="builder-generate-docx"):
             try:
+                _docx_progress = st.progress(0)
+                _docx_status = st.empty()
+                for _pct, _msg in [
+                    (16, "Preparing your resume layout..."),
+                    (42, "Building the .docx structure..."),
+                    (78, "Finalizing the download file..."),
+                ]:
+                    _docx_progress.progress(_pct)
+                    _docx_status.caption(_msg)
+                    time.sleep(0.18)
                 st.session_state.builder_output_docx_bytes = build_resume_from_scratch(payload)
                 safe_name = (basics.get("full_name", "First_Resume").strip() or "First_Resume").replace(" ", "_")
                 st.session_state.builder_output_filename = f"{safe_name}_Resume.docx"
+                _docx_progress.progress(100)
+                _docx_status.caption("Resume file ready.")
+                time.sleep(0.2)
+                _docx_progress.empty()
+                _docx_status.empty()
                 st.success("First resume document generated successfully.")
             except Exception as error:
+                _docx_progress.empty()  # type: ignore[possibly-undefined]
+                _docx_status.empty()  # type: ignore[possibly-undefined]
                 st.error(str(error))
 
     if st.session_state.builder_output_docx_bytes and st.session_state.builder_output_filename:
@@ -5302,23 +5675,6 @@ def render_mode_screen() -> None:
         "Choose how you'd like to work.",
         "Pick the path that feels easiest. You can run everything privately on this device, use a standard cloud provider, or keep everything manual.",
     )
-
-    selected_profile_items = _get_selected_profile_items()
-    if st.session_state.get("use_career_profile") and selected_profile_items:
-        with st.container(border=True):
-            st.markdown('<div class="apple-kicker">Career Profile Guidance</div>', unsafe_allow_html=True)
-            st.markdown(
-                f'<div class="apple-section-title">{len(selected_profile_items)} saved profile items will guide this run.</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                '<div class="apple-section-copy">The prompt will prioritize these items as relevance evidence while still keeping all output anchored to the uploaded resume text.</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                build_inline_chip_row([item.title or item.item_type.title() for item in selected_profile_items[:4]]),
-                unsafe_allow_html=True,
-            )
 
     _show_private = show_local_ai_cards()
     _mode_cols = st.columns(3 if _show_private else 2, gap="large")
@@ -5583,13 +5939,19 @@ def render_local_ai_run_screen() -> None:
             if st.button("Refresh Job Brief", use_container_width=True, key="local-ai-process-jd"):
                 try:
                     cleaned_text = (st.session_state.get("jd_cleaning_result") or {}).get("cleaned_text", "")
-                    with st.spinner("Private Mode is refreshing your job brief. This can take a few seconds."):
-                        signals = process_job_description(
-                            raw_job_description=st.session_state.job_description,
-                            cleaned_job_description=cleaned_text,
-                            model_name=model_name,
-                            base_url=st.session_state.get("local_ai_base_url", OLLAMA_BASE_URL),
-                        )
+                    _jd_progress = st.progress(0)
+                    _jd_status = st.empty()
+                    _jd_progress.progress(18)
+                    _jd_status.caption("Preparing the role brief...")
+                    time.sleep(0.15)
+                    _jd_progress.progress(46)
+                    _jd_status.caption("Reading the job description...")
+                    signals = process_job_description(
+                        raw_job_description=st.session_state.job_description,
+                        cleaned_job_description=cleaned_text,
+                        model_name=model_name,
+                        base_url=st.session_state.get("local_ai_base_url", OLLAMA_BASE_URL),
+                    )
                     st.session_state.local_ai_job_signals = signals
                     st.session_state.local_ai_last_job_meta = get_last_task_meta("process_job_description")
                     if signals.get("normalized_role_title"):
@@ -5598,9 +5960,16 @@ def render_local_ai_run_screen() -> None:
                         st.session_state.target_industry = signals["industry_hint"]
                     if signals.get("seniority") in CAREER_STAGES:
                         st.session_state.career_stage = signals["seniority"]
+                    _jd_progress.progress(100)
+                    _jd_status.caption("Job brief updated.")
+                    time.sleep(0.2)
+                    _jd_progress.empty()
+                    _jd_status.empty()
                     st.success("Job brief updated.")
                     st.rerun()
                 except Exception as error:
+                    _jd_progress.empty()  # type: ignore[possibly-undefined]
+                    _jd_status.empty()  # type: ignore[possibly-undefined]
                     st.warning(_humanize_local_ai_error(error, "Job description processing"))
             st.caption("Wait for the loading message to finish before continuing.")
 
@@ -5628,18 +5997,31 @@ def render_local_ai_run_screen() -> None:
             if st.button("Extract Profile Suggestions", use_container_width=True, key="local-ai-extract-profile"):
                 try:
                     profile = create_or_get_profile()
-                    with st.spinner("Private Mode is extracting profile suggestions from your resume. This may take 10-20 seconds."):
-                        profile_result = extract_or_create_profile(
-                            resume_text=st.session_state.resume_text or "",
-                            existing_profile_summary=profile.summary,
-                            model_name=model_name,
-                            base_url=st.session_state.get("local_ai_base_url", OLLAMA_BASE_URL),
-                        )
+                    _profile_progress = st.progress(0)
+                    _profile_status = st.empty()
+                    _profile_progress.progress(15)
+                    _profile_status.caption("Preparing your profile context...")
+                    time.sleep(0.15)
+                    _profile_progress.progress(40)
+                    _profile_status.caption("Extracting profile suggestions...")
+                    profile_result = extract_or_create_profile(
+                        resume_text=st.session_state.resume_text or "",
+                        existing_profile_summary=profile.summary,
+                        model_name=model_name,
+                        base_url=st.session_state.get("local_ai_base_url", OLLAMA_BASE_URL),
+                    )
                     st.session_state.local_ai_last_profile_meta = get_last_task_meta("extract_or_create_profile")
                     suggestion_count = _save_local_ai_profile_suggestions(profile_result)
                     st.session_state.local_ai_profile_error = ""
+                    _profile_progress.progress(100)
+                    _profile_status.caption("Profile suggestions ready.")
+                    time.sleep(0.2)
+                    _profile_progress.empty()
+                    _profile_status.empty()
                     st.success(f"Prepared {suggestion_count} profile items for review.")
                 except Exception as error:
+                    _profile_progress.empty()  # type: ignore[possibly-undefined]
+                    _profile_status.empty()  # type: ignore[possibly-undefined]
                     st.session_state.local_ai_profile_error = _humanize_local_ai_error(error, "Profile extraction")
             st.caption("Profile extraction can take a little longer than job processing.")
             if st.session_state.get("local_ai_profile_error"):
@@ -5752,8 +6134,10 @@ def render_local_ai_run_screen() -> None:
     render_shell_end()
 
 
-def handle_validated_payload(payload: dict) -> None:
+def handle_validated_payload(payload: dict, review_details: dict | None = None) -> None:
     """Store validation state and move to review."""
+    if review_details is None:
+        st.session_state.ai_repair_notice = ""
     baseline_report = st.session_state.baseline_fit_report or _evaluate_current_resume_fit(force=True)
     optimized_resume_text = _build_optimized_resume_text(payload)
     replacements = collect_replacements(payload)
@@ -5796,7 +6180,7 @@ def handle_validated_payload(payload: dict) -> None:
     st.session_state.baseline_fit_report = baseline_report
     st.session_state.validated_payload = payload
     st.session_state.validation_summary = build_validation_summary(payload)
-    st.session_state.review_details = analyze_payload(payload)
+    st.session_state.review_details = review_details or analyze_payload(payload)
     st.session_state.output_docx_bytes = None
     st.session_state.output_filename = None
     st.session_state.show_review_changes = False
@@ -5833,6 +6217,7 @@ def handle_validated_payload(payload: dict) -> None:
             match_before=match_score_before,
             match_after=match_score_after,
             improvements=improvements,
+            execution_mode=st.session_state.get("execution_mode") or "",
             resume_used_id="",
             application_id=st.session_state.get("current_application_id"),
         )
@@ -5840,6 +6225,8 @@ def handle_validated_payload(payload: dict) -> None:
     except Exception as e:
         logger.warning("Failed to save optimization result: %s", str(e))
         _saved_application_id = st.session_state.get("current_application_id")
+
+    _record_completed_optimization_for_landing(st.session_state.get("execution_mode") or "")
 
     # Job Tracker integration — decide whether to auto-save or show save card
     _active_tracker_job = st.session_state.get("active_tracker_job_id")
@@ -6080,7 +6467,7 @@ def render_manual_screen() -> None:
             [
                 "Copy the prompt above and paste it into ChatGPT, Claude, or Gemini. Include the same resume you uploaded in the box.",
                 "Ask the AI to return only the structured JSON output with no extra explanation.",
-                "Paste the AI result into the box below, then click Validate Output.",
+                "Paste the AI result into the box below, then click Build Resume.",
             ],
         )
 
@@ -6103,7 +6490,7 @@ def render_manual_screen() -> None:
             st.session_state.screen = "mode"
             st.rerun()
     with col2:
-        if primary_button("Validate Output", use_container_width=True, key="manual-validate-output"):
+        if primary_button("Build Resume", use_container_width=True, key="manual-validate-output"):
             try:
                 payload = parse_replacement_payload(pasted_output)
                 handle_validated_payload(payload)
@@ -6254,8 +6641,8 @@ def render_api_screen() -> None:
                     unsafe_allow_html=True,
                 )
 
-            # Model — pre-select saved preference
-            _models = provider_config["models"]
+            # Model — use the provider's live model list when a key is available.
+            _models = get_provider_models(provider, api_key.strip())
             _saved_model = _api_settings.get("default_model", _models[0])
             _model_idx = _models.index(_saved_model) if _saved_model in _models else 0
             model = st.selectbox("Model", _models, index=_model_idx)
@@ -6332,6 +6719,7 @@ def render_api_screen() -> None:
     with col2:
         if primary_button("Run Optimization", use_container_width=True, key="api-run-optimization"):
             try:
+                st.session_state.ai_repair_notice = ""
                 # Save key if user opted in (first-time entry)
                 if (
                     provider != "Advanced Custom Endpoint"
@@ -6366,14 +6754,40 @@ def render_api_screen() -> None:
                     base_url=base_url,
                 )
 
-                for _pct, _msg in [(72, "Processing AI response..."), (88, "Validating changes..."), (100, "Done!")]:
-                    _progress.progress(_pct)
-                    _status.caption(_msg)
+                _progress.progress(72)
+                _status.caption("Processing AI response...")
+                time.sleep(0.25)
+
+                _progress.progress(82)
+                _status.caption("Checking exact resume matches...")
+                time.sleep(0.2)
+                review_details = analyze_payload(payload)
+                review_stats = review_details.get("stats", {})
+                review_issue_count = int(review_stats.get("unmatched_replacements", 0)) + int(
+                    review_stats.get("duplicate_replacements", 0)
+                )
+
+                if review_issue_count > 0:
+                    _progress.progress(90)
+                    _status.caption("Repairing unclear AI edits...")
                     time.sleep(0.25)
+                    payload, review_details = _attempt_exact_match_repair(
+                        provider=provider,
+                        api_key=api_key,
+                        prompt=prompt_to_send,
+                        model=model,
+                        base_url=base_url,
+                        payload=payload,
+                        review_details=review_details,
+                    )
+
+                _progress.progress(100)
+                _status.caption("Done!")
+                time.sleep(0.2)
 
                 _progress.empty()
                 _status.empty()
-                handle_validated_payload(payload)
+                handle_validated_payload(payload, review_details=review_details)
                 st.rerun()
             except Exception as error:
                 _progress.empty()  # type: ignore[possibly-undefined]
@@ -6429,18 +6843,49 @@ def render_review_screen() -> None:
     if not ready_for_export and not review_attention_items:
         review_attention_items.append("This draft is not fully export-ready yet, so a manual review is still recommended.")
 
+    review_intro_copy = (
+        "Your optimized resume is ready. Download it or review the changes."
+        if ready_for_export
+        else "We finished the optimization, but a few AI-generated edits need review before the file can be exported safely."
+    )
     render_screen_intro(
         "review",
         "Step 4 of 5",
         "Validation and Export",
-        "Your optimized resume is ready. Download it or review the changes.",
+        review_intro_copy,
     )
+    fallback_notice = st.session_state.get("ai_fallback_notice", "")
+    if fallback_notice:
+        st.info(fallback_notice)
+    repair_notice = st.session_state.get("ai_repair_notice", "")
+    if repair_notice:
+        if ready_for_export:
+            st.info(repair_notice)
+        else:
+            st.warning(repair_notice)
 
     if not st.session_state.show_review_changes:
         if ready_for_export:
             st.success("Optimization complete. Your resume is validated and ready to download.")
         else:
             st.warning("This result needs review before export.")
+
+        if st.session_state.get("use_career_profile") and _get_selected_profile_items():
+            _used_profile_items = _get_selected_profile_items()
+            with st.container(border=True):
+                st.markdown('<div class="apple-kicker">Career Profile Guidance</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="apple-section-title">{len(_used_profile_items)} saved profile items supported this optimization.</div>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    '<div class="apple-section-copy">These saved profile items were included as supporting context while the optimization stayed anchored to the uploaded resume.</div>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    build_inline_chip_row([item.title or item.item_type.title() for item in _used_profile_items[:6]]),
+                    unsafe_allow_html=True,
+                )
 
         if st.session_state.get("execution_mode") == "local_ai" or st.session_state.get("optimization_path") == "local_ai":
             _render_task_meta_card("Local AI Draft", st.session_state.get("local_ai_last_draft_meta", {}))
@@ -6585,7 +7030,7 @@ def render_review_screen() -> None:
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 )
             else:
-                secondary_button("Download Resume", key="review-dl-disabled", use_container_width=True, disabled=True)
+                secondary_button("Download Locked", key="review-dl-disabled", use_container_width=True, disabled=True)
 
         with action_col2:
             if secondary_button("Inspect Exact Changes", use_container_width=True, key="review-inspect-changes"):
@@ -6593,72 +7038,111 @@ def render_review_screen() -> None:
                 st.session_state.show_review_changes = True
                 st.rerun()
 
-        # ===== Success confirmation strip =====
-        st.markdown(
-            """
-            <style>
-            @keyframes slideInBanner {
-                from { opacity: 0; transform: translateY(8px); }
-                to   { opacity: 1; transform: translateY(0); }
-            }
-            .resume-ready-banner {
-                animation: slideInBanner 0.45s cubic-bezier(0.16,1,0.3,1) both;
-                margin: 0.75rem 0 1rem;
-            }
-            </style>
-            <div class="resume-ready-banner">
-            <div style="
-                background: linear-gradient(135deg, #d97757 0%, #c9683f 60%, #b85934 100%);
-                border-radius: 14px;
-                padding: 1.25rem 1.5rem;
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-                flex-wrap: wrap;
-                box-shadow: 0 4px 20px rgba(217,119,87,0.30);
-            ">
-                <span style="
-                    display: inline-flex;
+        if ready_for_export:
+            st.markdown(
+                """
+                <style>
+                @keyframes slideInBanner {
+                    from { opacity: 0; transform: translateY(8px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
+                .resume-ready-banner {
+                    animation: slideInBanner 0.45s cubic-bezier(0.16,1,0.3,1) both;
+                    margin: 0.75rem 0 1rem;
+                }
+                </style>
+                <div class="resume-ready-banner">
+                <div style="
+                    background: linear-gradient(135deg, #d97757 0%, #c9683f 60%, #b85934 100%);
+                    border-radius: 14px;
+                    padding: 1.25rem 1.5rem;
+                    display: flex;
                     align-items: center;
-                    justify-content: center;
-                    width: 2rem;
-                    height: 2rem;
-                    background: rgba(255,255,255,0.20);
-                    border-radius: 50%;
-                    flex-shrink: 0;
-                    backdrop-filter: blur(4px);
+                    gap: 1rem;
+                    flex-wrap: wrap;
+                    box-shadow: 0 4px 20px rgba(217,119,87,0.30);
                 ">
-                    <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
-                        <path d="M1.5 5L4.5 8L10.5 1.5" stroke="white" stroke-width="2.2"
-                              stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </span>
-                <div style="flex: 1; min-width: 0;">
-                    <div style="font-size: 1rem; font-weight: 700; color: #fff; line-height: 1.3;">
-                        Resume optimized and ready to download.
+                    <span style="
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 2rem;
+                        height: 2rem;
+                        background: rgba(255,255,255,0.20);
+                        border-radius: 50%;
+                        flex-shrink: 0;
+                        backdrop-filter: blur(4px);
+                    ">
+                        <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+                            <path d="M1.5 5L4.5 8L10.5 1.5" stroke="white" stroke-width="2.2"
+                                  stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </span>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 1rem; font-weight: 700; color: #fff; line-height: 1.3;">
+                            Resume optimized and ready to download.
+                        </div>
+                    </div>
+                    <div style="font-size: 0.82rem; color: rgba(255,255,255,0.85); white-space: nowrap; flex-shrink: 0;">
+                        Found this useful?&nbsp;
+                        <a href="https://buy.stripe.com/cNiaEZ4KwgLJdtA2C0dMI01" target="_blank"
+                           style="color: #fff; font-weight: 700; text-decoration: none;
+                                  border-bottom: 1.5px solid rgba(255,255,255,0.55);
+                                  padding-bottom: 1px;">
+                            Support development
+                        </a>
+                        &nbsp;·&nbsp;
+                        <a href="https://resume-optimizer-otg.streamlit.app" target="_blank"
+                           style="color: #fff; font-weight: 700; text-decoration: none;
+                                  border-bottom: 1.5px solid rgba(255,255,255,0.55);
+                                  padding-bottom: 1px;">
+                            Share
+                        </a>
                     </div>
                 </div>
-                <div style="font-size: 0.82rem; color: rgba(255,255,255,0.85); white-space: nowrap; flex-shrink: 0;">
-                    Found this useful?&nbsp;
-                    <a href="https://buy.stripe.com/cNiaEZ4KwgLJdtA2C0dMI01" target="_blank"
-                       style="color: #fff; font-weight: 700; text-decoration: none;
-                              border-bottom: 1.5px solid rgba(255,255,255,0.55);
-                              padding-bottom: 1px;">
-                        Support development
-                    </a>
-                    &nbsp;·&nbsp;
-                    <a href="https://resume-optimizer-otg.streamlit.app" target="_blank"
-                       style="color: #fff; font-weight: 700; text-decoration: none;
-                              border-bottom: 1.5px solid rgba(255,255,255,0.55);
-                              padding-bottom: 1px;">
-                        Share
-                    </a>
                 </div>
-            </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                """
+                <div style="
+                    margin: 0.75rem 0 1rem;
+                    background: #fff7ed;
+                    border: 1px solid #fdba74;
+                    border-radius: 14px;
+                    padding: 1.15rem 1.35rem;
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 0.9rem;
+                    flex-wrap: wrap;
+                ">
+                    <span style="
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 1.9rem;
+                        height: 1.9rem;
+                        background: #ffedd5;
+                        border-radius: 50%;
+                        flex-shrink: 0;
+                        color: #c2410c;
+                        font-size: 1rem;
+                        font-weight: 700;
+                    ">!</span>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 1rem; font-weight: 700; color: #9a3412; line-height: 1.3;">
+                            Export is paused until the draft is review-safe.
+                        </div>
+                        <div style="font-size: 0.92rem; color: #7c2d12; margin-top: 0.35rem; line-height: 1.55;">
+                            The AI returned edits that could not be matched cleanly to the original resume, so Resume OTG blocked the download to protect the file. Review the exact changes below, then rerun Full AI Optimization if needed.
+                        </div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
         # ── Save to Job Tracker ────────────────────────────────────────────────
         _tracker_auto = st.session_state.get("tracker_auto_saved_to")
@@ -6675,7 +7159,8 @@ def render_review_screen() -> None:
                     st.rerun()
 
         with bottom_col2:
-            if secondary_button("Start Over", use_container_width=True, key="review-start-over-summary"):
+            restart_label = "Run Optimization Again" if not ready_for_export else "Start Over"
+            if secondary_button(restart_label, use_container_width=True, key="review-start-over-summary"):
                 logger.info("User started a new optimization from success state")
                 reset_flow()
                 st.rerun()

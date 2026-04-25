@@ -1,6 +1,6 @@
-"""
-Review and diagnostics helpers for resume replacement payloads.
-"""
+from __future__ import annotations
+
+"""Review and diagnostics helpers for resume replacement payloads."""
 from difflib import SequenceMatcher
 from typing import Any, Dict, List
 
@@ -30,14 +30,14 @@ def _best_suggestions(anchor: str, paragraphs: List[str], limit: int = 3) -> Lis
     return scored[:limit]
 
 
-def analyze_payload_against_document(doc_path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Compare requested anchors against the uploaded document before export.
-
-    This keeps replacement deterministic while still giving the UI
-    helpful diagnostics and fuzzy suggestions.
-    """
-    paragraphs = extract_paragraphs(doc_path)
+def _analyze_payload_against_paragraphs(
+    paragraphs: List[str],
+    payload: Dict[str, Any],
+    *,
+    ready_for_export: bool,
+    warnings: List[str] | None = None,
+) -> Dict[str, Any]:
+    """Compare requested anchors against a paragraph list."""
     paragraph_counts: Dict[str, int] = {}
     for paragraph in paragraphs:
         paragraph_counts[paragraph] = paragraph_counts.get(paragraph, 0) + 1
@@ -99,26 +99,54 @@ def analyze_payload_against_document(doc_path: str, payload: Dict[str, Any]) -> 
             }
         )
 
-    warnings: List[str] = []
+    warning_list: List[str] = list(warnings or [])
     if unmatched:
-        warnings.append(
+        warning_list.append(
             "Some of the AI-generated edits were unclear, so the app could not place them safely."
         )
     if duplicate:
-        warnings.append(
+        warning_list.append(
             "Some of the AI-generated edits were unclear, so the app could not place them safely."
         )
 
     return {
         "paragraph_count": len(paragraphs),
         "results": results,
-        "warnings": warnings,
+        "warnings": warning_list,
         "stats": {
             "requested_replacements": len(requested_items),
             "matched_replacements": matched,
             "unmatched_replacements": unmatched,
             "duplicate_replacements": duplicate,
-            "ready_for_export": unmatched == 0 and duplicate == 0,
+            "ready_for_export": ready_for_export and unmatched == 0 and duplicate == 0,
         },
         "paragraphs": paragraphs,
     }
+
+
+def analyze_payload_against_document(doc_path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Compare requested anchors against the uploaded document before export.
+
+    This keeps replacement deterministic while still giving the UI
+    helpful diagnostics and fuzzy suggestions.
+    """
+    paragraphs = extract_paragraphs(doc_path)
+    return _analyze_payload_against_paragraphs(paragraphs, payload, ready_for_export=True)
+
+
+def analyze_payload_against_text_paragraphs(paragraphs: List[str], payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Compare requested anchors against text-only paragraphs.
+
+    Used for PDF uploads where we can review anchors safely, but cannot export
+    an in-place optimized .docx from the original file.
+    """
+    return _analyze_payload_against_paragraphs(
+        paragraphs,
+        payload,
+        ready_for_export=False,
+        warnings=[
+            "PDF uploads can be reviewed, but exact .docx export requires uploading the original resume as a .docx file."
+        ],
+    )

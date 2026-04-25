@@ -17,6 +17,7 @@ Entry point: render_job_tracker_detail_screen()
 from __future__ import annotations
 
 import datetime
+import time
 import streamlit as st
 
 from job_tracker_store import (
@@ -103,6 +104,16 @@ def _render_edit_section(job: dict) -> None:
         with sa:
             if st.button("Save Changes", key=f"jt-det-edit-save-{job_id}", type="primary", use_container_width=True):
                 try:
+                    _progress = st.progress(0)
+                    _status = st.empty()
+                    for pct, msg in (
+                        (18, "Checking updates..."),
+                        (52, "Saving job details..."),
+                        (84, "Refreshing tracker record..."),
+                    ):
+                        _progress.progress(pct)
+                        _status.caption(msg)
+                        time.sleep(0.12)
                     update_job_metadata(
                         job_id,
                         job_title=new_title or None,
@@ -112,8 +123,14 @@ def _render_edit_section(job: dict) -> None:
                         applied_date=new_applied,
                         status=new_status,
                     )
+                    _progress.progress(100)
+                    _status.caption("Changes saved.")
+                    time.sleep(0.15)
+                    st.session_state.jt_detail_flash = "Job details saved."
                     st.rerun()
                 except Exception as err:
+                    _progress.empty()  # type: ignore[possibly-undefined]
+                    _status.empty()  # type: ignore[possibly-undefined]
                     st.error(str(err))
         with sb:
             if st.button("Delete Job", key=f"jt-det-delete-{job_id}", use_container_width=True):
@@ -370,6 +387,10 @@ def render_job_tracker_detail_screen() -> None:
         if st.button("Job Tracker", key="jt-detail-back", use_container_width=True):
             st.session_state.screen = "job_tracker"
             st.rerun()
+
+    flash_message = st.session_state.pop("jt_detail_flash", "")
+    if flash_message:
+        st.success(flash_message)
 
     # ── Header ────────────────────────────────────────────────────────────────
     display_title = job["job_title"] or "Role title missing"

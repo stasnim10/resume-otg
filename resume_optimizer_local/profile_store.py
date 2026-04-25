@@ -28,99 +28,98 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_profile_db() -> None:
-    """Create required tables if missing. Idempotent — only runs DDL once per process."""
+    """Create required tables if missing and always apply additive migrations."""
     global _db_initialized
-    if _db_initialized:
-        return
     with get_connection() as conn:
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS career_profiles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL,
-                full_name TEXT NOT NULL DEFAULT '',
-                email TEXT NOT NULL DEFAULT '',
-                phone TEXT NOT NULL DEFAULT '',
-                location TEXT NOT NULL DEFAULT '',
-                linkedin TEXT NOT NULL DEFAULT '',
-                portfolio_url TEXT NOT NULL DEFAULT '',
-                photo_path TEXT NOT NULL DEFAULT '',
-                headline TEXT NOT NULL DEFAULT '',
-                career_stage TEXT NOT NULL DEFAULT 'Student',
-                summary TEXT NOT NULL DEFAULT '',
-                target_roles_json TEXT NOT NULL DEFAULT '[]',
-                target_industries_json TEXT NOT NULL DEFAULT '[]',
-                preferred_locations_json TEXT NOT NULL DEFAULT '[]',
-                work_authorization TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
+        if not _db_initialized:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS career_profiles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    full_name TEXT NOT NULL DEFAULT '',
+                    email TEXT NOT NULL DEFAULT '',
+                    phone TEXT NOT NULL DEFAULT '',
+                    location TEXT NOT NULL DEFAULT '',
+                    linkedin TEXT NOT NULL DEFAULT '',
+                    portfolio_url TEXT NOT NULL DEFAULT '',
+                    photo_path TEXT NOT NULL DEFAULT '',
+                    headline TEXT NOT NULL DEFAULT '',
+                    career_stage TEXT NOT NULL DEFAULT 'Student',
+                    summary TEXT NOT NULL DEFAULT '',
+                    target_roles_json TEXT NOT NULL DEFAULT '[]',
+                    target_industries_json TEXT NOT NULL DEFAULT '[]',
+                    preferred_locations_json TEXT NOT NULL DEFAULT '[]',
+                    work_authorization TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
 
-            CREATE TABLE IF NOT EXISTS profile_sources (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL,
-                source_type TEXT NOT NULL,
-                source_name TEXT NOT NULL,
-                file_path TEXT NOT NULL DEFAULT '',
-                raw_text TEXT NOT NULL DEFAULT '',
-                parsed_status TEXT NOT NULL DEFAULT 'pending',
-                parsed_payload_json TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL
-            );
+                CREATE TABLE IF NOT EXISTS profile_sources (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    source_name TEXT NOT NULL,
+                    file_path TEXT NOT NULL DEFAULT '',
+                    raw_text TEXT NOT NULL DEFAULT '',
+                    parsed_status TEXT NOT NULL DEFAULT 'pending',
+                    parsed_payload_json TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL
+                );
 
-            CREATE TABLE IF NOT EXISTS profile_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL,
-                profile_id INTEGER,
-                source_id INTEGER,
-                item_type TEXT NOT NULL,
-                title TEXT NOT NULL DEFAULT '',
-                organization TEXT NOT NULL DEFAULT '',
-                location TEXT NOT NULL DEFAULT '',
-                start_date TEXT NOT NULL DEFAULT '',
-                end_date TEXT NOT NULL DEFAULT '',
-                is_current INTEGER NOT NULL DEFAULT 0,
-                description TEXT NOT NULL DEFAULT '',
-                bullets_json TEXT NOT NULL DEFAULT '[]',
-                skills_json TEXT NOT NULL DEFAULT '[]',
-                tools_json TEXT NOT NULL DEFAULT '[]',
-                industry_tags_json TEXT NOT NULL DEFAULT '[]',
-                function_tags_json TEXT NOT NULL DEFAULT '[]',
-                keywords_json TEXT NOT NULL DEFAULT '[]',
-                confidence_score REAL NOT NULL DEFAULT 0.5,
-                verification_status TEXT NOT NULL DEFAULT 'suggested',
-                visibility TEXT NOT NULL DEFAULT 'active',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
+                CREATE TABLE IF NOT EXISTS profile_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    profile_id INTEGER,
+                    source_id INTEGER,
+                    item_type TEXT NOT NULL,
+                    title TEXT NOT NULL DEFAULT '',
+                    organization TEXT NOT NULL DEFAULT '',
+                    location TEXT NOT NULL DEFAULT '',
+                    start_date TEXT NOT NULL DEFAULT '',
+                    end_date TEXT NOT NULL DEFAULT '',
+                    is_current INTEGER NOT NULL DEFAULT 0,
+                    description TEXT NOT NULL DEFAULT '',
+                    bullets_json TEXT NOT NULL DEFAULT '[]',
+                    skills_json TEXT NOT NULL DEFAULT '[]',
+                    tools_json TEXT NOT NULL DEFAULT '[]',
+                    industry_tags_json TEXT NOT NULL DEFAULT '[]',
+                    function_tags_json TEXT NOT NULL DEFAULT '[]',
+                    keywords_json TEXT NOT NULL DEFAULT '[]',
+                    confidence_score REAL NOT NULL DEFAULT 0.5,
+                    verification_status TEXT NOT NULL DEFAULT 'suggested',
+                    visibility TEXT NOT NULL DEFAULT 'active',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
 
-            CREATE TABLE IF NOT EXISTS applications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL,
-                job_title TEXT NOT NULL DEFAULT '',
-                company TEXT NOT NULL DEFAULT '',
-                job_description TEXT NOT NULL DEFAULT '',
-                role_family TEXT NOT NULL DEFAULT '',
-                industry TEXT NOT NULL DEFAULT '',
-                job_url TEXT NOT NULL DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'draft',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
+                CREATE TABLE IF NOT EXISTS applications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    job_title TEXT NOT NULL DEFAULT '',
+                    company TEXT NOT NULL DEFAULT '',
+                    job_description TEXT NOT NULL DEFAULT '',
+                    role_family TEXT NOT NULL DEFAULT '',
+                    industry TEXT NOT NULL DEFAULT '',
+                    job_url TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'draft',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
 
-            CREATE TABLE IF NOT EXISTS application_profile_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                application_id INTEGER NOT NULL,
-                profile_item_id INTEGER NOT NULL,
-                selected_by TEXT NOT NULL DEFAULT 'user',
-                rank_score REAL NOT NULL DEFAULT 0,
-                pinned INTEGER NOT NULL DEFAULT 0,
-                selection_reason TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL,
-                UNIQUE(application_id, profile_item_id)
-            );
-            """
-        )
+                CREATE TABLE IF NOT EXISTS application_profile_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    application_id INTEGER NOT NULL,
+                    profile_item_id INTEGER NOT NULL,
+                    selected_by TEXT NOT NULL DEFAULT 'user',
+                    rank_score REAL NOT NULL DEFAULT 0,
+                    pinned INTEGER NOT NULL DEFAULT 0,
+                    selection_reason TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    UNIQUE(application_id, profile_item_id)
+                );
+                """
+            )
         _ensure_profile_columns(conn)
         _ensure_redesign_columns(conn)
         _ensure_onboarding_columns(conn)
@@ -166,6 +165,7 @@ def _ensure_redesign_columns(conn: sqlite3.Connection) -> None:
         "improvements": "TEXT DEFAULT '[]'",
         "resume_used_id": "TEXT DEFAULT ''",
         "optimized_at": "TIMESTAMP",
+        "execution_mode": "TEXT DEFAULT ''",
     }
     for column_name, column_type in redesign_columns.items():
         if column_name not in columns:
@@ -722,6 +722,7 @@ def save_optimization_result(
     match_before: int,
     match_after: int,
     improvements: list[dict],
+    execution_mode: str = "",
     resume_used_id: str = "",
     application_id: int | None = None,
 ) -> int:
@@ -745,6 +746,7 @@ def save_optimization_result(
                     match_before = ?,
                     match_after = ?,
                     improvements = ?,
+                    execution_mode = ?,
                     resume_used_id = ?,
                     updated_at = ?,
                     optimized_at = ?,
@@ -758,6 +760,7 @@ def save_optimization_result(
                     match_before,
                     match_after,
                     improvements_json,
+                    execution_mode,
                     resume_used_id,
                     now,
                     now,
@@ -776,9 +779,9 @@ def save_optimization_result(
                 """
                 INSERT INTO applications (
                     user_id, company, job_title, job_description,
-                    match_before, match_after, improvements, resume_used_id,
+                    match_before, match_after, improvements, execution_mode, resume_used_id,
                     created_at, updated_at, optimized_at, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')
                 """,
                 (
                     user_id,
@@ -788,6 +791,7 @@ def save_optimization_result(
                     match_before,
                     match_after,
                     improvements_json,
+                    execution_mode,
                     resume_used_id,
                     now,
                     now,
@@ -819,7 +823,7 @@ def get_optimization_history(user_id: str = "local-user") -> list[dict]:
         rows = conn.execute(
             """
             SELECT id, company, job_title, match_before, match_after,
-                   created_at, improvements
+                   created_at, improvements, execution_mode
             FROM applications
             WHERE user_id = ? AND status = 'completed'
             ORDER BY created_at DESC
@@ -843,6 +847,7 @@ def get_optimization_history(user_id: str = "local-user") -> list[dict]:
             "match_after": row["match_after"],
             "created_at": row["created_at"],
             "improvements_count": improvements_count,
+            "execution_mode": row["execution_mode"] or "",
         })
 
     return history
