@@ -6657,7 +6657,7 @@ def render_api_screen() -> None:
             unsafe_allow_html=True,
         )
 
-        with st.expander("Prompt Preview", expanded=False):
+        with st.expander("How your prompt works", expanded=False):
             customize_prompt = st.checkbox(
                 "Customize prompt before sending",
                 value=st.session_state.api_prompt_customized,
@@ -6682,11 +6682,38 @@ def render_api_screen() -> None:
                     unsafe_allow_html=True,
                 )
             else:
-                st.text_area(
-                    "Prompt Preview",
-                    value=st.session_state.generated_prompt or "",
-                    height=220,
-                    disabled=True,
+                st.markdown(
+                    """
+<div style="border:1px solid #e0d8cc;border-radius:10px;padding:16px 20px;background:#fdf9f4;margin-top:4px;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+    <span style="background:#c97d3a;color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-transform:uppercase;">Two-Stage AI Prompt</span>
+    <span style="font-size:12px;color:#888;">Generated at runtime from your JD</span>
+  </div>
+  <p style="font-size:13.5px;color:#3a3a3a;margin:0 0 14px 0;line-height:1.6;">
+    Instead of a fixed template, Resume OTG runs a <strong>two-step process</strong> the moment you click <em>Run Optimization</em>:
+  </p>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <div style="min-width:28px;height:28px;border-radius:50%;background:#c97d3a;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">1</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#2a2a2a;">Read the JD — extract role intelligence</div>
+        <div style="font-size:12.5px;color:#666;margin-top:2px;">Identifies your target role level, function, top competencies in ranked order, and high-value keywords — all from <em>your specific job posting</em>, not a generic template.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <div style="min-width:28px;height:28px;border-radius:50%;background:#c97d3a;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">2</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#2a2a2a;">Build a tailored prompt — optimize your resume</div>
+        <div style="font-size:12.5px;color:#666;margin-top:2px;">Uses the JD intelligence from Step 1 to construct a precise editing prompt, then sends it to the AI. Your resume edits reflect the <em>actual</em> priorities of this role.</div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size:12px;color:#aaa;margin:14px 0 0 0;">
+    Want to write your own prompt instead? Check <strong>Customize prompt before sending</strong> above.
+  </p>
+</div>
+""",
+                    unsafe_allow_html=True,
                 )
 
     prompt_to_send = (
@@ -6700,7 +6727,7 @@ def render_api_screen() -> None:
         ("Job description", "Loaded" if st.session_state.job_description.strip() else "Missing"),
         ("Provider", provider),
         ("Model", model if model else "Missing"),
-        ("Prompt mode", "Customized" if st.session_state.api_prompt_customized else "Recommended"),
+        ("Prompt mode", "Customized" if st.session_state.api_prompt_customized else "Two-stage (recommended)"),
     ]
     if provider == "Advanced Custom Endpoint":
         checklist.append(("Base URL", "Ready" if base_url.strip() else "Missing"))
