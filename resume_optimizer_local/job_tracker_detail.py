@@ -35,6 +35,7 @@ from job_tracker_store import (
     update_job_status,
     update_note,
 )
+from ui_helpers import secondary_button
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -384,7 +385,7 @@ def render_job_tracker_detail_screen() -> None:
     # ── Back ──────────────────────────────────────────────────────────────────
     back_col, _ = st.columns([1.5, 6])
     with back_col:
-        if st.button("Job Tracker", key="jt-detail-back", use_container_width=True):
+        if secondary_button("Back", key="jt-detail-back", use_container_width=True):
             st.session_state.screen = "job_tracker"
             st.rerun()
 

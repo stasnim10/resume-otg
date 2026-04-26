@@ -20,7 +20,7 @@ from job_tracker_store import (
     update_job_metadata,
     update_job_status,
 )
-from ui_helpers import primary_button
+from ui_helpers import primary_button, secondary_button
 
 
 def _inject_jt_css() -> None:
@@ -419,30 +419,32 @@ def _render_edit_form(job: dict) -> None:
         picked = st.date_input("Applied Date", value=existing_date, max_value=datetime.date.today(), key=f"jt-edit-applied-{job_id}")
         new_applied = picked.strftime("%Y-%m-%d") if picked else ""
 
-    st.markdown('<div class="jt-form-actions">', unsafe_allow_html=True)
-    a1, a2, a3, _ = st.columns([1.5, 1.5, 1.5, 3.5])
-    with a1:
-        if primary_button("Save", key=f"jt-edit-save-{job_id}", use_container_width=True):
-            update_job_metadata(
-                job_id,
-                job_title=new_title or None,
-                company=new_company or None,
-                location=new_location,
-                job_url=new_url,
-                applied_date=new_applied,
-                status=new_status,
-            )
-            st.session_state.jt_edit_open = None
-            st.rerun()
-    with a2:
-        if st.button("Cancel", key=f"jt-edit-cancel-{job_id}", use_container_width=True):
-            st.session_state.jt_edit_open = None
-            st.rerun()
-    with a3:
-        if st.button("Delete", key=f"jt-edit-delete-{job_id}", use_container_width=True):
-            st.session_state.jt_delete_confirm = job_id
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+    outer_left, center_group, outer_right = st.columns([1.15, 3.2, 1.15], gap="small")
+    with center_group:
+        st.markdown('<div class="jt-form-actions">', unsafe_allow_html=True)
+        a1, a2, a3 = st.columns(3, gap="medium")
+        with a1:
+            if primary_button("Save", key=f"jt-edit-save-{job_id}", use_container_width=True):
+                update_job_metadata(
+                    job_id,
+                    job_title=new_title or None,
+                    company=new_company or None,
+                    location=new_location,
+                    job_url=new_url,
+                    applied_date=new_applied,
+                    status=new_status,
+                )
+                st.session_state.jt_edit_open = None
+                st.rerun()
+        with a2:
+            if secondary_button("Cancel", key=f"jt-edit-cancel-{job_id}", use_container_width=True):
+                st.session_state.jt_edit_open = None
+                st.rerun()
+        with a3:
+            if secondary_button("Delete", key=f"jt-edit-delete-{job_id}", use_container_width=True):
+                st.session_state.jt_delete_confirm = job_id
+                st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_empty_state() -> None:
@@ -453,7 +455,6 @@ def _render_job_card(job: dict) -> None:
     job_id = job["id"]
     display_title, display_company = _title_display(job["job_title"], job["company"])
 
-    status_active = st.session_state.get("jt_status_editing") == job_id
     note_active = st.session_state.get("jt_note_editing") == job_id
     edit_active = st.session_state.get("jt_edit_open") == job_id
     selected = job_id in st.session_state.get("jt_selected_ids", [])
@@ -481,7 +482,7 @@ def _render_job_card(job: dict) -> None:
 
     with st.container(border=True):
         # ✨ 4 Distinct Columns perfectly centered vertically ✨
-        c_pill, c_title, c_company, c_actions = st.columns([1.3, 3.5, 2.5, 3.8], gap="small", vertical_alignment="center")
+        c_pill, c_title, c_company, c_actions = st.columns([1.3, 3.7, 2.7, 3.1], gap="small", vertical_alignment="center")
 
         with c_pill:
             st.markdown(_status_pill(job["status"]), unsafe_allow_html=True)
@@ -497,32 +498,25 @@ def _render_job_card(job: dict) -> None:
             st.markdown(f'<div class="jt-row-company" title="{html.escape(display_company)}">{html.escape(display_company)}</div>', unsafe_allow_html=True)
 
         with c_actions:
-            a1, a2, a3, a4, a5 = st.columns([1, 1, 1, 1, 1.2], gap="small", vertical_alignment="center")
+            a1, a2, a3, a4 = st.columns([1, 1, 1, 1.2], gap="small", vertical_alignment="center")
             with a1:
                 if _jt_icon_button(":material/open_in_new:", key=f"jt-open-{job_id}"):
                     _nav("job_detail", active_job_detail_id=job_id)
             with a2:
-                if _jt_icon_button(":material/published_with_changes:", key=f"jt-status-{job_id}", active=status_active):
-                    st.session_state.jt_status_editing = None if status_active else job_id
-                    if not status_active:
-                        st.session_state.jt_note_editing = None
-                        st.session_state.jt_edit_open = None
-                    st.rerun()
-            with a3:
                 if _jt_icon_button(":material/sticky_note_2:", key=f"jt-note-{job_id}", active=note_active):
                     st.session_state.jt_note_editing = None if note_active else job_id
                     if not note_active:
                         st.session_state.jt_status_editing = None
                         st.session_state.jt_edit_open = None
                     st.rerun()
-            with a4:
+            with a3:
                 if _jt_icon_button(":material/edit:", key=f"jt-edit-{job_id}", active=edit_active):
                     st.session_state.jt_edit_open = None if edit_active else job_id
                     if not edit_active:
                         st.session_state.jt_status_editing = None
                         st.session_state.jt_note_editing = None
                     st.rerun()
-            with a5:
+            with a4:
                 st.markdown('<div class="jt-toggle-wrapper">', unsafe_allow_html=True)
                 st.toggle(
                     "Select",
@@ -533,31 +527,6 @@ def _render_job_card(job: dict) -> None:
                     label_visibility="collapsed",
                 )
                 st.markdown('</div>', unsafe_allow_html=True)
-
-        if status_active:
-            _inline_divider()
-            cur_idx = TRACKER_STATUSES.index(job["status"]) if job["status"] in TRACKER_STATUSES else 0
-            new_status = st.radio(
-                "Status",
-                TRACKER_STATUSES,
-                index=cur_idx,
-                key=f"jt-status-radio-{job_id}",
-                horizontal=True,
-                label_visibility="collapsed",
-            )
-            st.markdown('<div class="jt-form-actions">', unsafe_allow_html=True)
-            s1, s2, _ = st.columns([1.5, 1.5, 6], vertical_alignment="center")
-            with s1:
-                if primary_button("Save", key=f"jt-status-save-{job_id}", use_container_width=True):
-                    update_job_status(job_id, new_status)
-                    st.session_state.jt_status_editing = None
-                    st.rerun()
-            with s2:
-                if st.button("Cancel", key=f"jt-status-cancel-{job_id}", use_container_width=True):
-                    st.session_state.jt_status_editing = None
-                    st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-            _close_inline_divider()
 
         if note_active:
             _inline_divider()
@@ -659,17 +628,17 @@ def render_job_tracker_screen() -> None:
     if jobs:
         selected_ids = _selected_ids_for_visible_jobs(jobs)
         if selected_ids:
-            c1, c2, c3, _ = st.columns([1.5, 1, 1.5, 4], vertical_alignment="center")
+            c1, _, c2, c3 = st.columns([1.5, 4.5, 1.4, 1.4], vertical_alignment="center")
             with c1:
                 st.markdown(f'<div class="jt-selection-copy">{len(selected_ids)} selected</div>', unsafe_allow_html=True)
             with c2:
-                if _jt_inline_tool_button("Clear", key="jt-clear-visible"):
+                if secondary_button("Clear", key="jt-clear-visible", use_container_width=True):
                     for job in jobs:
                         st.session_state[f"jt-select-{job['id']}"] = False
                     st.session_state.jt_selected_ids = []
                     st.rerun()
             with c3:
-                if _jt_inline_tool_button("Delete selected", key="jt-bulk-delete", danger=True):
+                if secondary_button("Delete selected", key="jt-bulk-delete", use_container_width=True):
                     for job_id in selected_ids:
                         delete_job(job_id)
                         st.session_state[f"jt-select-{job_id}"] = False
