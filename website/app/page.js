@@ -27,12 +27,6 @@ const steps = [
   },
 ];
 
-const productNotes = [
-  "Guided setup that instantly builds your professional profile.",
-  "Transparent AI suggestions—you review every change before it's applied.",
-  "Integrated Job Tracker to organize your applications in one clean view.",
-];
-
 export default function HomePage() {
   return (
     <main className="page-shell">
@@ -113,14 +107,16 @@ export default function HomePage() {
         </div>
         <div className="product-showcase">
           <div className="video-placeholder">
-            <span>Product walkthrough coming soon</span>
-          </div>
-          <div className="product-note-list">
-            {productNotes.map((note) => (
-              <div className="product-note" key={note}>
-                {note}
-              </div>
-            ))}
+            <div className="video-frame">
+              <iframe
+                src="https://www.youtube.com/embed/W7k3avzYMB4?si=QcCdmGtA4KDXTnkM"
+                title="Resume OTG product walkthrough"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
           </div>
         </div>
       </section>
