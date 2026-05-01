@@ -28,6 +28,8 @@ from profile_store import (
     start_onboarding,
 )
 from ui_helpers import primary_button, secondary_button
+from llm_core.errors import GuardrailFailure
+from llm_core.guardrails.input_guards import validate_profile_input
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -550,6 +552,12 @@ def _run_extraction(files: list, notes: str) -> None:
             raw_text = "\n\n".join(p for p in raw_parts if p.strip())
             if not raw_text.strip():
                 st.error("No readable content found — try a different file or paste some text.")
+                return
+
+            try:
+                validate_profile_input(raw_text)
+            except GuardrailFailure as gf:
+                st.error(str(gf))
                 return
 
             source_name = ", ".join(source_names) or "Uploaded documents"
