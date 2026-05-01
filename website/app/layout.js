@@ -1,13 +1,18 @@
 import "./globals.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://resume-optimizer-otg.streamlit.app";
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://resume-builder-otg.vercel.app";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.resumeotg.app";
 
 export const metadata = {
   title: "Resume OTG — Resume optimization that feels guided, not chaotic.",
   description:
     "Resume OTG helps job seekers build stronger resumes with guided onboarding, profile intelligence, explainable AI optimization, and a Job Tracker that keeps every application organised.",
   metadataBase: new URL(siteUrl),
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
   openGraph: {
     title: "Resume OTG",
     description:
