@@ -1,7 +1,7 @@
 import "./globals.css";
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://resume-optimizer-otg.streamlit.app";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.resumeotg.app";
+const ogImage = "/hero-image.png";
 
 export const metadata = {
   title: "Resume OTG — Resume optimization that feels guided, not chaotic.",
@@ -21,9 +21,9 @@ export const metadata = {
     siteName: "Resume OTG",
     images: [
       {
-        url: "/logo.png",
-        width: 966,
-        height: 724,
+        url: ogImage,
+        width: 1060,
+        height: 834,
         alt: "Resume OTG — guided resume optimization",
       },
     ],
@@ -35,8 +35,13 @@ export const metadata = {
     title: "Resume OTG",
     description:
       "Guided resume optimization with explainable AI, profile intelligence, and Job Tracker.",
-    images: ["/logo.png"],
+    images: [ogImage],
   },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }) {

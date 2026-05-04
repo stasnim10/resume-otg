@@ -26,6 +26,7 @@ Interaction model
 
 from __future__ import annotations
 
+import html
 import re
 import tempfile
 from pathlib import Path
@@ -41,6 +42,7 @@ from profile_extractor import extract_profile_basics as extract_profile_basics_f
 from profile_store import (
     archive_profile_item,
     create_or_get_profile,
+    delete_profile_source,
     list_profile_items,
     list_profile_sources,
     save_profile_basics,
@@ -90,6 +92,50 @@ _EXP_TYPE_OPTIONS = [
 _EXP_TYPE_VALUES  = [v for v, _ in _EXP_TYPE_OPTIONS]
 _EXP_TYPE_LABELS  = [l for _, l in _EXP_TYPE_OPTIONS]
 _EXP_LABEL_BY_VAL = {v: l for v, l in _EXP_TYPE_OPTIONS}
+
+_FIELD_LABELS_BY_TYPE = {
+    "project": {
+        "title": "Project name",
+        "organization": "Organization / client (optional)",
+        "title_placeholder": "Warehouse automation dashboard",
+        "organization_placeholder": "Decathlon, university lab, or personal project",
+    },
+    "leadership": {
+        "title": "Role title",
+        "organization": "Organization name",
+        "title_placeholder": "Treasurer · Team Lead · Chapter President",
+        "organization_placeholder": "Student association, club, or team",
+    },
+    "volunteering": {
+        "title": "Role title",
+        "organization": "Organization name",
+        "title_placeholder": "Volunteer Coordinator",
+        "organization_placeholder": "Community organization or nonprofit",
+    },
+    "business": {
+        "title": "Role / business title",
+        "organization": "Company / business name",
+        "title_placeholder": "Founder · Operations Lead",
+        "organization_placeholder": "Company or venture name",
+    },
+}
+
+
+def _item_field_labels(item_type: str, is_edu: bool) -> dict[str, str]:
+    """Return labels/placeholders for profile-item identity fields."""
+    if is_edu:
+        return {
+            "title": "Degree / program",
+            "organization": "School / institution",
+            "title_placeholder": "B.S. Business Administration",
+            "organization_placeholder": "University or school name",
+        }
+    return _FIELD_LABELS_BY_TYPE.get(item_type, {
+        "title": "Role title",
+        "organization": "Company name",
+        "title_placeholder": "Supply Chain Intern",
+        "organization_placeholder": "Decathlon",
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -187,11 +233,41 @@ def _date_range(item: ProfileItem) -> str:
     return " – ".join(parts)
 
 
+def _date_sort_value(date_str: str) -> tuple[int, int]:
+    """Return sortable (year, month) from profile dates; blanks sort oldest."""
+    month, year = _parse_date_parts(date_str)
+    try:
+        year_num = int(year)
+    except ValueError:
+        year_num = 0
+    try:
+        month_num = int(month) if month else 12
+    except ValueError:
+        month_num = 12
+    return year_num, month_num
+
+
+def _item_recency_key(item: ProfileItem) -> tuple[int, int, int, str]:
+    """Sort current and most recent profile items first."""
+    end_value = (9999, 12) if item.is_current else _date_sort_value(item.end_date)
+    start_value = _date_sort_value(item.start_date)
+    return (
+        end_value[0],
+        end_value[1],
+        start_value[0],
+        item.updated_at or item.created_at or "",
+    )
+
+
+def _sort_profile_items(items: list[ProfileItem]) -> list[ProfileItem]:
+    return sorted(items, key=_item_recency_key, reverse=True)
+
+
 def _items_for(items: list[ProfileItem], tab: str) -> list[ProfileItem]:
     if tab == "education":
-        return [i for i in items if i.item_type in _EDUCATION_TYPES]
+        return _sort_profile_items([i for i in items if i.item_type in _EDUCATION_TYPES])
     if tab == "experience":
-        return [i for i in items if i.item_type in _EXPERIENCE_TYPES]
+        return _sort_profile_items([i for i in items if i.item_type in _EXPERIENCE_TYPES])
     if tab == "skills":
         return [i for i in items if i.item_type in _SKILLS_TYPES]
     return []
@@ -241,6 +317,96 @@ def _save_cancel(form_key: str) -> tuple[bool, bool]:
 
 def _clear_editing() -> None:
     st.session_state.profile_editing = None
+
+
+def _render_document_action_styles() -> None:
+    """Compact document controls that avoid the global pill button style."""
+    st.markdown(
+        """
+        <style>
+          .profile-doc-list {
+            margin-top: 0.6rem;
+          }
+
+          .profile-doc-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            min-height: 26px;
+            padding: 0.05rem 0;
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.35;
+          }
+
+          .profile-doc-name {
+            min-width: 0;
+            overflow-wrap: anywhere;
+          }
+
+          .stApp .profile-doc-icon-button .stButton,
+          .profile-doc-icon-button .stButton {
+            display: flex !important;
+            justify-content: flex-end !important;
+            margin: 0 !important;
+          }
+
+          .stApp .profile-doc-icon-button .stButton button,
+          .profile-doc-icon-button .stButton button {
+            width: 28px !important;
+            min-width: 28px !important;
+            height: 28px !important;
+            min-height: 28px !important;
+            padding: 0 !important;
+            border-radius: 999px !important;
+            border: 1px solid var(--line) !important;
+            background: rgba(255,255,255,0.62) !important;
+            color: var(--muted) !important;
+            font-size: 0.9rem !important;
+            font-weight: 700 !important;
+            line-height: 1 !important;
+            box-shadow: none !important;
+          }
+
+          .stApp .profile-doc-icon-button .stButton button:hover,
+          .profile-doc-icon-button .stButton button:hover {
+            background: var(--surface-muted) !important;
+            color: var(--text) !important;
+            opacity: 1 !important;
+          }
+
+          .stApp .profile-doc-icon-button .stButton button *,
+          .profile-doc-icon-button .stButton button * {
+            color: inherit !important;
+          }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _document_icon_button(label: str, key: str, help_text: str) -> bool:
+    st.markdown('<div class="profile-doc-icon-button">', unsafe_allow_html=True)
+    clicked = st.button(label, key=key, help=help_text)
+    st.markdown("</div>", unsafe_allow_html=True)
+    return clicked
+
+
+def _render_document_header(editing: bool) -> None:
+    title_col, action_col = st.columns([18, 1], gap="small", vertical_alignment="top")
+    with title_col:
+        st.markdown(
+            '<div class="apple-kicker">Documents</div>'
+            '<div class="apple-section-title">Your reference library.</div>',
+            unsafe_allow_html=True,
+        )
+    with action_col:
+        label = "✓" if editing else "✎"
+        help_text = "Done" if editing else "Edit documents"
+        if _document_icon_button(label, "profile-doc-edit-toggle", help_text):
+            st.session_state.profile_docs_editing = not editing
+            st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -413,6 +579,7 @@ def _render_reference_upload_ui() -> None:
 
 def _render_documents(profile) -> None:
     sources = list_profile_sources()
+    _render_document_action_styles()
 
     with st.container(border=True):
         if not sources:
@@ -428,14 +595,40 @@ def _render_documents(profile) -> None:
         else:
             # ── Returning user ─────────────────────────────────────────────
             # Documents are a reference library — upload saves to context, no extraction.
-            _section_header("Documents", "Your reference library.")
-            for src in sources[:8]:
-                icon = "📎" if getattr(src, "source_type", "") == "reference" else "📄"
+            editing_docs = bool(st.session_state.get("profile_docs_editing"))
+            _render_document_header(editing_docs)
+            if not editing_docs:
+                rows: list[str] = []
+                for src in sources[:8]:
+                    icon = "📎" if getattr(src, "source_type", "") == "reference" else "📄"
+                    source_name = html.escape(src.source_name or "Unnamed document")
+                    rows.append(
+                        '<div class="profile-doc-row">'
+                        f'<span class="profile-doc-name">{icon} {source_name}</span>'
+                        "</div>"
+                    )
                 st.markdown(
-                    f'<div style="font-size:0.88rem; color:var(--muted); padding:0.18rem 0;">'
-                    f'{icon} {src.source_name or "Unnamed document"}</div>',
+                    '<div class="profile-doc-list">' + "".join(rows) + "</div>",
                     unsafe_allow_html=True,
                 )
+            else:
+                st.markdown('<div class="profile-doc-list">', unsafe_allow_html=True)
+                for src in sources[:8]:
+                    icon = "📎" if getattr(src, "source_type", "") == "reference" else "📄"
+                    name_col, remove_col = st.columns([18, 1], gap="small", vertical_alignment="center")
+                    with name_col:
+                        st.markdown(
+                            '<div class="profile-doc-row">'
+                            f'<span class="profile-doc-name">{icon} {html.escape(src.source_name or "Unnamed document")}</span>'
+                            "</div>",
+                            unsafe_allow_html=True,
+                        )
+                    with remove_col:
+                        if _document_icon_button("×", f"profile-source-remove-{src.id}", "Remove document"):
+                            delete_profile_source(src.id)
+                            st.toast("Removed from your reference library.")
+                            st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
             if len(sources) > 8:
                 st.caption(f"+{len(sources) - 8} more")
 
@@ -697,13 +890,19 @@ def _render_item_card(item: ProfileItem, tab: str) -> None:
         top_col, btn_col = st.columns([5, 1])
         with top_col:
             date_str = _date_range(item)
-            org_date = " · ".join(filter(None, [item.organization, date_str]))
             type_badge = _item_type_label(item)
+            if tab == "experience":
+                primary = " · ".join(filter(None, [item.organization, item.title])) or type_badge
+                secondary_parts = [date_str]
+            else:
+                primary = item.title or type_badge
+                secondary_parts = [item.organization, date_str]
+            detail_line = " · ".join(filter(None, secondary_parts))
             st.markdown(
-                f'<div style="font-weight:600; font-size:1rem;">{item.title or type_badge}</div>'
+                f'<div style="font-weight:600; font-size:1rem;">{primary}</div>'
                 f'<div style="color:var(--muted); font-size:0.9rem; margin-bottom:0.35rem;">'
-                f'{org_date}'
-                f'{"  ·  " if org_date else ""}'
+                f'{detail_line}'
+                f'{"  ·  " if detail_line else ""}'
                 f'<span style="font-size:0.8rem; background:var(--surface-muted); padding:0.1rem 0.45rem;'
                 f' border-radius:999px; border:1px solid var(--line);">{type_badge}</span>'
                 f"</div>",
@@ -759,16 +958,21 @@ def _item_form(
                 index=default_idx,
             )
             item_type = type_values[type_labels.index(selected_label)]
+            field_labels = _item_field_labels(item_type, is_edu)
             title = st.text_input(
-                "Title / Degree",
+                field_labels["title"],
                 value=existing.title if existing else "",
-                placeholder="Supply Chain Intern · B.S. Business",
+                placeholder=field_labels["title_placeholder"],
             )
             org = st.text_input(
-                "Organization / School",
+                field_labels["organization"],
                 value=existing.organization if existing else "",
-                placeholder="Company or institution",
+                placeholder=field_labels["organization_placeholder"],
             )
+            if not is_edu and item_type == "experience":
+                st.caption(
+                    "Company name is stored separately from role title. Existing saved items are not changed automatically."
+                )
             loc = st.text_input(
                 "Location (optional)",
                 value=existing.location if existing else "",

@@ -1,5 +1,8 @@
 import Image from "next/image";
 import { StickyNav } from "./components/StickyNav";
+import { ProductVideo } from "./components/ProductVideo";
+import { Reveal } from "./components/Reveal";
+import { StaggerGrid, StaggerItem } from "./components/StaggerGrid";
 import { SupportActions } from "@/components/SupportActions";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://resume-optimizer-otg.streamlit.app";
@@ -55,7 +58,7 @@ export default function HomePage() {
       <section className="hero-simple" id="top">
         <div className="hero-simple-copy">
           <p className="eyebrow">Resume OTG</p>
-          <h1>Craft your Perfect Resume. Land the Interview.</h1>
+          <h1>Craft your perfect resume. Land the interview.</h1>
           <p className="hero-simple-body">
             Stop wrestling with formatting and generic AI rewrites. Resume OTG guides you through a clean, step-by-step process to tailor your experience for the exact roles you want—keeping you in control every step of the way.
           </p>
@@ -67,6 +70,9 @@ export default function HomePage() {
               See how it works
             </a>
           </div>
+          <p className="app-load-note">
+            The app may take a moment to wake up on first load.
+          </p>
         </div>
 
         <div className="hero-simple-visual">
@@ -77,60 +83,67 @@ export default function HomePage() {
             height={1856}
             className="hero-image"
             priority
+            fetchPriority="high"
+            decoding="async"
           />
         </div>
       </section>
 
       <section className="section" id="how-it-works">
-        <div className="section-heading narrow">
-          <p className="eyebrow">How it works</p>
-          <h2>Simple, Guided, and Review-first.</h2>
-        </div>
-        <div className="flow-grid">
+        <Reveal className="section-heading narrow">
+          <p className="eyebrow">Guided workflow</p>
+          <h2>Simple, guided, and review-first.</h2>
+        </Reveal>
+        <StaggerGrid className="flow-grid">
           {steps.map((item) => (
-            <article className="flow-card" key={item.step}>
-              <span className="flow-step">{item.step}</span>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </article>
+            <StaggerItem key={item.step}>
+              <article className="flow-card">
+                <span className="flow-step">{item.step}</span>
+                <h3>{item.title}</h3>
+                <p>{item.body}</p>
+              </article>
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerGrid>
       </section>
 
       <section className="section" id="product">
-        <div className="section-heading narrow">
-          <p className="eyebrow">Product</p>
-          <h2>Everything you Need. Nothing you Don't.</h2>
+        <Reveal className="section-heading narrow">
+          <p className="eyebrow">See it in action</p>
+          <h2>Everything you need. Nothing you don't.</h2>
           <p>
             See exactly how Resume OTG streamlines your application process from start to finish.
           </p>
-        </div>
+        </Reveal>
         <div className="product-showcase">
           <div className="video-placeholder">
-            <div className="video-frame">
-              <iframe
-                src="https://www.youtube.com/embed/W7k3avzYMB4?si=QcCdmGtA4KDXTnkM"
-                title="Resume OTG product walkthrough"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              />
-            </div>
+            <ProductVideo />
           </div>
         </div>
       </section>
 
       <section className="section" id="support">
-        <div className="section-heading narrow">
+        <Reveal className="section-heading narrow">
           <p className="eyebrow">Help and support</p>
-          <h2>We're here to Help.</h2>
+          <h2>We're here to help.</h2>
           <p>
             Got a question or need a hand? Reach out anytime. If Resume OTG helped you land that interview, we'd love to hear about it.
           </p>
-        </div>
+        </Reveal>
         <SupportActions />
       </section>
+
+      <footer className="site-footer">
+        <div>
+          <p className="footer-brand">Resume OTG</p>
+          <p className="footer-copy">Guided resume optimization for job seekers who want clarity before they click apply.</p>
+        </div>
+        <nav className="footer-links" aria-label="Footer">
+          <a href="/privacy">Privacy</a>
+          <a href="#support">Support</a>
+          <a href={appUrl} target="_blank" rel="noreferrer">Open app</a>
+        </nav>
+      </footer>
     </main>
   );
 }

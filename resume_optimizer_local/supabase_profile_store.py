@@ -323,6 +323,14 @@ def list_profile_sources(user_id: str = "local-user") -> list[ProfileSource]:
         return []
 
 
+def delete_profile_source(source_id: Any, user_id: str = "local-user") -> None:
+    uid = _uid(user_id)
+    try:
+        _sb().table("profile_sources").delete().eq("id", str(source_id)).eq("user_id", uid).execute()
+    except Exception as exc:
+        logger.warning("delete_profile_source failed: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Profile items
 # ---------------------------------------------------------------------------

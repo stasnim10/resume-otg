@@ -505,6 +505,16 @@ def list_profile_sources(user_id: str = "local-user") -> list[ProfileSource]:
     ]
 
 
+def delete_profile_source(source_id: int, user_id: str = "local-user") -> None:
+    """Delete a stored source document from the reference library."""
+    init_profile_db()
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM profile_sources WHERE id = ? AND user_id = ?",
+            (source_id, user_id),
+        )
+
+
 def update_profile_item_verification(item_id: int, verification_status: str) -> None:
     """Update the verification flag for a profile item."""
     with get_connection() as conn:

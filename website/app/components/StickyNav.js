@@ -1,6 +1,5 @@
 "use client";
-import { motion, useMotionValue, useScroll, useTransform } from "motion/react";
-import { useEffect } from "react";
+import { motion, useScroll, useTransform } from "motion/react";
 
 /**
  * Wraps the site header in a sticky container that transitions from
@@ -14,7 +13,11 @@ export function StickyNav({ children }) {
     [0, 72],
     ["rgba(248,246,242,0)", "rgba(248,246,242,0.88)"]
   );
-  const borderOpacity = useTransform(scrollY, [0, 72], [0, 0.12]);
+  const borderColor = useTransform(
+    scrollY,
+    [0, 72],
+    ["rgba(31,29,30,0)", "rgba(31,29,30,0.12)"]
+  );
   const shadow = useTransform(
     scrollY,
     [0, 72],
@@ -27,7 +30,8 @@ export function StickyNav({ children }) {
       style={{
         backgroundColor: bg,
         boxShadow: shadow,
-        borderBottom: `1px solid rgba(31,29,30,${borderOpacity})`,
+        borderBottom: "1px solid",
+        borderColor,
         backdropFilter: "blur(18px)",
         WebkitBackdropFilter: "blur(18px)",
       }}
