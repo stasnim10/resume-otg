@@ -78,7 +78,7 @@ from help_widget import render_help_section, render_support_button
 from profile_screen import render_profile_screen
 from onboarding_screen import render_onboarding_screen
 from job_tracker_screen import render_job_tracker_screen
-from job_tracker_detail import render_job_tracker_detail_screen
+from job_tracker_detail import render_job_tracker_detail_screen, render_job_prep_screen
 from job_tracker_store import init_tracker_tables
 from shell import (
     FLOW_STEPS,
@@ -7601,6 +7601,8 @@ def main() -> None:
         render_job_tracker_screen()
     elif screen == "job_detail":
         render_job_tracker_detail_screen()
+    elif screen == "job_prep":
+        render_job_prep_screen()
     elif screen == "application_workspace":
         render_application_workspace_screen()
     elif screen == "optimization_history":

@@ -1,5 +1,5 @@
 """
-Job Tracker — job detail view (3-tab).
+Job Tracker — job detail view.
 
 Design principles:
   - No emoji in tracker UI
@@ -12,7 +12,9 @@ Tabs:
   2. Job & Materials — JD, materials, optimization run history
   3. History   — timeline with expandable opt-run rows
 
-Entry point: render_job_tracker_detail_screen()
+Prep is a separate full-page screen ("job_prep") reached via the header button.
+
+Entry points: render_job_tracker_detail_screen(), render_job_prep_screen()
 """
 from __future__ import annotations
 
@@ -26,6 +28,7 @@ from job_tracker_store import (
     add_note,
     delete_job,
     get_job,
+    get_profile_items_for_job,
     list_materials,
     list_notes,
     list_optimization_runs,
@@ -35,6 +38,8 @@ from job_tracker_store import (
     update_job_status,
     update_note,
 )
+from profile_store import create_or_get_profile, list_profile_items
+from role_prep_engine import RolePrepKit, build_role_prep
 from ui_helpers import secondary_button
 
 # ── Constants ──────────────────────────────────────────────────────────────────
@@ -58,6 +63,10 @@ def _status_pill(status: str) -> str:
         f'font-size:0.75rem;font-weight:600;background:{color};color:#fff;">'
         f"{status}</span>"
     )
+
+
+def _slug(value: str) -> str:
+    return "".join(ch.lower() if ch.isalnum() else "-" for ch in value).strip("-") or "prompt"
 
 
 # ── Tab renders ────────────────────────────────────────────────────────────────
@@ -361,10 +370,102 @@ def _render_history_tab(job: dict) -> None:
             )
 
 
+def _render_prompt_panel(label: str, prompt_text: str, job_id: int | str) -> None:
+    st.caption("Copy this into ChatGPT, Claude, or your preferred AI tool.")
+    st.text_area(
+        f"{label} prompt",
+        value=prompt_text,
+        height=400,
+        key=f"role-prep-prompt-text-{job_id}-{_slug(label)}",
+        label_visibility="collapsed",
+    )
+    st.download_button(
+        f"Download {label} prompt",
+        data=prompt_text,
+        file_name=f"resume-otg-{job_id}-{_slug(label)}.md",
+        mime="text/markdown",
+        key=f"role-prep-download-{job_id}-{_slug(label)}",
+        use_container_width=True,
+    )
+
+
+def render_job_prep_screen() -> None:
+    """Full-page prep screen — prompts only, no evidence panel."""
+    job_id: int | None = st.session_state.get("active_job_detail_id")
+
+    if not job_id:
+        st.error("No job selected.")
+        if st.button("Back to Tracker", key="job-prep-err-back"):
+            st.session_state.screen = "job_tracker"
+            st.rerun()
+        return
+
+    job = get_job(job_id)
+    if not job:
+        st.error("Job not found.")
+        if st.button("Back", key="job-prep-notfound-back"):
+            st.session_state.screen = "job_tracker"
+            st.rerun()
+        return
+
+    # ── Back ─────────────────────────────────────────────────────────────────
+    back_col, _ = st.columns([1.5, 6])
+    with back_col:
+        if secondary_button("Back", key="job-prep-back", use_container_width=True):
+            st.session_state.screen = "job_detail"
+            st.rerun()
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    display_title = job["job_title"] or "Role title missing"
+    st.markdown(f"<h1 style='font-size:1.55rem;font-weight:700;margin:0.3rem 0 0.1rem;'>{display_title}</h1>", unsafe_allow_html=True)
+    sub_parts = [p for p in [job.get("company") or "", job.get("location") or ""] if p]
+    if sub_parts:
+        st.caption("  ·  ".join(sub_parts))
+
+    st.markdown(
+        '<hr style="border:none;border-top:1px solid var(--line);margin:0.75rem 0;">',
+        unsafe_allow_html=True,
+    )
+
+    # ── Guards ────────────────────────────────────────────────────────────────
+    jd_text = (job.get("jd_text") or "").strip()
+    if len(jd_text) < 40:
+        st.info("Add a job description in Job & Materials first — the prompts are built from it.")
+        return
+
+    profile_items = [item for item in list_profile_items() if item.visibility == "active"]
+    if not profile_items:
+        st.info("Complete your Career Profile first — the prompts pull from your saved experience.")
+        if st.button("Open Career Profile", key="job-prep-open-profile", use_container_width=True):
+            st.session_state.screen = "profile"
+            st.rerun()
+        return
+
+    # ── Build kit ─────────────────────────────────────────────────────────────
+    profile = create_or_get_profile()
+    linked_rows = get_profile_items_for_job(job_id)
+    linked_ids = {str(row.get("id")) for row in linked_rows if row.get("id") is not None}
+
+    with st.spinner("Building your prep prompts…"):
+        kit = build_role_prep(job, profile_items, profile, linked_item_ids=linked_ids)
+
+    # ── Prompt tabs ───────────────────────────────────────────────────────────
+    st.markdown(
+        "<p style='color:var(--muted);font-size:0.92rem;margin-bottom:0.75rem;'>"
+        "Pick what you need. Copy the prompt into ChatGPT, Claude, or any AI tool.</p>",
+        unsafe_allow_html=True,
+    )
+
+    prompt_tabs = st.tabs(list(kit.prompts.keys()))
+    for tab, (label, prompt_text) in zip(prompt_tabs, kit.prompts.items()):
+        with tab:
+            _render_prompt_panel(label, prompt_text, job_id)
+
+
 # ── Main entry point ───────────────────────────────────────────────────────────
 
 def render_job_tracker_detail_screen() -> None:
-    """Render the 3-tab job detail view."""
+    """Render the job detail view."""
     job_id: int | None = st.session_state.get("active_job_detail_id")
 
     if not job_id:
@@ -406,7 +507,7 @@ def render_job_tracker_detail_screen() -> None:
     if sub_parts:
         st.caption("  ·  ".join(sub_parts))
 
-    badge_col, score_col, _ = st.columns([2, 2, 4])
+    badge_col, score_col, prep_col = st.columns([2, 2, 3])
     with badge_col:
         st.markdown(_status_pill(job["status"]), unsafe_allow_html=True)
     with score_col:
@@ -422,6 +523,15 @@ def render_job_tracker_detail_screen() -> None:
                 f'<span style="color:var(--muted);font-size:0.75rem;">{delta_str}</span></p>',
                 unsafe_allow_html=True,
             )
+    with prep_col:
+        if st.button(
+            "Prep for this role →",
+            key=f"jt-prep-btn-{job_id}",
+            type="primary",
+            use_container_width=True,
+        ):
+            st.session_state.screen = "job_prep"
+            st.rerun()
 
     st.markdown(
         '<hr style="border:none;border-top:1px solid var(--line);margin:0.75rem 0;">',
@@ -429,7 +539,9 @@ def render_job_tracker_detail_screen() -> None:
     )
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
-    tab_overview, tab_materials, tab_history = st.tabs(["Overview", "Job & Materials", "History"])
+    tab_overview, tab_materials, tab_history = st.tabs(
+        ["Overview", "Job & Materials", "History"]
+    )
 
     with tab_overview:
         _render_overview_tab(job)
