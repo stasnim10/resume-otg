@@ -4,6 +4,8 @@ Streamlit app for Resume OTG.
 from __future__ import annotations
 
 import io
+import hashlib
+import html
 import json
 import logging
 import re
@@ -17,6 +19,12 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from ai_gateway import PROVIDER_CONFIG, get_provider_models, optimize_with_provider
+from default_resume_store import (
+    delete_default_resume,
+    get_default_resume_metadata,
+    read_default_resume,
+    save_default_resume,
+)
 from docx_handler import apply_replacements, build_resume_from_scratch, extract_text
 from jd_cleaning import clean_job_description
 from jd_fetcher import fetch_job_description_from_url, looks_like_url
@@ -539,6 +547,9 @@ def apply_apple_theme() -> None:
           --alert-bg: #f0faf4;
           --btn-primary-bg: #d97757;
           --btn-primary-text: #ffffff;
+          --btn-secondary-bg: #ffffff;
+          --btn-secondary-text: #1d1d1f;
+          --btn-secondary-border: rgba(0,0,0,0.12);
           --header-bg: rgba(245,245,247,0.94);
           --card-border: rgba(0,0,0,0.06);
           --focus-blue: rgba(0,113,227,0.5);
@@ -572,6 +583,9 @@ def apply_apple_theme() -> None:
             --alert-bg: #112017;
             --btn-primary-bg: #d97757;
             --btn-primary-text: #ffffff;
+            --btn-secondary-bg: #16181b;
+            --btn-secondary-text: #f5f5f7;
+            --btn-secondary-border: rgba(255,255,255,0.18);
             --header-bg: rgba(14,15,18,0.94);
             --card-border: rgba(255,255,255,0.10);
             --focus-blue: rgba(78,161,255,0.55);
@@ -617,6 +631,22 @@ def apply_apple_theme() -> None:
           text-align: center;
         }
 
+        .apple-hero.apple-hero-dashboard {
+          padding: 0.25rem 0 1.35rem 0;
+          text-align: left;
+          border-bottom: 1px solid var(--line);
+          margin-bottom: 1.15rem;
+        }
+
+        .apple-hero.apple-hero-dashboard .apple-eyebrow,
+        .apple-hero.apple-hero-dashboard h1,
+        .apple-hero.apple-hero-dashboard .apple-page-title,
+        .apple-hero.apple-hero-dashboard p {
+          margin-left: 0;
+          margin-right: 0;
+          text-align: left;
+        }
+
         .apple-eyebrow {
           display: inline-flex;
           align-items: center;
@@ -641,6 +671,13 @@ def apply_apple_theme() -> None:
           margin-right: auto;
         }
 
+        .apple-hero.apple-hero-dashboard h1,
+        .apple-hero.apple-hero-dashboard .apple-page-title {
+          font-size: clamp(2.05rem, 3.2vw, 3.2rem);
+          max-width: 14em;
+          margin-bottom: 0.55rem;
+        }
+
         .apple-hero p, .apple-subtitle {
           margin: 0;
           font-size: 1.06rem;
@@ -649,6 +686,13 @@ def apply_apple_theme() -> None:
           max-width: 760px;
           margin-left: auto;
           margin-right: auto;
+        }
+
+        .apple-hero.apple-hero-dashboard p,
+        .apple-hero.apple-hero-dashboard .apple-subtitle {
+          font-size: 1rem;
+          line-height: 1.55;
+          max-width: 720px;
         }
 
         .apple-trust-row {
@@ -677,7 +721,7 @@ def apply_apple_theme() -> None:
           gap: 0.35rem;
           width: fit-content;
           padding: 0.5rem 0.8rem;
-          margin: 0 auto 2.2rem auto;
+          margin: 0 auto 1.35rem auto;
           background: var(--step-active-bg);
           border-radius: 999px;
         }
@@ -742,20 +786,20 @@ def apply_apple_theme() -> None:
         }
 
         .apple-panel {
-          border-radius: 24px;
-          padding: 2.5rem;
+          border-radius: 14px;
+          padding: 1.5rem;
         }
 
         .apple-card {
-          border-radius: 24px;
-          padding: 2.5rem;
+          border-radius: 14px;
+          padding: 1.5rem;
           min-height: 100%;
         }
 
         .apple-choice {
-          border-radius: 32px;
-          padding: 2rem;
-          min-height: 380px;
+          border-radius: 14px;
+          padding: 1.5rem;
+          min-height: 300px;
           transition: background-color 180ms ease, border-color 180ms ease, opacity 180ms ease;
         }
 
@@ -782,7 +826,7 @@ def apply_apple_theme() -> None:
         }
 
         .apple-choice-title {
-          font-size: 1.9rem;
+          font-size: 1.45rem;
           line-height: 1.12;
           letter-spacing: -0.022em;
           font-weight: 700;
@@ -798,7 +842,7 @@ def apply_apple_theme() -> None:
         }
 
         .apple-section-title {
-          font-size: 1.45rem;
+          font-size: 1.18rem;
           font-weight: 700;
           letter-spacing: -0.022em;
           margin-bottom: 0.45rem;
@@ -806,8 +850,8 @@ def apply_apple_theme() -> None:
 
         .apple-section-copy {
           color: var(--muted);
-          font-size: 1rem;
-          line-height: 1.72;
+          font-size: 0.95rem;
+          line-height: 1.62;
           margin-bottom: 1.1rem;
         }
 
@@ -874,9 +918,9 @@ def apply_apple_theme() -> None:
         }
 
         .apple-landing-card {
-          min-height: 380px;
-          padding: 2.75rem;
-          border-radius: 30px;
+          min-height: 280px;
+          padding: 1.75rem;
+          border-radius: 18px;
           background: var(--surface);
           border: 1px solid var(--line);
           box-shadow: none;
@@ -889,6 +933,46 @@ def apply_apple_theme() -> None:
         .apple-landing-card:hover {
           box-shadow: var(--shadow-raised);
           transform: translateY(-2px);
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.apple-landing-card-title) {
+          position: relative;
+          overflow: hidden;
+          transform-style: preserve-3d;
+          transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease, background 240ms ease;
+          animation: apple-card-rise 520ms ease both;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.apple-landing-card-title)::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          border-radius: inherit;
+          background:
+            linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0) 42%),
+            radial-gradient(circle at 88% 16%, rgba(217,119,87,0.12), rgba(217,119,87,0) 30%),
+            radial-gradient(circle at 8% 95%, rgba(59,130,246,0.10), rgba(59,130,246,0) 32%);
+          opacity: 0;
+          transition: opacity 240ms ease;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.apple-landing-card-title):hover {
+          transform: perspective(900px) rotateX(1.5deg) rotateY(-1.8deg) translateY(-5px);
+          box-shadow: 0 24px 58px rgba(17, 24, 39, 0.12) !important;
+          border-color: rgba(217, 119, 87, 0.28) !important;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.apple-landing-card-title):hover::before {
+          opacity: 1;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.apple-landing-card-title) .apple-kicker,
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.apple-landing-card-title) .apple-landing-card-title,
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.apple-landing-card-title) .apple-landing-card-copy,
+        [data-testid="stVerticalBlockBorderWrapper"]:has(.apple-landing-card-title) .stButton {
+          position: relative;
+          z-index: 1;
         }
 
         .apple-landing-card.featured {
@@ -924,19 +1008,19 @@ def apply_apple_theme() -> None:
         }
 
         .apple-landing-card-title {
-          font-size: 2rem;
-          line-height: 1.08;
+          font-size: 1.48rem;
+          line-height: 1.14;
           letter-spacing: -0.022em;
           font-weight: 700;
-          margin: 0.2rem 0 0.85rem 0;
+          margin: 0.1rem 0 0.55rem 0;
         }
 
         .apple-landing-card-copy {
           color: var(--muted);
-          font-size: 1rem;
-          line-height: 1.72;
+          font-size: 0.95rem;
+          line-height: 1.55;
           max-width: 33ch;
-          margin-bottom: 1.25rem;
+          margin-bottom: 0.95rem;
         }
 
         .apple-landing-actions {
@@ -968,6 +1052,137 @@ def apply_apple_theme() -> None:
           font-size: 0.92rem;
           line-height: 1.45;
           color: var(--text);
+        }
+
+        .apple-dashboard-section-label {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          margin: 0.9rem 0 0.65rem 0;
+        }
+
+        .apple-dashboard-section-label-title {
+          font-size: 0.78rem;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--muted-light);
+          font-weight: 700;
+        }
+
+        .apple-metric-strip {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 0.7rem;
+          margin: 0.75rem 0 0.4rem 0;
+          perspective: 900px;
+        }
+
+        .apple-metric-pill {
+          position: relative;
+          overflow: hidden;
+          border: 1px solid var(--line);
+          background: var(--surface);
+          border-radius: 14px;
+          padding: 0.85rem 0.95rem;
+          min-height: 96px;
+          transform-style: preserve-3d;
+          animation: apple-card-rise 520ms ease both;
+          transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+        }
+
+        .apple-metric-pill:nth-child(2) {
+          animation-delay: 70ms;
+        }
+
+        .apple-metric-pill:nth-child(3) {
+          animation-delay: 140ms;
+        }
+
+        .apple-metric-pill:nth-child(4) {
+          animation-delay: 210ms;
+        }
+
+        .apple-metric-pill::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.62) 42%, transparent 70%);
+          transform: translateX(-120%);
+          opacity: 0;
+        }
+
+        .apple-metric-pill:hover {
+          transform: perspective(800px) rotateX(2deg) translateY(-4px);
+          box-shadow: 0 18px 42px rgba(17, 24, 39, 0.10);
+          border-color: rgba(59, 130, 246, 0.24);
+        }
+
+        .apple-metric-pill:hover::after {
+          opacity: 1;
+          animation: apple-sheen 850ms ease;
+        }
+
+        .apple-metric-pill-label {
+          font-size: 0.68rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--muted-light);
+          line-height: 1.3;
+        }
+
+        .apple-metric-pill-value {
+          margin-top: 0.45rem;
+          font-size: 1.55rem;
+          line-height: 1;
+          font-weight: 800;
+          color: var(--text);
+        }
+
+        .apple-metric-pill-delta {
+          margin-top: 0.45rem;
+          font-size: 0.78rem;
+          color: var(--muted);
+          line-height: 1.3;
+        }
+
+        @keyframes apple-card-rise {
+          from {
+            opacity: 0;
+            transform: perspective(900px) rotateX(4deg) translateY(14px);
+          }
+          to {
+            opacity: 1;
+            transform: perspective(900px) rotateX(0deg) translateY(0);
+          }
+        }
+
+        @keyframes apple-sheen {
+          from {
+            transform: translateX(-120%);
+          }
+          to {
+            transform: translateX(120%);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          [data-testid="stVerticalBlockBorderWrapper"]:has(.apple-landing-card-title),
+          .apple-metric-pill {
+            animation: none;
+            transition: none;
+          }
+
+          [data-testid="stVerticalBlockBorderWrapper"]:has(.apple-landing-card-title):hover,
+          .apple-metric-pill:hover {
+            transform: none;
+          }
+
+          .apple-metric-pill:hover::after {
+            animation: none;
+          }
         }
 
         .apple-running-card {
@@ -1028,7 +1243,7 @@ def apply_apple_theme() -> None:
         .instruction-panel {
           margin: 0.65rem 0 1rem 0;
           padding: 1.45rem 1.5rem;
-          border-radius: 20px;
+          border-radius: 14px;
           border: 1px solid var(--line);
           background: var(--bg);
         }
@@ -1068,7 +1283,7 @@ def apply_apple_theme() -> None:
         .apple-summary-grid {
           background: var(--surface);
           border: 1px solid var(--line);
-          border-radius: 24px;
+          border-radius: 14px;
           padding: 2rem;
           margin: 1rem 0 1.1rem 0;
         }
@@ -1125,8 +1340,8 @@ def apply_apple_theme() -> None:
         .apple-readiness-card {
           background: var(--bg);
           border: 1px solid var(--line);
-          border-radius: 20px;
-          padding: 1.25rem 1.35rem;
+          border-radius: 12px;
+          padding: 0.9rem 1rem;
           margin-top: 0.8rem;
         }
 
@@ -1155,14 +1370,14 @@ def apply_apple_theme() -> None:
         }
 
         div[data-testid="stVerticalBlock"] div[data-testid="stContainer"] {
-          border-radius: 32px;
+          border-radius: 14px;
         }
 
         [data-testid="stVerticalBlockBorderWrapper"] {
           background-color: var(--surface) !important;
           border: 1px solid var(--card-border) !important;
-          border-radius: 32px !important;
-          padding: 1.5rem !important;
+          border-radius: 14px !important;
+          padding: 1.15rem !important;
           box-shadow: none !important;
           height: 100%;
           display: flex;
@@ -1177,16 +1392,43 @@ def apply_apple_theme() -> None:
         .stSelectbox > div > div,
         .stTextArea textarea,
         .stMultiSelect > div > div {
-          border-radius: 20px !important;
+          border-radius: 12px !important;
+        }
+
+        div[data-testid="stExpander"] details {
+          background: var(--surface) !important;
+          border: 1px solid var(--line) !important;
+        }
+
+        div[data-testid="stExpander"] summary,
+        div[data-testid="stExpander"] summary *,
+        div[data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
+          color: var(--text) !important;
+        }
+
+        div[data-testid="stTabs"] button {
+          color: var(--muted) !important;
+          border-radius: 999px !important;
+        }
+
+        div[data-testid="stTabs"] button[aria-selected="true"] {
+          color: var(--text) !important;
+          background: var(--surface-muted) !important;
         }
 
         .stTextArea textarea,
         .stTextInput input {
           background: var(--input-fill) !important;
-          border: 1px solid transparent !important;
+          border: 1px solid var(--line-strong) !important;
           color: var(--text) !important;
           box-shadow: none !important;
           transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+        }
+
+        .stTextArea textarea::placeholder,
+        .stTextInput input::placeholder {
+          color: rgba(110, 110, 115, 0.72) !important;
+          opacity: 1 !important;
         }
 
         .stTextArea textarea:focus,
@@ -1200,7 +1442,110 @@ def apply_apple_theme() -> None:
         .stSelectbox > div > div,
         .stMultiSelect > div > div {
           background: var(--input-fill) !important;
-          border: 1px solid transparent !important;
+          border: 1px solid var(--line-strong) !important;
+        }
+
+        .stSelectbox [data-baseweb="select"],
+        .stMultiSelect [data-baseweb="select"] {
+          background: var(--input-fill) !important;
+          border-color: var(--line-strong) !important;
+          color: var(--text) !important;
+        }
+
+        .stSelectbox [data-baseweb="select"] div,
+        .stSelectbox [data-baseweb="select"] span,
+        .stSelectbox [data-baseweb="select"] input,
+        .stMultiSelect [data-baseweb="select"] div,
+        .stMultiSelect [data-baseweb="select"] span,
+        .stMultiSelect [data-baseweb="select"] input {
+          color: var(--text) !important;
+          -webkit-text-fill-color: var(--text) !important;
+        }
+
+        .stSelectbox [data-baseweb="select"] svg,
+        .stMultiSelect [data-baseweb="select"] svg {
+          color: var(--muted-light) !important;
+          fill: currentColor !important;
+        }
+
+        .stSelectbox [data-baseweb="select"] input::placeholder,
+        .stMultiSelect [data-baseweb="select"] input::placeholder {
+          color: rgba(110, 110, 115, 0.72) !important;
+          -webkit-text-fill-color: rgba(110, 110, 115, 0.72) !important;
+          opacity: 1 !important;
+        }
+
+        [data-baseweb="popover"] [role="listbox"],
+        [data-baseweb="menu"] {
+          background: var(--surface) !important;
+          border: 1px solid var(--line-strong) !important;
+          color: var(--text) !important;
+        }
+
+        [data-baseweb="popover"] [role="option"],
+        [data-baseweb="popover"] li,
+        [data-baseweb="menu"] li {
+          background: var(--surface) !important;
+          color: var(--text) !important;
+        }
+
+        [data-baseweb="popover"] [role="option"]:hover,
+        [data-baseweb="popover"] li:hover,
+        [data-baseweb="menu"] li:hover {
+          background: var(--surface-muted) !important;
+          color: var(--text) !important;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          .stTextArea textarea,
+          .stTextInput input,
+          .stSelectbox > div > div,
+          .stMultiSelect > div > div,
+          .stSelectbox [data-baseweb="select"],
+          .stMultiSelect [data-baseweb="select"] {
+            border-color: rgba(255, 255, 255, 0.18) !important;
+          }
+
+          .stTextArea textarea::placeholder,
+          .stTextInput input::placeholder {
+            color: rgba(208, 212, 219, 0.58) !important;
+          }
+
+          .stSelectbox [data-baseweb="select"] div,
+          .stSelectbox [data-baseweb="select"] span,
+          .stSelectbox [data-baseweb="select"] input,
+          .stMultiSelect [data-baseweb="select"] div,
+          .stMultiSelect [data-baseweb="select"] span,
+          .stMultiSelect [data-baseweb="select"] input {
+            color: #f5f5f7 !important;
+            -webkit-text-fill-color: #f5f5f7 !important;
+          }
+
+          .stSelectbox [data-baseweb="select"] input::placeholder,
+          .stMultiSelect [data-baseweb="select"] input::placeholder {
+            color: rgba(208, 212, 219, 0.58) !important;
+            -webkit-text-fill-color: rgba(208, 212, 219, 0.58) !important;
+          }
+
+          [data-baseweb="popover"] [role="listbox"],
+          [data-baseweb="menu"] {
+            background: #16181b !important;
+            border-color: rgba(255, 255, 255, 0.16) !important;
+          }
+
+          [data-baseweb="popover"] [role="option"],
+          [data-baseweb="popover"] li,
+          [data-baseweb="menu"] li {
+            background: #16181b !important;
+            color: #f5f5f7 !important;
+          }
+
+          [data-baseweb="popover"] [role="option"]:hover,
+          [data-baseweb="popover"] li:hover,
+          [data-baseweb="menu"] li:hover {
+            background: #1d2024 !important;
+            color: #ffffff !important;
+          }
         }
 
         .stButton button, .stDownloadButton button {
@@ -1322,10 +1667,10 @@ def apply_apple_theme() -> None:
 
         .stApp .apple-secondary button,
         .apple-secondary button {
-          background: #d97757 !important;
-          color: #ffffff !important;
+          background: var(--btn-secondary-bg) !important;
+          color: var(--btn-secondary-text) !important;
           box-shadow: none !important;
-          border-color: #d97757 !important;
+          border-color: var(--btn-secondary-border) !important;
         }
 
         .stApp .apple-secondary button *,
@@ -1336,8 +1681,8 @@ def apply_apple_theme() -> None:
         .apple-secondary button p,
         .apple-secondary button span,
         .apple-secondary button div {
-          color: #ffffff !important;
-          fill: #ffffff !important;
+          color: var(--btn-secondary-text) !important;
+          fill: var(--btn-secondary-text) !important;
           opacity: 1 !important;
         }
 
@@ -1363,7 +1708,7 @@ def apply_apple_theme() -> None:
         }
 
         div[data-testid="stAlert"] {
-          border-radius: 20px;
+          border-radius: 12px;
           border: 1px solid var(--line);
           box-shadow: none;
           background: var(--alert-bg);
@@ -1400,14 +1745,77 @@ def apply_apple_theme() -> None:
           margin-top: 1.5rem;
           padding: 1rem;
           background: var(--surface-muted);
-          border-radius: 20px;
+          border-radius: 12px;
           border-left: 3px solid var(--green);
           text-align: center;
+        }
+
+        .apple-simple-table {
+          border: 1px solid var(--line);
+          border-radius: 12px;
+          overflow: hidden;
+          background: var(--surface);
+          margin-top: 0.9rem;
+        }
+
+        .apple-simple-row {
+          display: grid;
+          grid-template-columns: minmax(160px, 1.6fr) minmax(120px, 1fr) 0.65fr 0.75fr 0.9fr;
+          gap: 0.8rem;
+          align-items: center;
+          padding: 0.8rem 0.95rem;
+          border-bottom: 1px solid var(--line);
+          color: var(--text);
+        }
+
+        .apple-simple-row:last-child {
+          border-bottom: none;
+        }
+
+        .apple-simple-row.header {
+          background: var(--surface-muted);
+          color: var(--muted-light);
+          font-size: 0.72rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .apple-simple-title {
+          font-weight: 700;
+          color: var(--text);
+          line-height: 1.3;
+        }
+
+        .apple-simple-subtle {
+          color: var(--muted);
+          font-size: 0.86rem;
+          line-height: 1.35;
+        }
+
+        .apple-score-good { color: var(--green); font-weight: 800; }
+        .apple-score-mid { color: var(--amber); font-weight: 800; }
+        .apple-score-low { color: var(--muted); font-weight: 800; }
+
+        @media (max-width: 760px) {
+          .apple-simple-row,
+          .apple-simple-row.header {
+            grid-template-columns: 1fr;
+          }
+
+          .apple-simple-row.header {
+            display: none;
+          }
         }
 
         @media (max-width: 900px) {
           .apple-hero h1, .apple-page-title {
             font-size: clamp(2.6rem, 10vw, 3.8rem);
+          }
+
+          .apple-hero.apple-hero-dashboard h1,
+          .apple-hero.apple-hero-dashboard .apple-page-title {
+            font-size: clamp(2rem, 8vw, 2.7rem);
           }
 
           .apple-hero-panel,
@@ -1423,6 +1831,16 @@ def apply_apple_theme() -> None:
           }
 
           .apple-landing-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .apple-metric-strip {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 560px) {
+          .apple-metric-strip {
             grid-template-columns: 1fr;
           }
         }
@@ -1500,6 +1918,11 @@ def apply_apple_theme() -> None:
           border-radius: 0 !important;
           font-family: var(--font-main) !important;
         }
+        .stTabs [data-baseweb="tab"]:hover,
+        .stTabs [data-baseweb="tab"]:focus-visible {
+          background: var(--surface-muted) !important;
+          color: var(--text) !important;
+        }
         .stTabs [aria-selected="true"] {
           color: var(--text) !important;
           border-bottom-color: var(--text) !important;
@@ -1507,6 +1930,27 @@ def apply_apple_theme() -> None:
         }
         .stTabs [data-baseweb="tab-highlight"],
         .stTabs [data-baseweb="tab-border"] { display: none !important; }
+
+        @media (prefers-color-scheme: dark) {
+          .stTabs [data-baseweb="tab-list"] {
+            border-bottom-color: rgba(255, 255, 255, 0.14) !important;
+          }
+
+          .stTabs [data-baseweb="tab"] {
+            color: rgba(245, 245, 247, 0.74) !important;
+          }
+
+          .stTabs [data-baseweb="tab"]:hover,
+          .stTabs [data-baseweb="tab"]:focus-visible {
+            background: #1b1e22 !important;
+            color: #ffffff !important;
+          }
+
+          .stTabs [aria-selected="true"] {
+            color: #ffffff !important;
+            border-bottom-color: #ffffff !important;
+          }
+        }
 
         /* ── Form labels — consistent sizing ── */
         .stTextInput label, .stTextArea label,
@@ -1536,10 +1980,74 @@ def apply_apple_theme() -> None:
         }
 
         /* ── Expander label ── */
+        [data-testid="stExpander"] details {
+          background: var(--surface) !important;
+          border: 1px solid var(--line) !important;
+          border-radius: 16px !important;
+          overflow: hidden !important;
+        }
+
         [data-testid="stExpander"] summary {
+          min-height: 48px !important;
+          padding: 0.75rem 1rem !important;
+          background: var(--surface-muted) !important;
+          border-radius: 16px !important;
+          color: var(--text) !important;
           font-size: 0.875rem !important;
-          font-weight: 500 !important;
+          font-weight: 650 !important;
           font-family: var(--font-main) !important;
+          transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+        }
+
+        [data-testid="stExpander"] summary > div,
+        [data-testid="stExpander"] summary [data-testid="stExpanderHeader"],
+        [data-testid="stExpander"] summary [data-testid="stExpanderHeader"] > div {
+          background: transparent !important;
+        }
+
+        [data-testid="stExpander"] details[open] summary {
+          background: var(--panel-fill) !important;
+          border-bottom: 1px solid var(--line) !important;
+          border-bottom-left-radius: 0 !important;
+          border-bottom-right-radius: 0 !important;
+        }
+
+        [data-testid="stExpander"] summary:hover,
+        [data-testid="stExpander"] summary:focus-visible {
+          background: var(--surface) !important;
+          color: var(--text) !important;
+        }
+
+        [data-testid="stExpander"] summary *,
+        [data-testid="stExpander"] [data-testid="stExpanderTitle"],
+        [data-testid="stExpander"] [data-testid="stExpanderHeader"],
+        [data-testid="stExpander"] [data-testid="stExpanderToggleIcon"],
+        [data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] * {
+          color: var(--text) !important;
+          fill: currentColor !important;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          [data-testid="stExpander"] details {
+            background: #111316 !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+          }
+
+          [data-testid="stExpander"] summary {
+            background: #171a1e !important;
+            color: #f5f5f7 !important;
+          }
+
+          [data-testid="stExpander"] details[open] summary {
+            background: #24211d !important;
+            border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+          }
+
+          [data-testid="stExpander"] summary:hover,
+          [data-testid="stExpander"] summary:focus-visible {
+            background: #2b2a26 !important;
+            color: #ffffff !important;
+          }
         }
 
         /* ── Sidebar layout ── */
@@ -1970,18 +2478,15 @@ def get_effective_industry(job_description: str) -> str:
     return st.session_state.target_industry.strip() or detect_industry(job_description)
 
 
-def save_uploaded_resume(uploaded_file) -> None:
-    """Store uploaded resume data and extracted plain text in session state."""
+def _store_resume_in_session(resume_name: str, resume_bytes: bytes, source: str = "upload") -> None:
+    """Store resume data and extracted plain text in session state."""
     _progress = st.progress(0)
     _status = st.empty()
     _progress.progress(10)
-    _status.caption("Uploading your resume...")
+    _status.caption("Loading your resume...")
     time.sleep(0.15)
 
-    resume_bytes = uploaded_file.getvalue()
-
-    # Determine file suffix based on uploaded filename
-    filename_lower = uploaded_file.name.lower()
+    filename_lower = resume_name.lower()
     if not filename_lower.endswith(".docx"):
         _progress.empty()
         _status.empty()
@@ -2003,27 +2508,52 @@ def save_uploaded_resume(uploaded_file) -> None:
     finally:
         Path(temp_path).unlink(missing_ok=True)
 
-    st.session_state.resume_name = uploaded_file.name
+    st.session_state.resume_name = resume_name
     st.session_state.resume_bytes = resume_bytes
     st.session_state.resume_text = resume_text
+    st.session_state.resume_source = source
     st.session_state.resume_paragraphs = [
         paragraph.strip()
         for paragraph in resume_text.splitlines()
         if paragraph.strip()
     ]
     logger.info(
-        "Resume uploaded: filename=%s, paragraphs=%s",
-        uploaded_file.name,
+        "Resume loaded: filename=%s, source=%s, paragraphs=%s",
+        resume_name,
+        source,
         len(st.session_state.resume_paragraphs),
     )
     st.session_state.local_ai_job_signals = {}
     st.session_state.local_ai_profile_summary = ""
     st.session_state.local_ai_profile_headline = ""
+    st.session_state.resume_fit_report = None
+    st.session_state.baseline_fit_report = None
+    st.session_state.optimized_fit_report = None
+    st.session_state.resume_fit_report_signature = ""
+    if st.session_state.get("job_description", "").strip():
+        _evaluate_current_resume_fit(force=True)
     _progress.progress(100)
     _status.caption("Resume ready.")
     time.sleep(0.2)
     _progress.empty()
     _status.empty()
+
+
+def save_uploaded_resume(uploaded_file, save_as_default: bool = False) -> None:
+    """Store uploaded resume data in session state and optionally persist it as default."""
+    resume_bytes = uploaded_file.getvalue()
+    _store_resume_in_session(uploaded_file.name, resume_bytes, source="upload")
+    if save_as_default:
+        metadata = save_default_resume(uploaded_file.name, resume_bytes)
+        st.session_state.default_resume_last_saved = metadata.get("saved_at", "")
+        st.session_state.resume_source = "saved_default"
+
+
+def load_default_resume_into_session() -> None:
+    """Load the saved default resume into the current optimization session."""
+    metadata, resume_bytes = read_default_resume()
+    resume_name = str(metadata.get("original_name") or "Saved resume.docx")
+    _store_resume_in_session(resume_name, resume_bytes, source="saved_default")
 
 
 def analyze_payload(payload: dict) -> dict:
@@ -2243,13 +2773,14 @@ def render_landing() -> None:
     hero_eyebrow = "Welcome Back" if is_returning_user else "Resume OTG"
     hero_title = f"Welcome back, {profile.full_name.strip()}." if is_returning_user and profile.full_name.strip() else "Make resume tailoring feel beautifully simple."
     hero_copy = (
-        "Pick up where you left off, build from your saved profile, or jump back into an application already in progress."
+        "Choose your next workflow. Resume OTG will carry your saved resume and profile context forward."
         if is_returning_user
         else "Start with the task you need right now. The app will quietly build your profile in the background so future applications get easier."
     )
+    hero_class = "apple-hero apple-hero-dashboard" if is_returning_user else "apple-hero"
     local_ai_chip = (
         (
-            f'<div class="apple-landing-status" style="max-width: 430px; margin: 1.4rem auto 0 auto;">'
+            f'<div class="apple-landing-status" style="max-width: 430px; margin-top: 1rem;">'
             f'<div class="apple-landing-status-kicker">{local_ai_card_status}</div>'
             f'<div class="apple-landing-status-copy">{local_ai_status_copy}</div>'
             f'</div>'
@@ -2260,7 +2791,7 @@ def render_landing() -> None:
     st.markdown(
         f"""
         <div class="apple-hero-panel">
-          <div class="apple-hero">
+          <div class="{hero_class}">
             <div class="apple-eyebrow">{hero_eyebrow}</div>
             <h1>{hero_title}</h1>
             <p>{hero_copy}</p>
@@ -2272,9 +2803,9 @@ def render_landing() -> None:
     )
 
     if is_returning_user:
-        _render_landing_metric_cards(optimization_history)
-        # --- Returning users: 2-column layout (no builder card) ---
-        col1, col2 = st.columns(2, gap="large")
+        _render_dashboard_section_label("Next Action", "Pick one path to continue.")
+        # --- Returning users: primary work modes ---
+        col1, col2, col3 = st.columns(3, gap="large")
 
         with col1:
             with st.container(border=True):
@@ -2320,9 +2851,26 @@ def render_landing() -> None:
                         st.session_state.screen = "job_tracker"
                         st.rerun()
 
+        with col3:
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <div class="apple-kicker">Bulk Application</div>
+                    <div class="apple-landing-card-title">Optimize up to 5 jobs at once</div>
+                    <div class="apple-landing-card-copy">Paste multiple job links or descriptions, format each JD, then generate prompts or resumes in one batch.</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if secondary_button("Start Bulk Application", use_container_width=True, key="landing-bulk"):
+                    st.session_state.screen = "bulk_application"
+                    st.rerun()
+
+        _render_dashboard_section_label("Activity Snapshot", "Your recent optimization momentum.")
+        _render_landing_metric_cards(optimization_history)
+
     else:
-        # --- New users: 3-column layout ---
-        col1, col2, col3 = st.columns(3, gap="large")
+        # --- New users: 4-column layout ---
+        col1, col2, col3, col4 = st.columns(4, gap="large")
 
         with col1:
             with st.container(border=True):
@@ -2368,6 +2916,20 @@ def render_landing() -> None:
                 )
                 if secondary_button("Import Materials", use_container_width=True, key="landing-import"):
                     st.session_state.screen = "profile"
+                    st.rerun()
+
+        with col4:
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <div class="apple-kicker">Bulk Application</div>
+                    <div class="apple-landing-card-title">Process multiple jobs</div>
+                    <div class="apple-landing-card-copy">Add up to 5 postings, clean each description, and choose Manual Mode or Full AI Optimization for the full batch.</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if secondary_button("Start Bulk Application", use_container_width=True, key="landing-bulk"):
+                    st.session_state.screen = "bulk_application"
                     st.rerun()
 
     render_shell_end()
@@ -2445,70 +3007,25 @@ def _record_completed_optimization_for_landing(mode: str) -> None:
     ) + 1
 
 
-def _render_metric_card(title: str, value: str, delta: str, tone: str = "neutral") -> None:
-    """Render a consistent custom metric card."""
-    tone_map = {
-        "green": {
-            "border": "#22c55e",
-            "badge_bg": "linear-gradient(135deg, #16a34a 0%, #4ade80 100%)",
-        },
-        "orange": {
-            "border": "#d97757",
-            "badge_bg": "linear-gradient(135deg, #d97757 0%, #f59e0b 100%)",
-        },
-        "blue": {
-            "border": "#3b82f6",
-            "badge_bg": "linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)",
-        },
-        "neutral": {
-            "border": "#c7bba8",
-            "badge_bg": "linear-gradient(135deg, #7c6f64 0%, #b7a38c 100%)",
-        },
-    }
-    styles = tone_map.get(tone, tone_map["neutral"])
+def _render_metric_card(title: str, value: str, delta: str) -> str:
+    """Return compact landing metric markup."""
+    return (
+        '<div class="apple-metric-pill">'
+        f'<div class="apple-metric-pill-label">{title}</div>'
+        f'<div class="apple-metric-pill-value">{value}</div>'
+        f'<div class="apple-metric-pill-delta">{delta}</div>'
+        "</div>"
+    )
+
+
+def _render_dashboard_section_label(title: str, helper: str = "") -> None:
+    """Render a subtle section label on dashboard-style pages."""
+    helper_markup = f'<div class="apple-minor-copy">{helper}</div>' if helper else ""
     st.markdown(
         f"""
-        <div style="
-            background: #ffffff;
-            padding: 22px 22px 20px 22px;
-            border-radius: 18px;
-            box-shadow: 0 8px 24px rgba(17, 24, 39, 0.06);
-            border: 1px solid rgba(215, 119, 87, 0.10);
-            border-top: 4px solid {styles["border"]};
-            min-height: 172px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            margin: 6px 0 10px 0;
-        ">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
-                <div style="
-                    color: #7b7280;
-                    font-size: 12px;
-                    font-weight: 700;
-                    letter-spacing: 0.09em;
-                    text-transform: uppercase;
-                    line-height: 1.4;
-                ">{title}</div>
-                <div style="
-                    background: {styles["badge_bg"]};
-                    color: #fff;
-                    padding: 6px 10px;
-                    border-radius: 999px;
-                    font-size: 12px;
-                    font-weight: 700;
-                    white-space: nowrap;
-                    line-height: 1;
-                ">{delta}</div>
-            </div>
-            <div style="
-                color: #1f2937;
-                font-size: 2rem;
-                font-weight: 800;
-                line-height: 1.1;
-                margin-top: 14px;
-                word-break: break-word;
-            ">{value}</div>
+        <div class="apple-dashboard-section-label">
+          <div class="apple-dashboard-section-label-title">{title}</div>
+          {helper_markup}
         </div>
         """,
         unsafe_allow_html=True,
@@ -2554,16 +3071,15 @@ def _render_landing_metric_cards(optimization_history: list[dict]) -> None:
 
     avg_gain = round(total_match_gain / total_runs) if total_runs else 0
 
-    st.markdown("<div style='height: 0.4rem;'></div>", unsafe_allow_html=True)
-    metric_cols = st.columns(4, gap="medium")
-    with metric_cols[0]:
-        _render_metric_card("Resumes Optimized", f"{total_runs}", f"+{runs_this_month} this month", tone="orange")
-    with metric_cols[1]:
-        _render_metric_card("AI Mode Runs", f"{ai_runs}", "Full AI + Private", tone="green")
-    with metric_cols[2]:
-        _render_metric_card("Manual Runs", f"{manual_runs}", "Bring your own AI", tone="blue")
-    with metric_cols[3]:
-        _render_metric_card("Estimated Time Saved", _format_minutes_saved(total_minutes_saved), "Based on 30 min per run", tone="neutral")
+    metric_cards = "".join(
+        [
+            _render_metric_card("Resumes Optimized", f"{total_runs}", f"+{runs_this_month} this month"),
+            _render_metric_card("AI Mode Runs", f"{ai_runs}", "Full AI + Private"),
+            _render_metric_card("Manual Runs", f"{manual_runs}", "Bring your own AI"),
+            _render_metric_card("Time Saved", _format_minutes_saved(total_minutes_saved), "Based on 30 min per run"),
+        ]
+    )
+    st.markdown(f'<div class="apple-metric-strip">{metric_cards}</div>', unsafe_allow_html=True)
 
 
 def _profile_setup_complete() -> bool:
@@ -2902,6 +3418,21 @@ def _get_selected_profile_items() -> list[ProfileItem]:
     return [items_by_id[item_id] for item_id in st.session_state.get("selected_profile_item_ids", []) if item_id in items_by_id]
 
 
+def _active_profile_items() -> list[ProfileItem]:
+    """Return active profile items that can safely guide prompt relevance."""
+    return [item for item in list_profile_items() if item.visibility == "active"]
+
+
+def _sync_profile_defaults_to_session(profile) -> None:
+    """Use profile-level defaults when session fields still have startup values."""
+    if profile.career_stage and st.session_state.get("career_stage") == CAREER_STAGES[0]:
+        st.session_state.career_stage = profile.career_stage
+    if not st.session_state.get("target_role") and profile.target_roles:
+        st.session_state.target_role = profile.target_roles[0]
+    if not st.session_state.get("target_industry") and profile.target_industries:
+        st.session_state.target_industry = profile.target_industries[0]
+
+
 def _build_profile_context(items: list[ProfileItem]) -> str:
     """Convert selected profile items into a compact prompt context block."""
     sections: list[str] = []
@@ -2921,18 +3452,44 @@ def _build_profile_context(items: list[ProfileItem]) -> str:
     return "\n\n".join(sections)
 
 
+def _build_prompt_profile_context(use_active_defaults: bool = False) -> str:
+    """Build profile context from top-level profile plus selected or active items."""
+    profile = create_or_get_profile()
+    _sync_profile_defaults_to_session(profile)
+
+    context_sections: list[str] = []
+    profile_lines = [
+        f"Headline: {profile.headline}" if profile.headline else "",
+        f"Career stage: {profile.career_stage}" if profile.career_stage else "",
+        f"Summary: {profile.summary}" if profile.summary else "",
+        f"Target roles: {', '.join(profile.target_roles)}" if profile.target_roles else "",
+        f"Target industries: {', '.join(profile.target_industries)}" if profile.target_industries else "",
+    ]
+    profile_block = "\n".join(line for line in profile_lines if line)
+    if profile_block:
+        context_sections.append("PROFILE BASICS\n" + profile_block)
+
+    items = _get_selected_profile_items()
+    if use_active_defaults and not items:
+        items = _active_profile_items()
+        if items:
+            st.session_state.use_career_profile = True
+            st.session_state.selected_profile_item_ids = [item.id for item in items if item.id is not None]
+
+    item_context = _build_profile_context(items)
+    if item_context:
+        context_sections.append("PROFILE EVIDENCE ITEMS\n" + item_context)
+
+    return "\n\n".join(context_sections)
+
+
 def _build_optimizer_prompt_from_state() -> str:
     """Build the optimizer prompt enriched with profile evidence and JD gap analysis."""
-    # Sync profile fields into session state when the session still has un-set defaults.
-    _profile = create_or_get_profile()
-    if _profile.career_stage and st.session_state.get("career_stage") == CAREER_STAGES[0]:
-        st.session_state.career_stage = _profile.career_stage
-    if not st.session_state.get("target_role") and _profile.target_roles:
-        st.session_state.target_role = _profile.target_roles[0]
-    if not st.session_state.get("target_industry") and _profile.target_industries:
-        st.session_state.target_industry = _profile.target_industries[0]
-
-    profile_context = _build_profile_context(_get_selected_profile_items()) if st.session_state.get("use_career_profile") else ""
+    profile_context = (
+        _build_prompt_profile_context(use_active_defaults=True)
+        if st.session_state.get("use_career_profile")
+        else ""
+    )
 
     # Pull missing keywords/skills from the current fit report so the LLM knows
     # exactly which JD signals are absent from the resume and should be incorporated.
@@ -2950,6 +3507,196 @@ def _build_optimizer_prompt_from_state() -> str:
         missing_keywords=missing_keywords,
         missing_skills=missing_skills,
     )
+
+
+MAX_BULK_JOBS = 5
+
+
+def _empty_bulk_job() -> dict:
+    """Return a fresh Bulk Application job slot."""
+    return {
+        "raw_input": "",
+        "cleaned_text": "",
+        "source_url": "",
+        "role": "",
+        "company": "",
+        "industry": "",
+        "fit_report": {},
+        "match_score": None,
+        "optimized_fit_report": {},
+        "optimized_score": None,
+        "score_delta": None,
+        "prompt": "",
+        "manual_output": "",
+        "status": "Empty",
+        "error": "",
+        "payload": None,
+        "review_details": None,
+        "docx_bytes": None,
+        "filename": "",
+        "download_filename": "",
+    }
+
+
+def _ensure_bulk_jobs() -> list[dict]:
+    """Keep exactly five Bulk Application job slots in session state."""
+    jobs = st.session_state.get("bulk_jobs") or []
+    normalized_jobs: list[dict] = []
+    for job in jobs[:MAX_BULK_JOBS]:
+        slot = _empty_bulk_job()
+        if isinstance(job, dict):
+            slot.update(job)
+        normalized_jobs.append(slot)
+    while len(normalized_jobs) < MAX_BULK_JOBS:
+        normalized_jobs.append(_empty_bulk_job())
+    st.session_state.bulk_jobs = normalized_jobs
+    return normalized_jobs
+
+
+def _reset_bulk_application() -> None:
+    """Reset Bulk Application-specific state without clearing the resume."""
+    st.session_state.bulk_jobs = [_empty_bulk_job() for _ in range(MAX_BULK_JOBS)]
+    st.session_state.bulk_execution_mode = None
+    st.session_state.bulk_last_run_summary = ""
+    for index in range(MAX_BULK_JOBS):
+        st.session_state.pop(f"bulk-job-input-{index}", None)
+        st.session_state.pop(f"bulk-manual-output-{index}", None)
+        st.session_state.pop(f"bulk-download-name-{index}", None)
+        st.session_state.pop(f"bulk-api-download-name-{index}", None)
+
+
+def _bulk_prompt_for_job(cleaned_text: str, role: str, industry: str) -> str:
+    """Build an optimizer prompt for one bulk job."""
+    profile_context = _build_prompt_profile_context(use_active_defaults=True)
+    return build_optimizer_prompt(
+        st.session_state.resume_text or "",
+        cleaned_text,
+        st.session_state.career_stage,
+        role or detect_role_title(cleaned_text) or "the target role",
+        industry or detect_industry(cleaned_text),
+        profile_context=profile_context,
+        missing_keywords=[],
+        missing_skills=[],
+    )
+
+
+def _format_bulk_job(raw_input: str) -> dict:
+    """Fetch or clean one pasted Bulk Application job input."""
+    job = _empty_bulk_job()
+    job["raw_input"] = raw_input
+    if not raw_input.strip():
+        return job
+
+    if looks_like_url(raw_input):
+        extracted_text, final_url, role_hint = fetch_job_description_from_url(raw_input)
+        cleaning_result = clean_job_description(extracted_text)
+        cleaned_text = cleaning_result["cleaned_text"]
+        job["source_url"] = final_url
+        job["role"] = role_hint or detect_role_title(cleaned_text)
+    else:
+        cleaning_result = clean_job_description(raw_input)
+        cleaned_text = cleaning_result["cleaned_text"]
+        job["role"] = detect_role_title(cleaned_text)
+
+    job["cleaned_text"] = cleaned_text
+    job["company"] = detect_company_name(cleaned_text)
+    job["industry"] = detect_industry(cleaned_text)
+    fit_report = evaluate_resume_fit(
+        st.session_state.resume_text or "",
+        cleaned_text,
+        selected_profile_items=_active_profile_items(),
+    )
+    job["fit_report"] = fit_report
+    job["match_score"] = int(fit_report.get("overall_score", 0))
+    job["prompt"] = _bulk_prompt_for_job(cleaned_text, job["role"], job["industry"])
+    job["status"] = "Prompt ready"
+    return job
+
+
+def _sanitize_docx_filename(value: str, fallback: str) -> str:
+    """Return a safe .docx filename from user-editable text."""
+    filename = re.sub(r"[/\\:*?\"<>|]+", "_", str(value or "").strip())
+    filename = re.sub(r"\s+", " ", filename).strip(" .")
+    if not filename:
+        filename = fallback
+    if not filename.lower().endswith(".docx"):
+        filename = f"{filename}.docx"
+    return filename
+
+
+def _bulk_default_filename(index: int, job: dict) -> str:
+    """Create a readable download filename for a bulk output."""
+    original = st.session_state.resume_name or "Resume.docx"
+    stem = Path(original).stem
+    role = re.sub(r"[^A-Za-z0-9]+", "_", job.get("role") or f"Job_{index + 1}").strip("_")
+    role = role[:45] or f"Job_{index + 1}"
+    company = re.sub(r"[^A-Za-z0-9]+", "_", job.get("company") or "").strip("_")
+    company_part = f"_{company[:28]}" if company else ""
+    return f"{stem}_{role}{company_part}_Optimized.docx"
+
+
+def _bulk_download_filename(index: int, job: dict) -> str:
+    """Resolve the current editable download filename for one bulk job."""
+    fallback = _bulk_default_filename(index, job)
+    return _sanitize_docx_filename(job.get("download_filename") or job.get("filename") or fallback, fallback)
+
+
+def _finalize_bulk_payload(index: int, job: dict, payload: dict, review_details: dict | None = None) -> dict:
+    """Validate one bulk payload and build its .docx output when safe."""
+    review_details = review_details or analyze_payload(payload)
+    review_stats = review_details.get("stats", {})
+    manual_review_count = int(review_stats.get("unmatched_replacements", 0)) + int(review_stats.get("duplicate_replacements", 0))
+
+    job["payload"] = payload
+    job["review_details"] = review_details
+    if manual_review_count > 0 or not review_stats.get("ready_for_export", False):
+        job["status"] = "Needs review"
+        job["error"] = "Some AI edits could not be matched safely to the resume."
+        job["docx_bytes"] = None
+        job["filename"] = ""
+        job["optimized_fit_report"] = {}
+        job["optimized_score"] = None
+        job["score_delta"] = None
+        return job
+
+    docx_bytes, _message = build_output_docx(payload)
+    optimized_report = evaluate_resume_fit(
+        _build_optimized_resume_text(payload),
+        job.get("cleaned_text", ""),
+        selected_profile_items=_active_profile_items(),
+    )
+    optimized_score = int(optimized_report.get("overall_score", 0))
+    current_score = job.get("match_score")
+    job["docx_bytes"] = docx_bytes
+    job["optimized_fit_report"] = optimized_report
+    job["optimized_score"] = optimized_score
+    job["score_delta"] = optimized_score - int(current_score or 0) if current_score is not None else None
+    default_filename = _bulk_default_filename(index, job)
+    job["filename"] = _bulk_download_filename(index, {**job, "filename": default_filename})
+    job["download_filename"] = job["filename"]
+    job["status"] = "Resume ready"
+    job["error"] = ""
+    return job
+
+
+def _bulk_ready_jobs() -> list[tuple[int, dict]]:
+    """Return bulk jobs that have prompts ready."""
+    return [
+        (index, job)
+        for index, job in enumerate(_ensure_bulk_jobs())
+        if str(job.get("prompt", "")).strip()
+    ]
+
+
+def _score_class(score: int | None) -> str:
+    """Return a compact score class for table-style summaries."""
+    if score is None:
+        return "apple-score-low"
+    if score >= 75:
+        return "apple-score-good"
+    if score >= 50:
+        return "apple-score-mid"
+    return "apple-score-low"
 
 
 def _get_local_ai_model_name() -> str:
@@ -3063,10 +3810,12 @@ def _humanize_local_ai_error(error: Exception | str, task_label: str) -> str:
 def _resume_fit_signature() -> str:
     """Return a compact signature for the current report inputs."""
     selected_ids = ",".join(str(item_id) for item_id in st.session_state.get("selected_profile_item_ids", []))
+    resume_digest = hashlib.sha256((st.session_state.resume_text or "").encode("utf-8")).hexdigest()[:16]
+    jd_digest = hashlib.sha256((st.session_state.job_description or "").encode("utf-8")).hexdigest()[:16]
     return "|".join(
         [
-            str(len(st.session_state.resume_text or "")),
-            str(len(st.session_state.job_description or "")),
+            resume_digest,
+            jd_digest,
             selected_ids,
             st.session_state.resume_name or "",
         ]
@@ -3097,6 +3846,60 @@ def _evaluate_current_resume_fit(force: bool = False) -> dict:
             int(report.get("ats_score", 0)),
         )
     return st.session_state.resume_fit_report or {}
+
+
+def _fit_score_band(score: int) -> tuple[str, str]:
+    """Return a compact fit label and color token for a match score."""
+    if score >= 85:
+        return "Excellent match", "var(--green)"
+    if score >= 70:
+        return "Strong match", "var(--green)"
+    if score >= 50:
+        return "Fair match", "var(--amber)"
+    return "Needs work", "var(--danger)"
+
+
+def render_current_resume_score_panel() -> None:
+    """Show the current resume/JD score on the input screen after processing."""
+    if not st.session_state.get("resume_text") or not st.session_state.get("job_description", "").strip():
+        return
+    report = st.session_state.get("resume_fit_report") or {}
+    if not report or st.session_state.get("resume_fit_report_signature") != _resume_fit_signature():
+        return
+
+    score = int(report.get("overall_score", 0))
+    band, band_color = _fit_score_band(score)
+    missing_keywords = report.get("missing_keywords", [])
+    matched_keywords = report.get("matched_keywords", [])
+    keyword_caption = ""
+    if matched_keywords:
+        keyword_caption = f"Matching: {', '.join(matched_keywords[:4])}"
+    elif missing_keywords:
+        keyword_caption = f"Needs: {', '.join(missing_keywords[:4])}"
+    else:
+        keyword_caption = "Score ready for this resume and role."
+
+    st.markdown("<div style='height: 0.75rem;'></div>", unsafe_allow_html=True)
+    with st.container(border=True):
+        score_col, detail_col = st.columns([0.34, 0.66], gap="large")
+        with score_col:
+            st.markdown(
+                f"""
+                <div style="text-align:center;">
+                    <div class="apple-kicker">Current Match</div>
+                    <div style="font-size:44px;font-weight:700;line-height:1;color:{band_color};">{score}%</div>
+                    <div style="font-size:12px;color:var(--muted);margin-top:0.35rem;">{band}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with detail_col:
+            st.markdown('<div class="apple-section-title">Your uploaded resume score is ready.</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="apple-section-copy">{keyword_caption}</div>',
+                unsafe_allow_html=True,
+            )
+            st.caption("This is the pre-optimization baseline that the next step uses.")
 
 
 def _infer_basics_from_resume_text(resume_text: str) -> tuple[str, str]:
@@ -3595,10 +4398,10 @@ def render_profile_review_screen() -> None:
     """Tab-based profile review with inline editing and 5 required categories."""
     render_shell_start()
     render_screen_intro(
-        "review",
+        "profile_review",
         "Career Profile Review",
-        "Simple & Clean",
-        "Review and edit your profile organized by category. Changes are saved automatically.",
+        "Review your profile evidence.",
+        "Review and edit your profile organized by category. Active items are saved when you click Save Career Profile.",
     )
 
     # Personal Info basics section (unchanged from original)
@@ -3664,7 +4467,7 @@ def render_profile_review_screen() -> None:
                 redo_profile_edit()
                 st.rerun()
         with info_col:
-            st.caption("Edit items inline by clicking into fields. Changes save automatically.")
+            st.caption("Open an item to edit it. Active items are saved together when you save the profile.")
 
         # Duplicate detection
         duplicates = detect_duplicate_items(extracted_items)
@@ -3706,9 +4509,13 @@ def render_profile_review_screen() -> None:
             st.info("No items extracted. Upload your resume or paste detailed notes to extract profile items.")
             drafted_items = []
 
-        # Display count summary
-        included_count = len(drafted_items)
-        st.markdown(f'<div class="apple-minor-copy">{included_count} items will be saved to your profile.</div>', unsafe_allow_html=True)
+        active_review_items = [item for item in _profile_items_from_session() if item.visibility != "archived"]
+        archived_review_items = [item for item in _profile_items_from_session() if item.visibility == "archived"]
+        st.markdown(
+            f'<div class="apple-minor-copy">{len(active_review_items)} active item{"s" if len(active_review_items) != 1 else ""} will be saved. '
+            f'{len(archived_review_items)} archived item{"s" if len(archived_review_items) != 1 else ""} will stay out of your profile.</div>',
+            unsafe_allow_html=True,
+        )
 
     col1, col2 = st.columns(2, gap="large")
     with col1:
@@ -3735,17 +4542,18 @@ def render_profile_review_screen() -> None:
             source_name = st.session_state.profile_import_source_name or "Imported Notes"
             if source_name and source_name != "Manual Notes":
                 source_type = "resume"
+            items_to_save = [item for item in _profile_items_from_session() if item.visibility != "archived"]
             source_id = save_profile_source(
                 source_type=source_type,
                 source_name=source_name,
                 raw_text=st.session_state.get("profile_last_source_raw_text", ""),
-                parsed_payload={"basics": basics, "item_count": len(drafted_items)},
+                parsed_payload={"basics": basics, "item_count": len(items_to_save)},
             )
-            for item in drafted_items:
+            for item in items_to_save:
                 item.profile_id = profile.id
                 item.source_id = source_id
                 item.verification_status = "verified"
-            saved_items = save_profile_items(drafted_items, replace_existing_for_source=source_id)
+            saved_items = save_profile_items(items_to_save, replace_existing_for_source=source_id)
             st.session_state.career_stage = career_stage
             if target_roles.strip():
                 st.session_state.target_role = target_roles.split(",")[0].strip()
@@ -3776,7 +4584,7 @@ def render_profile_build_resume_prompt_screen() -> None:
     """Prompt to build first resume after creating profile."""
     render_shell_start()
     render_screen_intro(
-        "complete",
+        "profile_build_resume_prompt",
         "Profile Created ✓",
         "Ready to build your first resume?",
         "We can use your profile as the foundation—no need to re-enter your information.",
@@ -3789,7 +4597,8 @@ def render_profile_build_resume_prompt_screen() -> None:
             align-items: center;
             gap: 0.6rem;
             padding: 0.75rem 1rem;
-            background: #f5f5f5;
+            background: var(--surface-muted);
+            border: 1px solid var(--line);
             border-radius: 8px;
             margin-bottom: 1.75rem;
         ">
@@ -3803,7 +4612,7 @@ def render_profile_build_resume_prompt_screen() -> None:
                           stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </span>
-            <span style="font-size: 0.875rem; font-weight: 500; color: #1a1a1a;">
+            <span style="font-size: 0.875rem; font-weight: 500; color: var(--text);">
                 Profile saved. Every future optimization will draw on it automatically.
             </span>
         </div>
@@ -3913,8 +4722,23 @@ def render_profile_item_card_new(item: ProfileItem, category: str, index: int, d
                     if keep_item:
                         drafted_items.append(edited_item)
                     st.session_state[f"edit-{card_id}"] = False
-                    # Save to edit history
-                    save_profile_edit_to_history([ProfileItem(**d) for d in st.session_state.profile_extracted_items])
+                    updated_session_items: list[dict] = []
+                    replaced = False
+                    for item_dict in st.session_state.profile_extracted_items:
+                        current = ProfileItem(**item_dict)
+                        same_item = (
+                            current.created_at == item.created_at
+                            and current.item_type == item.item_type
+                            and current.title == item.title
+                            and current.organization == item.organization
+                        )
+                        if same_item and not replaced:
+                            updated_session_items.append(edited_item.to_dict())
+                            replaced = True
+                        else:
+                            updated_session_items.append(item_dict)
+                    st.session_state.profile_extracted_items = updated_session_items
+                    save_profile_edit_to_history([ProfileItem(**d) for d in updated_session_items])
                     st.success("✓ Saved")
                     st.rerun()
 
@@ -4583,6 +5407,8 @@ def render_input_screen() -> None:
                 st.session_state.current_application_company = detected_company
             st.session_state.local_ai_job_signals = {}
             maybe_process_job_description_with_local_ai()
+            if st.session_state.get("resume_text"):
+                _evaluate_current_resume_fit(force=True)
             st.success("Job description extracted and cleaned successfully. Review the text below before continuing.")
             return True
         except Exception as error:
@@ -4609,6 +5435,8 @@ def render_input_screen() -> None:
             st.session_state.current_application_company = detected_company
         st.session_state.local_ai_job_signals = {}
         maybe_process_job_description_with_local_ai()
+        if st.session_state.get("resume_text"):
+            _evaluate_current_resume_fit(force=True)
         st.success("Job description cleaned and ready. Review the text below before continuing.")
         return True
 
@@ -4623,18 +5451,76 @@ def render_input_screen() -> None:
     upload_col, jd_col = st.columns([1, 1.15], gap="large")
     with upload_col:
         with st.container(border=True):
+            default_resume = get_default_resume_metadata()
             st.markdown(
                 """
-                <div class="apple-section-title">Upload your resume</div>
-                <div class="apple-section-copy">Use your original <code>.docx</code> resume so the finished export can preserve your document structure and formatting.</div>
+                <div class="apple-section-title">Choose your resume</div>
+                <div class="apple-section-copy">Use your saved default resume or upload a newer <code>.docx</code>. The finished export can preserve your document structure and formatting.</div>
                 """,
                 unsafe_allow_html=True,
             )
+            if default_resume:
+                default_name = str(default_resume.get("original_name") or "Saved resume.docx")
+                saved_at = str(default_resume.get("saved_at") or "")
+                rows = [
+                    ("Saved default", default_name),
+                    ("Status", "Ready on this device"),
+                ]
+                if saved_at:
+                    rows.append(("Saved", saved_at[:10]))
+                st.markdown(build_readiness_rows(rows), unsafe_allow_html=True)
+                saved_col, delete_col = st.columns([0.62, 0.38], gap="small")
+                with saved_col:
+                    if primary_button("Use Saved Resume", use_container_width=True, key="input-use-default-resume"):
+                        try:
+                            load_default_resume_into_session()
+                            st.success(f"Loaded saved resume `{default_name}`")
+                            st.rerun()
+                        except Exception as error:
+                            st.warning(f"Could not load the saved resume. Upload it again to replace the default. {error}")
+                with delete_col:
+                    if secondary_button("Remove", use_container_width=True, key="input-delete-default-resume"):
+                        delete_default_resume()
+                        st.session_state.default_resume_last_saved = ""
+                        if st.session_state.get("resume_source") == "saved_default":
+                            st.session_state.resume_name = None
+                            st.session_state.resume_bytes = None
+                            st.session_state.resume_text = None
+                            st.session_state.resume_paragraphs = []
+                            st.session_state.resume_source = ""
+                            st.session_state.resume_fit_report = None
+                            st.session_state.baseline_fit_report = None
+                            st.session_state.optimized_fit_report = None
+                            st.session_state.resume_fit_report_signature = ""
+                        st.success("Saved default resume removed.")
+                        st.rerun()
+                st.markdown("<div style='height:0.75rem;'></div>", unsafe_allow_html=True)
+            else:
+                st.info("No default resume saved yet. Upload once and keep it ready for future optimizations.")
+
+            save_as_default = st.checkbox(
+                "Save this upload as my default resume on this device",
+                value=True,
+                key="input-save-upload-as-default",
+            )
             uploaded_file = st.file_uploader("Upload Resume (.docx)", type=["docx"], label_visibility="collapsed")
             if uploaded_file is not None:
-                save_uploaded_resume(uploaded_file)
-                st.success(f"Loaded `{uploaded_file.name}`")
+                upload_bytes = uploaded_file.getvalue()
+                upload_signature = f"{uploaded_file.name}:{len(upload_bytes)}:{hashlib.sha256(upload_bytes).hexdigest()[:16]}:{save_as_default}"
+                if st.session_state.get("last_uploaded_resume_signature") != upload_signature:
+                    save_uploaded_resume(uploaded_file, save_as_default=save_as_default)
+                    st.session_state.last_uploaded_resume_signature = upload_signature
+                    st.success(f"Loaded `{uploaded_file.name}`")
                 chips = [uploaded_file.name, "Ready for optimization"]
+                if save_as_default:
+                    chips.append("Saved as default")
+                if local_ai_selected:
+                    chips.append("Private Mode")
+                render_chip_row(chips)
+            elif st.session_state.resume_name:
+                chips = [st.session_state.resume_name, "Ready for optimization"]
+                if st.session_state.get("resume_source") == "saved_default":
+                    chips.append("Saved default")
                 if local_ai_selected:
                     chips.append("Private Mode")
                 render_chip_row(chips)
@@ -4736,6 +5622,7 @@ def render_input_screen() -> None:
                 )
 
     st.session_state.job_description = job_description
+    render_current_resume_score_panel()
     if st.session_state.jd_role_hint and not st.session_state.target_role.strip():
         st.session_state.target_role = st.session_state.jd_role_hint
 
@@ -4755,7 +5642,7 @@ def render_input_screen() -> None:
                 st.rerun()
             # Auto-enable profile context when the user has active profile items.
             # They can still override this on the mode screen if needed.
-            active_profile_items_for_continue = [item for item in list_profile_items() if item.visibility == "active"]
+            active_profile_items_for_continue = _active_profile_items()
             if active_profile_items_for_continue:
                 st.session_state.use_career_profile = True
                 st.session_state.selected_profile_item_ids = [item.id for item in active_profile_items_for_continue]
@@ -5753,6 +6640,437 @@ def render_mode_screen() -> None:
     render_shell_end()
 
 
+def render_bulk_application_screen() -> None:
+    """Bulk Application flow for up to five jobs at once."""
+    render_shell_start()
+    render_screen_intro(
+        "bulk_application",
+        "Bulk Application",
+        "Optimize up to 5 applications in one run.",
+        "Paste multiple job links or descriptions, let Resume OTG format each JD, then choose Manual Mode or Full AI Optimization.",
+    )
+
+    jobs = _ensure_bulk_jobs()
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Resume</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">Start with the resume you want to tailor.</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="apple-section-copy">Bulk Application uses one base <code>.docx</code> resume, then creates one tailored prompt or resume for each job.</div>',
+            unsafe_allow_html=True,
+        )
+        default_resume = get_default_resume_metadata()
+        if default_resume and not st.session_state.resume_text:
+            default_name = str(default_resume.get("original_name") or "Saved resume.docx")
+            st.markdown(
+                build_readiness_rows([
+                    ("Saved default", default_name),
+                    ("Status", "Ready for Bulk Application"),
+                ]),
+                unsafe_allow_html=True,
+            )
+            if primary_button("Use Saved Resume", use_container_width=True, key="bulk-use-default-resume"):
+                try:
+                    load_default_resume_into_session()
+                    st.success(f"Loaded saved resume `{default_name}`")
+                    st.rerun()
+                except Exception as error:
+                    st.warning(f"Could not load the saved resume. Upload it again to replace the default. {error}")
+        uploaded_file = st.file_uploader(
+            "Upload Resume (.docx)",
+            type=["docx"],
+            label_visibility="collapsed",
+            key="bulk-resume-upload",
+        )
+        if uploaded_file is not None:
+            upload_bytes = uploaded_file.getvalue()
+            upload_signature = f"bulk:{uploaded_file.name}:{len(upload_bytes)}:{hashlib.sha256(upload_bytes).hexdigest()[:16]}"
+            if st.session_state.get("last_uploaded_resume_signature") != upload_signature:
+                save_uploaded_resume(uploaded_file, save_as_default=True)
+                st.session_state.last_uploaded_resume_signature = upload_signature
+                st.success(f"Loaded `{uploaded_file.name}`")
+        elif st.session_state.resume_name:
+            chips = [st.session_state.resume_name, "Ready for Bulk Application"]
+            if st.session_state.get("resume_source") == "saved_default":
+                chips.append("Saved default")
+            render_chip_row(chips)
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Jobs</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">Add up to 5 job links or descriptions.</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="apple-section-copy">Use one slot per application. Links will be fetched when possible; pasted descriptions are cleaned directly.</div>',
+            unsafe_allow_html=True,
+        )
+
+        for index, job in enumerate(jobs):
+            with st.expander(f"Application {index + 1}", expanded=index == 0 or bool(job.get("raw_input"))):
+                raw_input = st.text_area(
+                    f"Job link or description {index + 1}",
+                    value=job.get("raw_input", ""),
+                    height=135,
+                    placeholder="Paste a job-post URL or the full job description.",
+                    key=f"bulk-job-input-{index}",
+                )
+                jobs[index]["raw_input"] = raw_input
+                if job.get("status") and job.get("status") != "Empty":
+                    score_value = job.get("match_score")
+                    rows = [
+                        ("Status", job.get("status", "Empty")),
+                        ("Current ATS score", f"{score_value}%" if score_value is not None else "Not calculated yet"),
+                        ("Detected role", job.get("role") or "Not detected yet"),
+                        ("Company", job.get("company") or "Not detected yet"),
+                    ]
+                    st.markdown(build_readiness_rows(rows), unsafe_allow_html=True)
+                    if job.get("error"):
+                        st.warning(job["error"])
+
+        action_col1, action_col2 = st.columns(2, gap="large")
+        with action_col1:
+            if secondary_button("Reset Bulk Application", use_container_width=True, key="bulk-reset"):
+                _reset_bulk_application()
+                st.rerun()
+        with action_col2:
+            can_format = bool(st.session_state.resume_text and any(job.get("raw_input", "").strip() for job in jobs))
+            if primary_button("Format Job Descriptions", use_container_width=True, disabled=not can_format, key="bulk-format-jobs"):
+                formatted_jobs: list[dict] = []
+                progress = st.progress(0)
+                status = st.empty()
+                for index, job in enumerate(jobs):
+                    raw_input = str(job.get("raw_input", "")).strip()
+                    if not raw_input:
+                        formatted_jobs.append(_empty_bulk_job())
+                        continue
+                    try:
+                        status.caption(f"Formatting application {index + 1}...")
+                        formatted_jobs.append(_format_bulk_job(raw_input))
+                    except Exception as error:
+                        failed_job = _empty_bulk_job()
+                        failed_job["raw_input"] = raw_input
+                        failed_job["status"] = "Needs attention"
+                        failed_job["error"] = f"{error} Paste the JD text manually if the page blocks extraction."
+                        formatted_jobs.append(failed_job)
+                    progress.progress(int(((index + 1) / MAX_BULK_JOBS) * 100))
+                progress.empty()
+                status.empty()
+                st.session_state.bulk_jobs = formatted_jobs
+                st.session_state.bulk_execution_mode = None
+                st.session_state.bulk_last_run_summary = ""
+                st.success("Bulk Application prompts are ready for every formatted job.")
+                st.rerun()
+
+    ready_jobs = _bulk_ready_jobs()
+    if not ready_jobs:
+        st.info("Upload a resume and format at least one job description to choose a Bulk Application mode.")
+        render_shell_end()
+        return
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Batch Summary</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">A simple view of every job in this batch.</div>', unsafe_allow_html=True)
+        rows_html = [
+            '<div class="apple-simple-row header"><div>Application</div><div>Company</div><div>Current</div><div>Optimized</div><div>Status</div></div>'
+        ]
+        for index, job in ready_jobs:
+            score_value = job.get("match_score")
+            optimized_value = job.get("optimized_score")
+            delta_value = job.get("score_delta")
+            role = html.escape(str(job.get("role") or f"Application {index + 1}"))
+            company = html.escape(str(job.get("company") or "Not detected"))
+            current_text = f"{score_value}%" if score_value is not None else "Pending"
+            if optimized_value is not None:
+                delta_text = f" {delta_value:+d}%" if delta_value is not None else ""
+                optimized_text = f"{optimized_value}%{delta_text}"
+            else:
+                optimized_text = "Validate output"
+            status = html.escape(str(job.get("status") or "Prompt ready"))
+            rows_html.append(
+                f"""
+                <div class="apple-simple-row">
+                    <div>
+                        <div class="apple-simple-title">Application {index + 1}</div>
+                        <div class="apple-simple-subtle">{role}</div>
+                    </div>
+                    <div class="apple-simple-subtle">{company}</div>
+                    <div class="{_score_class(score_value)}">{current_text}</div>
+                    <div class="{_score_class(optimized_value)}">{optimized_text}</div>
+                    <div class="apple-simple-subtle">{status}</div>
+                </div>
+                """
+            )
+        st.markdown(f'<div class="apple-simple-table">{"".join(rows_html)}</div>', unsafe_allow_html=True)
+
+    with st.container(border=True):
+        st.markdown('<div class="apple-kicker">Mode</div>', unsafe_allow_html=True)
+        st.markdown('<div class="apple-section-title">Choose how to process this batch.</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="apple-section-copy">{len(ready_jobs)} application prompt{"s" if len(ready_jobs) != 1 else ""} ready. Manual Mode gives you separate prompts; Full AI runs each job one by one.</div>',
+            unsafe_allow_html=True,
+        )
+        mode_col1, mode_col2 = st.columns(2, gap="large")
+        with mode_col1:
+            if primary_button("Use Full AI Optimization", use_container_width=True, key="bulk-use-api"):
+                st.session_state.bulk_execution_mode = "api"
+                st.rerun()
+        with mode_col2:
+            if secondary_button("Use Manual Mode", use_container_width=True, key="bulk-use-manual"):
+                st.session_state.bulk_execution_mode = "manual"
+                st.rerun()
+
+    if st.session_state.get("bulk_execution_mode") == "manual":
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Manual Mode</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">Work down the page, one application at a time.</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="apple-section-copy">Each application is collapsed into a focused work panel so the batch is easier to scan and scroll.</div>',
+                unsafe_allow_html=True,
+            )
+
+        for index, job in ready_jobs:
+            score_value = job.get("match_score")
+            optimized_value = job.get("optimized_score")
+            delta_value = job.get("score_delta")
+            score_prefix = f"{score_value}%"
+            if optimized_value is not None:
+                score_prefix = f"{score_value}% → {optimized_value}%"
+                if delta_value is not None:
+                    score_prefix += f" ({delta_value:+d}%)"
+            score_prefix = f"{score_prefix} · " if score_value is not None else ""
+            title = job.get("role") or f"Application {index + 1}"
+            expander_label = f"Application {index + 1} · {score_prefix}{title}"
+            expanded = index == ready_jobs[0][0] or job.get("status") in {"Needs attention", "Resume ready", "Needs review"}
+            with st.expander(expander_label, expanded=expanded):
+                st.markdown(build_readiness_rows([
+                    ("Current ATS score", f"{score_value}%" if score_value is not None else "Not calculated yet"),
+                    ("Optimized ATS score", f"{optimized_value}% ({delta_value:+d}%)" if optimized_value is not None and delta_value is not None else "Validate output first"),
+                    ("Role", job.get("role") or "Not detected"),
+                    ("Company", job.get("company") or "Not detected"),
+                    ("Status", job.get("status") or "Prompt ready"),
+                ]), unsafe_allow_html=True)
+                with st.expander("Copy prompt", expanded=not job.get("manual_output")):
+                    render_prompt_block(f"Prompt for Application {index + 1}", job.get("prompt", ""), 260, f"bulk-{index}")
+                manual_output = st.text_area(
+                    "Paste Structured AI Output",
+                    value=job.get("manual_output", ""),
+                    height=170,
+                    placeholder="Paste the JSON response for this application.",
+                    key=f"bulk-manual-output-{index}",
+                )
+                jobs[index]["manual_output"] = manual_output
+                validate_col, download_col = st.columns([1, 1.25], gap="large")
+                with validate_col:
+                    if primary_button("Validate Output", use_container_width=True, key=f"bulk-validate-{index}"):
+                        try:
+                            payload = parse_replacement_payload(manual_output)
+                            jobs[index] = _finalize_bulk_payload(index, jobs[index], payload)
+                            st.session_state.bulk_jobs = jobs
+                            st.rerun()
+                        except Exception as error:
+                            jobs[index]["status"] = "Needs attention"
+                            jobs[index]["error"] = str(error)
+                            st.session_state.bulk_jobs = jobs
+                            st.error(str(error))
+                with download_col:
+                    if job.get("docx_bytes") and job.get("filename"):
+                        filename_value = st.text_input(
+                            "Download filename",
+                            value=job.get("download_filename") or job.get("filename") or _bulk_default_filename(index, job),
+                            key=f"bulk-download-name-{index}",
+                        )
+                        jobs[index]["download_filename"] = _sanitize_docx_filename(filename_value, _bulk_default_filename(index, job))
+                        st.session_state.bulk_jobs = jobs
+                        primary_download_button(
+                            "Download Resume",
+                            data=job["docx_bytes"],
+                            file_name=_bulk_download_filename(index, jobs[index]),
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                            key=f"bulk-download-{index}",
+                        )
+                    else:
+                        st.button("Download Resume", disabled=True, use_container_width=True, key=f"bulk-download-disabled-{index}")
+
+    elif st.session_state.get("bulk_execution_mode") == "api":
+        if st.session_state.bulk_selected_provider not in PROVIDER_CONFIG:
+            st.session_state.bulk_selected_provider = "OpenAI"
+
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Full AI Optimization</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">Generate resumes one by one.</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="apple-section-copy">The app sends each formatted prompt sequentially and keeps going if one application needs attention.</div>',
+                unsafe_allow_html=True,
+            )
+
+            provider = st.selectbox(
+                "Provider",
+                list(PROVIDER_CONFIG.keys()),
+                index=list(PROVIDER_CONFIG.keys()).index(st.session_state.bulk_selected_provider),
+                key="bulk-provider",
+            )
+            st.session_state.bulk_selected_provider = provider
+            provider_config = PROVIDER_CONFIG[provider]
+            base_url = ""
+
+            if provider == "Advanced Custom Endpoint":
+                base_url = st.text_input(
+                    "Base URL",
+                    value=st.session_state.bulk_custom_api_base_url,
+                    placeholder="http://localhost:11434/v1",
+                    key="bulk-custom-base-url",
+                )
+                model = st.text_input(
+                    "Model name",
+                    value=st.session_state.bulk_custom_api_model,
+                    placeholder="mistral",
+                    key="bulk-custom-model",
+                )
+                api_key = st.text_input(
+                    provider_config["key_label"],
+                    type="password",
+                    value=st.session_state.bulk_custom_api_key,
+                    placeholder=provider_config["placeholder"],
+                    key="bulk-custom-api-key",
+                )
+                st.session_state.bulk_custom_api_base_url = base_url
+                st.session_state.bulk_custom_api_model = model
+                st.session_state.bulk_custom_api_key = api_key
+            else:
+                api_key = st.text_input(
+                    provider_config["key_label"],
+                    type="password",
+                    value=st.session_state.bulk_api_key,
+                    placeholder=provider_config["placeholder"],
+                    key="bulk-api-key",
+                )
+                st.session_state.bulk_api_key = api_key
+                models = get_provider_models(provider, api_key.strip())
+                saved_model = st.session_state.get("bulk_selected_model") or models[0]
+                if saved_model not in models:
+                    saved_model = models[0]
+                model = st.selectbox(
+                    "Model",
+                    models,
+                    index=models.index(saved_model),
+                    key="bulk-model",
+                )
+                st.session_state.bulk_selected_model = model
+
+            ready_rows = [
+                ("Applications", str(len(ready_jobs))),
+                ("Provider", provider),
+                ("Model", model or "Missing"),
+            ]
+            if provider == "Advanced Custom Endpoint":
+                ready_rows.append(("Base URL", "Ready" if base_url.strip() else "Missing"))
+            else:
+                ready_rows.append(("API key", "Provided" if api_key.strip() else "Missing"))
+            st.markdown(build_readiness_rows(ready_rows), unsafe_allow_html=True)
+
+            can_run = bool(model and (api_key.strip() or provider == "Advanced Custom Endpoint"))
+            if primary_button("Run Full AI Batch", use_container_width=True, disabled=not can_run, key="bulk-run-api"):
+                progress = st.progress(0)
+                status = st.empty()
+                completed = 0
+                needs_attention = 0
+                for run_index, (job_index, job) in enumerate(ready_jobs, start=1):
+                    try:
+                        status.caption(f"Generating application {run_index} of {len(ready_jobs)}...")
+                        payload = optimize_with_provider(
+                            provider=provider,
+                            api_key=api_key,
+                            prompt=job.get("prompt", ""),
+                            model=model,
+                            base_url=base_url,
+                        )
+                        review_details = analyze_payload(payload)
+                        review_stats = review_details.get("stats", {})
+                        issue_count = int(review_stats.get("unmatched_replacements", 0)) + int(review_stats.get("duplicate_replacements", 0))
+                        if issue_count > 0:
+                            payload, review_details = _attempt_exact_match_repair(
+                                provider=provider,
+                                api_key=api_key,
+                                prompt=job.get("prompt", ""),
+                                model=model,
+                                base_url=base_url,
+                                payload=payload,
+                                review_details=review_details,
+                            )
+                        jobs[job_index] = _finalize_bulk_payload(job_index, jobs[job_index], payload, review_details=review_details)
+                        if jobs[job_index].get("docx_bytes"):
+                            completed += 1
+                        else:
+                            needs_attention += 1
+                    except Exception as error:
+                        jobs[job_index]["status"] = "Needs attention"
+                        jobs[job_index]["error"] = str(error)
+                        jobs[job_index]["docx_bytes"] = None
+                        needs_attention += 1
+                    progress.progress(int((run_index / len(ready_jobs)) * 100))
+                progress.empty()
+                status.empty()
+                st.session_state.bulk_jobs = jobs
+                st.session_state.bulk_last_run_summary = (
+                    f"{completed} resume{'s' if completed != 1 else ''} ready"
+                    + (f"; {needs_attention} need attention" if needs_attention else "")
+                )
+                st.rerun()
+
+        if st.session_state.get("bulk_last_run_summary"):
+            st.success(st.session_state.bulk_last_run_summary)
+
+        with st.container(border=True):
+            st.markdown('<div class="apple-kicker">Outputs</div>', unsafe_allow_html=True)
+            st.markdown('<div class="apple-section-title">Download completed resumes.</div>', unsafe_allow_html=True)
+            for index, job in ready_jobs:
+                cols = st.columns([1.2, 0.75, 1.35], gap="large")
+                with cols[0]:
+                    st.markdown(f"**Application {index + 1}: {job.get('role') or 'Target role'}**")
+                    st.caption(job.get("company") or "Company not detected")
+                    score_value = job.get("match_score")
+                    optimized_value = job.get("optimized_score")
+                    delta_value = job.get("score_delta")
+                    st.caption(f"Current ATS score: {score_value}%" if score_value is not None else "Current ATS score: pending")
+                    if optimized_value is not None:
+                        delta_text = f" ({delta_value:+d}%)" if delta_value is not None else ""
+                        st.caption(f"Optimized ATS score: {optimized_value}%{delta_text}")
+                    if job.get("error"):
+                        st.warning(job["error"])
+                with cols[1]:
+                    st.markdown(job.get("status") or "Prompt ready")
+                with cols[2]:
+                    if job.get("docx_bytes") and job.get("filename"):
+                        filename_value = st.text_input(
+                            "Download filename",
+                            value=job.get("download_filename") or job.get("filename") or _bulk_default_filename(index, job),
+                            key=f"bulk-api-download-name-{index}",
+                        )
+                        jobs[index]["download_filename"] = _sanitize_docx_filename(filename_value, _bulk_default_filename(index, job))
+                        st.session_state.bulk_jobs = jobs
+                        primary_download_button(
+                            "Download",
+                            data=job["docx_bytes"],
+                            file_name=_bulk_download_filename(index, jobs[index]),
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                            key=f"bulk-api-download-{index}",
+                        )
+                    else:
+                        st.button("Download", disabled=True, use_container_width=True, key=f"bulk-api-download-disabled-{index}")
+
+    bottom_col1, bottom_col2 = st.columns(2, gap="large")
+    with bottom_col1:
+        if secondary_button("Back to Home", use_container_width=True, key="bulk-back-home"):
+            st.session_state.screen = "landing"
+            st.rerun()
+    with bottom_col2:
+        if secondary_button("Single Application Mode", use_container_width=True, key="bulk-single-mode"):
+            st.session_state.screen = "input"
+            st.rerun()
+
+    render_shell_end()
+
+
 def render_local_ai_setup_screen() -> None:
     """Guided setup for first-time Local AI users."""
     render_shell_start()
@@ -6595,11 +7913,11 @@ def render_api_screen() -> None:
                 _status_label = "Verified" if _valid else "Not tested"
                 st.markdown(
                     f'<div style="display:flex;align-items:center;gap:0.75rem;'
-                    f'padding:0.75rem 1rem;background:#f9fafb;border:1px solid #e5e7eb;'
+                    f'padding:0.75rem 1rem;background:var(--surface-muted);border:1px solid var(--line);'
                     f'border-radius:10px;margin:0.25rem 0 0.5rem;">'
-                    f'<span style="font-size:0.8rem;color:#6b7280;font-weight:500;">'
+                    f'<span style="font-size:0.8rem;color:var(--muted);font-weight:500;">'
                     f'{provider_config["key_label"]}</span>'
-                    f'<code style="font-size:0.9rem;font-weight:600;color:#111827;">'
+                    f'<code style="font-size:0.9rem;font-weight:600;color:var(--text);">'
                     f'····{_key_info["last4"]}</code>'
                     f'<span style="font-size:0.75rem;color:{_dot_color};font-weight:500;">'
                     f'● {_status_label}</span>'
@@ -6684,31 +8002,31 @@ def render_api_screen() -> None:
             else:
                 st.markdown(
                     """
-<div style="border:1px solid #e0d8cc;border-radius:10px;padding:16px 20px;background:#fdf9f4;margin-top:4px;">
+<div style="border:1px solid var(--line);border-radius:10px;padding:16px 20px;background:var(--surface-muted);margin-top:4px;">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
     <span style="background:#c97d3a;color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:20px;text-transform:uppercase;">Two-Stage AI Prompt</span>
-    <span style="font-size:12px;color:#888;">Generated at runtime from your JD</span>
+    <span style="font-size:12px;color:var(--muted);">Generated at runtime from your JD</span>
   </div>
-  <p style="font-size:13.5px;color:#3a3a3a;margin:0 0 14px 0;line-height:1.6;">
+  <p style="font-size:13.5px;color:var(--text);margin:0 0 14px 0;line-height:1.6;">
     Instead of a fixed template, Resume OTG runs a <strong>two-step process</strong> the moment you click <em>Run Optimization</em>:
   </p>
   <div style="display:flex;flex-direction:column;gap:10px;">
     <div style="display:flex;gap:12px;align-items:flex-start;">
       <div style="min-width:28px;height:28px;border-radius:50%;background:#c97d3a;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">1</div>
       <div>
-        <div style="font-size:13px;font-weight:600;color:#2a2a2a;">Read the JD — extract role intelligence</div>
-        <div style="font-size:12.5px;color:#666;margin-top:2px;">Identifies your target role level, function, top competencies in ranked order, and high-value keywords — all from <em>your specific job posting</em>, not a generic template.</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">Read the JD — extract role intelligence</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">Identifies your target role level, function, top competencies in ranked order, and high-value keywords — all from <em>your specific job posting</em>, not a generic template.</div>
       </div>
     </div>
     <div style="display:flex;gap:12px;align-items:flex-start;">
       <div style="min-width:28px;height:28px;border-radius:50%;background:#c97d3a;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;">2</div>
       <div>
-        <div style="font-size:13px;font-weight:600;color:#2a2a2a;">Build a tailored prompt — optimize your resume</div>
-        <div style="font-size:12.5px;color:#666;margin-top:2px;">Uses the JD intelligence from Step 1 to construct a precise editing prompt, then sends it to the AI. Your resume edits reflect the <em>actual</em> priorities of this role.</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">Build a tailored prompt — optimize your resume</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">Uses the JD intelligence from Step 1 to construct a precise editing prompt, then sends it to the AI. Your resume edits reflect the <em>actual</em> priorities of this role.</div>
       </div>
     </div>
   </div>
-  <p style="font-size:12px;color:#aaa;margin:14px 0 0 0;">
+  <p style="font-size:12px;color:var(--muted);margin:14px 0 0 0;">
     Want to write your own prompt instead? Check <strong>Customize prompt before sending</strong> above.
   </p>
 </div>
@@ -7136,8 +8454,8 @@ def render_review_screen() -> None:
                 """
                 <div style="
                     margin: 0.75rem 0 1rem;
-                    background: #fff7ed;
-                    border: 1px solid #fdba74;
+                    background: var(--surface-muted);
+                    border: 1px solid var(--line-strong);
                     border-radius: 14px;
                     padding: 1.15rem 1.35rem;
                     display: flex;
@@ -7151,18 +8469,18 @@ def render_review_screen() -> None:
                         justify-content: center;
                         width: 1.9rem;
                         height: 1.9rem;
-                        background: #ffedd5;
+                        background: rgba(217,119,87,0.16);
                         border-radius: 50%;
                         flex-shrink: 0;
-                        color: #c2410c;
+                        color: var(--btn-primary-bg);
                         font-size: 1rem;
                         font-weight: 700;
                     ">!</span>
                     <div style="flex: 1; min-width: 0;">
-                        <div style="font-size: 1rem; font-weight: 700; color: #9a3412; line-height: 1.3;">
+                        <div style="font-size: 1rem; font-weight: 700; color: var(--text); line-height: 1.3;">
                             Export is paused until the draft is review-safe.
                         </div>
-                        <div style="font-size: 0.92rem; color: #7c2d12; margin-top: 0.35rem; line-height: 1.55;">
+                        <div style="font-size: 0.92rem; color: var(--muted); margin-top: 0.35rem; line-height: 1.55;">
                             The AI returned edits that could not be matched cleanly to the original resume, so Resume OTG blocked the download to protect the file. Review the exact changes below, then rerun Full AI Optimization if needed.
                         </div>
                     </div>
@@ -7202,7 +8520,7 @@ def render_review_screen() -> None:
             st.markdown(
                 """
                 <div style="display:flex; align-items:center; gap:0.5rem;
-                            font-size:0.85rem; color:#555; padding:0.5rem 0;">
+                            font-size:0.85rem; color:var(--muted); padding:0.5rem 0;">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <circle cx="7" cy="7" r="6.25" stroke="#22c55e" stroke-width="1.5"/>
                         <path d="M4.5 7L6 8.5L9.5 5" stroke="#22c55e" stroke-width="1.5"
@@ -7303,19 +8621,19 @@ def render_review_screen() -> None:
             st.markdown(
                 """
                 <div style="
-                    border-left: 3px solid #1a1a1a;
+                    border-left: 3px solid var(--text);
                     padding: 1.1rem 1.25rem;
-                    background: #fafafa;
+                    background: var(--surface-muted);
                     border-radius: 0 8px 8px 0;
                 ">
                     <div style="font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em;
-                                text-transform: uppercase; color: #888; margin-bottom: 0.4rem;">
+                                text-transform: uppercase; color: var(--muted-light); margin-bottom: 0.4rem;">
                         One-time setup
                     </div>
-                    <div style="font-size: 1rem; font-weight: 600; color: #1a1a1a; margin-bottom: 0.35rem;">
+                    <div style="font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 0.35rem;">
                         Make every future run stronger
                     </div>
-                    <div style="font-size: 0.875rem; color: #555; line-height: 1.6;">
+                    <div style="font-size: 0.875rem; color: var(--muted); line-height: 1.6;">
                         Save your experience once. The optimizer will draw on your full background
                         automatically — no copy-pasting between runs.
                     </div>
@@ -7451,6 +8769,9 @@ def main() -> None:
             # ── Primary nav ──────────────────────────────────────────────
             if secondary_button("Home", use_container_width=True, key="sidebar-home"):
                 st.session_state.screen = "landing"
+                st.rerun()
+            if secondary_button("Bulk Application", use_container_width=True, key="sidebar-bulk-application"):
+                st.session_state.screen = "bulk_application"
                 st.rerun()
             if secondary_button("Career Profile", use_container_width=True, key="sidebar-profile"):
                 st.session_state.screen = "profile"
@@ -7607,6 +8928,8 @@ def main() -> None:
         render_application_workspace_screen()
     elif screen == "optimization_history":
         render_optimization_history_screen()
+    elif screen == "bulk_application":
+        render_bulk_application_screen()
     elif screen == "input":
         render_input_screen()
     elif screen == "fit_report":

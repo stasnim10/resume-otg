@@ -1476,10 +1476,8 @@ def render_profile_screen() -> None:
         f"""
         <div style="margin-bottom:1.5rem;">
           <div class="apple-eyebrow">Career Profile</div>
-          <div style="font-size:clamp(1.8rem,3.5vw,2.6rem); font-weight:700;
-                      letter-spacing:-0.022em; margin:0.4rem 0 0.25rem 0;
-                      line-height:1.15;">{display_name}</div>
-          <div style="color:var(--muted); font-size:1rem; line-height:1.6;">{display_subtitle}</div>
+          <div class="apple-section-title" style="font-size:1.55rem;margin-bottom:0.25rem;">{display_name}</div>
+          <div class="apple-section-copy" style="margin-bottom:0;">{display_subtitle}</div>
         </div>
         """,
         unsafe_allow_html=True,

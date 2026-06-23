@@ -28,33 +28,18 @@ def _inject_jt_css() -> None:
         """
         <style>
         :root {
-            --jt-card-bg: #ffffff;
-            --jt-card-border: #e6e8ec;
-            --jt-text-strong: #111111;
-            --jt-text-muted: #7a7a7a;
-            --jt-text-faint: #b4b4bb;
-            --jt-divider: #eceef2;
-            --jt-coral: #d97757;
+            --jt-card-bg: var(--surface, #ffffff);
+            --jt-card-border: var(--card-border, #e6e8ec);
+            --jt-text-strong: var(--text, #111111);
+            --jt-text-muted: var(--muted, #7a7a7a);
+            --jt-text-faint: var(--muted-light, #b4b4bb);
+            --jt-divider: var(--line, #eceef2);
+            --jt-coral: var(--btn-primary-bg, #d97757);
             --jt-coral-hover: #c9683f;
-            --jt-input-bg: #ffffff;
-            --jt-input-border: rgba(0,0,0,0.10);
-            --jt-icon-text: #111111;
-            --jt-danger: #c0392b;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --jt-card-bg: #16181b;
-                --jt-card-border: rgba(255,255,255,0.10);
-                --jt-text-strong: #f5f5f7;
-                --jt-text-muted: #a1a1aa;
-                --jt-text-faint: #73737c;
-                --jt-divider: rgba(255,255,255,0.10);
-                --jt-input-bg: #111214;
-                --jt-input-border: rgba(255,255,255,0.14);
-                --jt-icon-text: #ffffff;
-                --jt-danger: #ff7b72;
-            }
+            --jt-input-bg: var(--input-fill, #ffffff);
+            --jt-input-border: var(--line-strong, rgba(0,0,0,0.10));
+            --jt-icon-text: #ffffff;
+            --jt-danger: var(--danger, #c0392b);
         }
 
         div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -333,7 +318,7 @@ def _close_inline_divider() -> None:
 def _render_add_job_form() -> None:
     st.markdown(
         '<div style="margin:0.5rem 0 1rem;">'
-        '<div style="font-size:1rem;font-weight:700;color:#111111;margin-bottom:1rem;">Add a Job</div>',
+        '<div style="font-size:1rem;font-weight:700;color:var(--text);margin-bottom:1rem;">Add a Job</div>',
         unsafe_allow_html=True,
     )
     with st.container(border=True):
@@ -476,7 +461,7 @@ def _render_job_card(job: dict) -> None:
         sub_parts.append(f"{note_count} note{'s' if note_count != 1 else ''}")
     if job.get("current_fit") is not None:
         score = int(job["current_fit"])
-        color = "#16a34a" if score >= 75 else ("#d97757" if score >= 50 else "#888")
+        color = "var(--green)" if score >= 75 else ("var(--amber)" if score >= 50 else "var(--muted)")
         sub_parts.append(f"FIT <span style='color:{color};font-weight:700;'>{score}%</span>")
     subline = " · ".join(sub_parts)
 
@@ -559,8 +544,8 @@ def _render_job_card(job: dict) -> None:
         if st.session_state.get("jt_delete_confirm") == job_id:
             _inline_divider()
             st.markdown(
-                '<div style="font-size:0.84rem;font-weight:600;color:#c0392b;margin-bottom:0.2rem;">Remove this job?</div>'
-                '<div style="font-size:0.76rem;color:#7a7a7a;margin-bottom:0.4rem;">Removes job, notes, materials, and history.</div>',
+                '<div style="font-size:0.84rem;font-weight:600;color:var(--danger);margin-bottom:0.2rem;">Remove this job?</div>'
+                '<div style="font-size:0.76rem;color:var(--muted);margin-bottom:0.4rem;">Removes job, notes, materials, and history.</div>',
                 unsafe_allow_html=True,
             )
             st.markdown('<div class="jt-form-actions">', unsafe_allow_html=True)
@@ -587,8 +572,9 @@ def render_job_tracker_screen() -> None:
     head1, head2 = st.columns([5.2, 1.2])
     with head1:
         st.markdown(
-            '<div style="font-size:2rem;font-weight:800;color:var(--jt-text-strong);margin-bottom:0.25rem;">Job Tracker</div>'
-            '<div style="font-size:0.9rem;color:var(--jt-text-muted);margin-bottom:1rem;">Track applications, update status fast, and keep the list tight and easy to scan.</div>',
+            '<div class="apple-eyebrow" style="margin-bottom:0.45rem;">Job Tracker</div>'
+            '<div class="apple-section-title" style="font-size:1.55rem;margin-bottom:0.25rem;">Track your applications.</div>'
+            '<div class="apple-section-copy" style="margin-bottom:1rem;">Search, update status, and keep notes without leaving the list.</div>',
             unsafe_allow_html=True,
         )
     with head2:
@@ -636,15 +622,34 @@ def render_job_tracker_screen() -> None:
                     for job in jobs:
                         st.session_state[f"jt-select-{job['id']}"] = False
                     st.session_state.jt_selected_ids = []
+                    st.session_state.jt_bulk_delete_confirm = False
                     st.rerun()
             with c3:
                 if secondary_button("Delete selected", key="jt-bulk-delete", use_container_width=True):
-                    for job_id in selected_ids:
-                        delete_job(job_id)
-                        st.session_state[f"jt-select-{job_id}"] = False
-                    st.session_state.jt_selected_ids = []
+                    st.session_state.jt_bulk_delete_confirm = True
                     st.rerun()
+            if st.session_state.get("jt_bulk_delete_confirm"):
+                with st.container(border=True):
+                    st.markdown(
+                        f'<div style="font-size:0.9rem;font-weight:700;color:var(--jt-danger);">Delete {len(selected_ids)} selected job{"s" if len(selected_ids) != 1 else ""}?</div>'
+                        '<div style="font-size:0.82rem;color:var(--jt-text-muted);margin-top:0.25rem;">This removes selected jobs, notes, materials, and history.</div>',
+                        unsafe_allow_html=True,
+                    )
+                    confirm_col, cancel_col, _ = st.columns([1.3, 1.3, 5], vertical_alignment="center")
+                    with confirm_col:
+                        if primary_button("Confirm delete", key="jt-bulk-delete-confirm", use_container_width=True):
+                            for job_id in selected_ids:
+                                delete_job(job_id)
+                                st.session_state[f"jt-select-{job_id}"] = False
+                            st.session_state.jt_selected_ids = []
+                            st.session_state.jt_bulk_delete_confirm = False
+                            st.rerun()
+                    with cancel_col:
+                        if secondary_button("Cancel", key="jt-bulk-delete-cancel", use_container_width=True):
+                            st.session_state.jt_bulk_delete_confirm = False
+                            st.rerun()
         else:
+            st.session_state.jt_bulk_delete_confirm = False
             st.markdown(
                 f'<div class="jt-visible-copy">{len(jobs)} visible job{"s" if len(jobs) != 1 else ""}</div>',
                 unsafe_allow_html=True,

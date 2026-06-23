@@ -149,10 +149,12 @@ def render_progress_stepper(current_key: str) -> None:
 
 def render_screen_intro(step_key: str, eyebrow: str, title: str, subtitle: str) -> None:
     """Render a calm screen header with progress."""
-    render_progress_stepper(step_key)
+    flow_keys = {key for key, _label in FLOW_STEPS}
+    if step_key in flow_keys or step_key in FLOW_STEP_ALIASES:
+        render_progress_stepper(step_key)
     st.markdown(
         f"""
-        <div class="apple-hero">
+        <div class="apple-hero apple-hero-dashboard">
           <div class="apple-eyebrow">{eyebrow}</div>
           <div class="apple-page-title">{title}</div>
           <p class="apple-subtitle">{subtitle}</p>

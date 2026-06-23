@@ -280,7 +280,7 @@ def build_optimizer_prompt(
     if profile_context.strip():
         profile_context_block = f"""
 CANDIDATE PROFILE EVIDENCE
-Use this saved career-profile evidence as a relevance guide when deciding what to emphasize. Only surface this evidence when it is already supported by the uploaded resume text. Do not introduce facts that cannot be directly anchored back to the resume.
+Use this saved career-profile evidence as a relevance guide when deciding what to emphasize. Treat it as authoritative for the candidate's current education status, career stage, and target direction when it conflicts with stale wording in the uploaded resume. For work achievements, only surface this evidence when it is already supported by the uploaded resume text. Do not introduce employers, roles, dates, metrics, or skills that cannot be directly anchored back to the resume.
 
 {profile_context}
 """
@@ -335,6 +335,8 @@ RULES
 8. Every match_anchor must exactly match one full paragraph from the resume text below.
 9. If no changes are needed for a section, omit it. Return {{}} only if no changes are needed at all.
 10. If you are not fully confident that a section's anchor can be copied EXACTLY, omit that section instead of guessing.
+11. Do not describe the candidate as a student, current degree candidate, or "Class of ..." unless the current resume or profile evidence clearly says the degree is still in progress.
+12. If profile evidence says a degree is completed, use completed language such as "MBA graduate" or "MBA" instead of "MBA candidate."
 
 ANCHOR MATCHING IS CRITICAL
 - Export will fail if a single match_anchor differs from the resume by even one character.

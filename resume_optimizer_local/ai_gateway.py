@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Union
 
+import requests
 import streamlit as st
 
 from json_parser import parse_replacement_payload
@@ -175,6 +176,49 @@ def _parse_output_text(output_text: str) -> dict:
     return parse_replacement_payload(output_text)
 
 
+def _build_payload_repair_prompt(original_prompt: str, raw_output: str, error_message: str) -> str:
+    """Ask a local/custom model to convert a bad response into the strict replacement schema."""
+    return f"""You returned an invalid response for a resume optimization task.
+
+VALIDATION ERROR
+{error_message}
+
+YOUR PREVIOUS RESPONSE
+{raw_output}
+
+REPAIR TASK
+Return only valid JSON that matches exactly this schema. Do not include markdown, prose, comments, analysis, or keys other than these:
+{{
+  "summary_replacement": {{
+    "match_anchor": "Full exact summary paragraph from the resume",
+    "replacement_text": "New full summary paragraph"
+  }},
+  "bullet_replacements": [
+    {{
+      "match_anchor": "Full exact bullet paragraph from the resume",
+      "replacement_text": "New bullet paragraph"
+    }}
+  ],
+  "skills_replacements": [
+    {{
+      "match_anchor": "Full exact skills paragraph from the resume",
+      "replacement_text": "New skills paragraph"
+    }}
+  ]
+}}
+
+Rules:
+1. Every match_anchor must be copied exactly from RESUME TEXT in the original task.
+2. If you cannot provide an exact match_anchor for a replacement, omit that replacement.
+3. Do not return a resume, job summary, sections, or recommendations.
+4. Do not use top-level keys like section, content, optimized_resume, analysis, or changes unless changes is converted into bullet_replacements.
+5. Return JSON only.
+
+ORIGINAL TASK
+{original_prompt}
+"""
+
+
 def _is_model_access_error(error: Exception) -> bool:
     message = str(error).lower()
     markers = (
@@ -215,15 +259,65 @@ def _run_openai_compatible(base_url: str, api_key: str, prompt: str, model: str)
     if not model or not model.strip():
         raise ValueError("Enter the model name for your local or custom endpoint.")
 
+    normalized_base_url = base_url.strip().rstrip("/")
+    is_ollama = "localhost:11434" in normalized_base_url or "127.0.0.1:11434" in normalized_base_url
+    if is_ollama:
+        native_base_url = normalized_base_url[:-3].rstrip("/") if normalized_base_url.endswith("/v1") else normalized_base_url
+        return _run_ollama_native(native_base_url, prompt, model.strip())
+
     client = OpenAI(
         api_key=(api_key.strip() or "ollama"),
-        base_url=base_url.strip().rstrip("/"),
+        base_url=normalized_base_url,
     )
-    response = client.responses.create(
+    response = client.chat.completions.create(
         model=model.strip(),
-        input=prompt,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.0,
     )
-    return _parse_output_text(response.output_text)
+    output_text = response.choices[0].message.content if response.choices else ""
+    try:
+        return _parse_output_text(output_text or "")
+    except ValueError as error:
+        repair_prompt = _build_payload_repair_prompt(prompt, output_text or "", str(error))
+        repair_response = client.chat.completions.create(
+            model=model.strip(),
+            messages=[{"role": "user", "content": repair_prompt}],
+            temperature=0.0,
+        )
+        repaired_text = repair_response.choices[0].message.content if repair_response.choices else ""
+        return _parse_output_text(repaired_text or "")
+
+
+def _run_ollama_native(base_url: str, prompt: str, model: str) -> dict:
+    """Run Ollama through its native JSON mode, then repair once if needed."""
+    raw_output = _ollama_generate_json(base_url, prompt, model)
+    try:
+        return _parse_output_text(raw_output)
+    except ValueError as error:
+        repair_prompt = _build_payload_repair_prompt(prompt, raw_output, str(error))
+        repaired_output = _ollama_generate_json(base_url, repair_prompt, model)
+        return _parse_output_text(repaired_output)
+
+
+def _ollama_generate_json(base_url: str, prompt: str, model: str) -> str:
+    """Generate one non-streaming JSON-mode response from Ollama."""
+    response = requests.post(
+        f"{base_url.rstrip('/')}/api/generate",
+        json={
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "format": "json",
+            "options": {
+                "temperature": 0.0,
+                "top_p": 0.9,
+            },
+        },
+        timeout=300,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    return str(payload.get("response") or "").strip()
 
 
 def _run_anthropic(api_key: str, prompt: str, model: str) -> dict:

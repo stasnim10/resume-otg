@@ -34,6 +34,7 @@ instance/
 **/*_Optimized.docx
 **/career_profile.db
 **/career_profile.db-*
+**/saved_resumes/*
 
 # Environment
 .env
