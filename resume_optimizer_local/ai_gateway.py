@@ -1,7 +1,7 @@
 """Provider-aware AI gateway for the Streamlit prototype."""
 from __future__ import annotations
 
-from typing import Dict, List, Union
+from typing import Callable, Dict, List, Union
 
 import requests
 import streamlit as st
@@ -219,6 +219,20 @@ ORIGINAL TASK
 """
 
 
+def _parse_with_repair(
+    original_prompt: str,
+    raw_output: str,
+    generate_repair: Callable[[str], str],
+) -> dict:
+    """Parse provider output and make one schema-repair attempt when needed."""
+    try:
+        return _parse_output_text(raw_output)
+    except ValueError as error:
+        repair_prompt = _build_payload_repair_prompt(original_prompt, raw_output, str(error))
+        repaired_output = generate_repair(repair_prompt)
+        return _parse_output_text(repaired_output)
+
+
 def _is_model_access_error(error: Exception) -> bool:
     message = str(error).lower()
     markers = (
@@ -243,11 +257,15 @@ def _run_openai(api_key: str, prompt: str, model: str) -> dict:
     from openai import OpenAI
 
     client = OpenAI(api_key=api_key.strip())
-    response = client.responses.create(
-        model=model,
-        input=prompt,
-    )
-    return _parse_output_text(response.output_text)
+    def generate(user_prompt: str) -> str:
+        response = client.responses.create(
+            model=model,
+            input=user_prompt,
+        )
+        return response.output_text or ""
+
+    raw_output = generate(prompt)
+    return _parse_with_repair(prompt, raw_output, generate)
 
 
 def _run_openai_compatible(base_url: str, api_key: str, prompt: str, model: str) -> dict:
@@ -330,17 +348,21 @@ def _run_anthropic(api_key: str, prompt: str, model: str) -> dict:
         ) from error
 
     client = Anthropic(api_key=api_key.strip())
-    response = client.messages.create(
-        model=model,
-        max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    def generate(user_prompt: str) -> str:
+        response = client.messages.create(
+            model=model,
+            max_tokens=8000,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
 
-    parts = []
-    for block in response.content:
-        if getattr(block, "type", None) == "text":
-            parts.append(block.text)
-    return _parse_output_text("\n".join(parts))
+        parts = []
+        for block in response.content:
+            if getattr(block, "type", None) == "text":
+                parts.append(block.text)
+        return "\n".join(parts)
+
+    raw_output = generate(prompt)
+    return _parse_with_repair(prompt, raw_output, generate)
 
 
 def _run_gemini(api_key: str, prompt: str, model: str) -> dict:
@@ -353,12 +375,15 @@ def _run_gemini(api_key: str, prompt: str, model: str) -> dict:
         ) from error
 
     client = genai.Client(api_key=api_key.strip())
-    response = client.models.generate_content(
-        model=model,
-        contents=prompt,
-    )
-    output_text = getattr(response, "text", None)
-    return _parse_output_text(output_text or "")
+    def generate(user_prompt: str) -> str:
+        response = client.models.generate_content(
+            model=model,
+            contents=user_prompt,
+        )
+        return getattr(response, "text", None) or ""
+
+    raw_output = generate(prompt)
+    return _parse_with_repair(prompt, raw_output, generate)
 
 
 def optimize_with_provider(

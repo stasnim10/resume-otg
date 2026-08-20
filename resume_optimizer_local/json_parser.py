@@ -213,6 +213,14 @@ def _normalize_replacement_payload_shape(payload: Dict[str, Any]) -> Dict[str, A
                 normalized[section_name] = replacements
         return normalized or payload
 
+    # Some models collapse a one-item response to the replacement object itself
+    # instead of keeping the requested section envelope. Preserve the usable
+    # edit as a bullet replacement; exact-anchor review still decides whether
+    # it is safe to apply to the source document.
+    root_replacement = _coerce_replacement_object(payload)
+    if root_replacement:
+        return {"bullet_replacements": [root_replacement]}
+
     normalized_payload: Dict[str, Any] = {}
 
     summary_candidate = _coerce_replacement_object(payload.get("summary"))

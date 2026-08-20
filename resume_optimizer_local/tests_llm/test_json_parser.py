@@ -19,6 +19,26 @@ def test_parse_replacement_payload_unwraps_common_result_wrapper():
     assert payload["summary_replacement"]["replacement_text"] == "Updated summary paragraph"
 
 
+def test_parse_replacement_payload_normalizes_bare_replacement_object():
+    raw = """
+    {
+      "match_anchor": "Managed supply chain operations",
+      "replacement_text": "Led supply chain operations across regions"
+    }
+    """
+
+    payload = parse_replacement_payload(raw)
+
+    assert payload == {
+        "bullet_replacements": [
+            {
+                "match_anchor": "Managed supply chain operations",
+                "replacement_text": "Led supply chain operations across regions",
+            }
+        ]
+    }
+
+
 def test_parse_replacement_payload_normalizes_optimized_sections_shape():
     raw = """
     {

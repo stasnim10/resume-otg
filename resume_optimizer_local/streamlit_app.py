@@ -25,6 +25,7 @@ from default_resume_store import (
     read_default_resume,
     save_default_resume,
 )
+from filename_utils import build_resume_download_filename
 from docx_handler import apply_replacements, build_resume_from_scratch, extract_text
 from jd_cleaning import clean_job_description
 from jd_fetcher import fetch_job_description_from_url, looks_like_url
@@ -2264,8 +2265,10 @@ def detect_role_title(job_description: str) -> str:
         rf"(?im)^\s*([A-Z][A-Za-z/&,\-\s]{{2,80}}(?:{role_suffixes}))\s*$",
         # "the X plays/is/will..." — capture just the title part
         rf"(?i)\bthe\s+([A-Z][A-Za-z/&,\-\s]{{1,60}}(?:{role_suffixes}))\s+(?:plays|is|will|works|supports|leads)\b",
-        # "seeking/hiring/looking for a [Title]" — captures just the title after the filler
-        rf"(?i)\b(?:seeking|hiring|recruiting|looking\s+for)\s+(?:a|an|the)?\s*([A-Z][A-Za-z/&,\-\s]{{1,60}}(?:{role_suffixes}))\b",
+        # "hiring: [Title]" / "looking for an [Title]" — capture only the title.
+        # Keep "an" before "a" so the regex cannot consume just the first
+        # character and leave a leading "n" attached to the role.
+        rf"(?i)\b(?:seeking|hiring|recruiting|looking\s+for)\s*(?:[:\-]\s*)?(?:(?:an|a|the)\s+)?([A-Z][A-Za-z/&,\-\s]{{1,60}}(?:{role_suffixes}))\b",
         # Seniority-prefixed titles (strict — requires explicit seniority word to avoid greedy sentence match)
         rf"\b((?:Senior|Lead|Principal|Staff|Junior|Associate|Assistant|VP of|Head of|Director of|Chief)\s+[A-Z][A-Za-z/&,\-\s]{{1,60}}(?:{role_suffixes}))\b",
     ]
@@ -2473,6 +2476,27 @@ def get_fresh_detected_target_role(job_description: str) -> str:
     )
 
 
+def _resume_download_user_name() -> str:
+    """Resolve the candidate name used in generated resume filenames."""
+    try:
+        profile_name = str(create_or_get_profile().full_name or "").strip()
+    except Exception as error:
+        logger.warning("Could not load profile name for download filename: %s", error)
+        profile_name = ""
+
+    return (
+        profile_name
+        or str(st.session_state.get("builder_full_name") or "").strip()
+        or str(st.session_state.get("onboarding_name") or "").strip()
+        or "Candidate"
+    )
+
+
+def _resume_download_filename(role: str) -> str:
+    """Return the standard candidate-and-role resume download filename."""
+    return build_resume_download_filename(_resume_download_user_name(), role)
+
+
 def get_effective_industry(job_description: str) -> str:
     """Use the manual override when present, otherwise JD detection."""
     return st.session_state.target_industry.strip() or detect_industry(job_description)
@@ -2621,9 +2645,12 @@ def ensure_export_file_ready() -> None:
     _status.caption("Preparing your export...")
     time.sleep(0.15)
     output_bytes, _message = build_output_docx(st.session_state.validated_payload)
-    original_name = Path(st.session_state.resume_name)
     st.session_state.output_docx_bytes = output_bytes
-    st.session_state.output_filename = f"{original_name.stem}_Optimized{original_name.suffix}"
+    target_role = (
+        get_fresh_detected_target_role(st.session_state.job_description)
+        or get_effective_target_role(st.session_state.job_description)
+    )
+    st.session_state.output_filename = _resume_download_filename(target_role)
 
 
 def _build_anchor_repair_prompt(original_prompt: str, payload: dict, review_details: dict) -> str:
@@ -2976,15 +3003,22 @@ def _get_landing_metrics_baseline(
     """Freeze the initial history totals so current-session runs can be layered on top."""
     current_user = st.session_state.get("auth_user_id") or "local-user"
     baseline_user = st.session_state.get("landing_metrics_baseline_user")
-    if baseline_user != current_user:
+    current_total = len(optimization_history)
+    current_ai = sum(1 for row in optimization_history if _history_mode_bucket(row) == "ai")
+    current_manual = sum(1 for row in optimization_history if _history_mode_bucket(row) == "manual")
+    session_total = int(st.session_state.get("landing_metrics_session_ai", 0) or 0) + int(
+        st.session_state.get("landing_metrics_session_manual", 0) or 0
+    )
+    baseline_changed_without_session_runs = session_total == 0 and (
+        int(st.session_state.get("landing_metrics_baseline_total", current_total) or 0) != current_total
+        or int(st.session_state.get("landing_metrics_baseline_ai", current_ai) or 0) != current_ai
+        or int(st.session_state.get("landing_metrics_baseline_manual", current_manual) or 0) != current_manual
+    )
+    if baseline_user != current_user or baseline_changed_without_session_runs:
         st.session_state.landing_metrics_baseline_user = current_user
-        st.session_state.landing_metrics_baseline_total = len(optimization_history)
-        st.session_state.landing_metrics_baseline_ai = sum(
-            1 for row in optimization_history if _history_mode_bucket(row) == "ai"
-        )
-        st.session_state.landing_metrics_baseline_manual = sum(
-            1 for row in optimization_history if _history_mode_bucket(row) == "manual"
-        )
+        st.session_state.landing_metrics_baseline_total = current_total
+        st.session_state.landing_metrics_baseline_ai = current_ai
+        st.session_state.landing_metrics_baseline_manual = current_manual
         st.session_state.landing_metrics_session_ai = 0
         st.session_state.landing_metrics_session_manual = 0
     return (
@@ -3626,13 +3660,8 @@ def _sanitize_docx_filename(value: str, fallback: str) -> str:
 
 def _bulk_default_filename(index: int, job: dict) -> str:
     """Create a readable download filename for a bulk output."""
-    original = st.session_state.resume_name or "Resume.docx"
-    stem = Path(original).stem
-    role = re.sub(r"[^A-Za-z0-9]+", "_", job.get("role") or f"Job_{index + 1}").strip("_")
-    role = role[:45] or f"Job_{index + 1}"
-    company = re.sub(r"[^A-Za-z0-9]+", "_", job.get("company") or "").strip("_")
-    company_part = f"_{company[:28]}" if company else ""
-    return f"{stem}_{role}{company_part}_Optimized.docx"
+    role = str(job.get("role") or f"Job {index + 1}").strip()
+    return _resume_download_filename(role)
 
 
 def _bulk_download_filename(index: int, job: dict) -> str:
@@ -6525,8 +6554,10 @@ def render_builder_review_screen() -> None:
                     _docx_status.caption(_msg)
                     time.sleep(0.18)
                 st.session_state.builder_output_docx_bytes = build_resume_from_scratch(payload)
-                safe_name = (basics.get("full_name", "First_Resume").strip() or "First_Resume").replace(" ", "_")
-                st.session_state.builder_output_filename = f"{safe_name}_Resume.docx"
+                st.session_state.builder_output_filename = build_resume_download_filename(
+                    basics.get("full_name", ""),
+                    st.session_state.get("target_role", ""),
+                )
                 _docx_progress.progress(100)
                 _docx_status.caption("Resume file ready.")
                 time.sleep(0.2)
@@ -7566,12 +7597,13 @@ def handle_validated_payload(payload: dict, review_details: dict | None = None) 
                 _metadata_updates["company"] = _opt_company
             if _metadata_updates:
                 _jt_update_job(_active_tracker_job, **_metadata_updates)
-            _jt_add_run(
-                job_id=_active_tracker_job,
-                match_before=match_score_before,
-                match_after=match_score_after,
-                improvements=improvements,
-            )
+            if not is_hosted_web():
+                _jt_add_run(
+                    job_id=_active_tracker_job,
+                    match_before=match_score_before,
+                    match_after=match_score_after,
+                    improvements=improvements,
+                )
             st.session_state.tracker_auto_saved_to = _active_tracker_job
         except Exception as e:
             logger.warning("Failed to auto-save tracker run: %s", e)
@@ -7593,12 +7625,13 @@ def handle_validated_payload(payload: dict, review_details: dict | None = None) 
                 _metadata_updates["company"] = _opt_company
             if _metadata_updates:
                 _jt_update_job(st.session_state.current_application_id, **_metadata_updates)
-            _jt_add_run(
-                job_id=st.session_state.current_application_id,
-                match_before=match_score_before,
-                match_after=match_score_after,
-                improvements=improvements,
-            )
+            if not is_hosted_web():
+                _jt_add_run(
+                    job_id=st.session_state.current_application_id,
+                    match_before=match_score_before,
+                    match_after=match_score_after,
+                    improvements=improvements,
+                )
             st.session_state.tracker_auto_saved_to = st.session_state.current_application_id
         except Exception as e:
             logger.warning("Failed to attach optimization to existing application: %s", e)
@@ -8171,6 +8204,11 @@ def render_review_screen() -> None:
     total_changes = summary_changes + bullet_changes + skill_changes
     strongest_metrics = [metric for metric in metrics_summary if int(metric.get("delta", 0)) > 0]
     review_attention_items: list[str] = []
+
+    # Refresh the name for already-generated files too, including sessions that
+    # were open when this naming convention was introduced.
+    if st.session_state.output_docx_bytes:
+        st.session_state.output_filename = _resume_download_filename(target_job_title)
 
     if ready_for_export and not st.session_state.output_docx_bytes:
         try:

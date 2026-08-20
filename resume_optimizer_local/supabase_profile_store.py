@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from typing import Any
 
 import streamlit as st
@@ -64,6 +65,85 @@ def _decode_execution_mode(value: str) -> str:
     if not text.startswith(prefix):
         return ""
     return text[len(prefix):]
+
+
+def _parse_history_timestamp(value: str) -> datetime | None:
+    """Parse a Supabase run timestamp for legacy duplicate detection."""
+    try:
+        return datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _legacy_run_signature(row: dict) -> tuple:
+    """Return fields shared by the two records produced by the old save path."""
+    improvements = _jl(row.get("improvements", []))
+    return (
+        str(row.get("job_id") or ""),
+        int(row.get("match_before", 0) or 0),
+        int(row.get("match_after", 0) or 0),
+        json.dumps(improvements, sort_keys=True, default=str),
+    )
+
+
+def _dedupe_legacy_optimization_rows(rows: list[dict]) -> list[dict]:
+    """Hide legacy hosted-mode pairs without deleting persisted history.
+
+    Older hosted runs were written twice within seconds: one record retained
+    the execution-mode sentinel and the tracker copy had an empty mode. Only
+    that exact mixed-mode pattern is collapsed, so legitimate repeat runs are
+    preserved.
+    """
+    deduped: list[dict] = []
+    for row in rows:
+        row_mode = _decode_execution_mode(row.get("cover_letter_storage_path", ""))
+        row_time = _parse_history_timestamp(row.get("run_at", ""))
+        duplicate_index: int | None = None
+
+        for index, existing in enumerate(deduped):
+            existing_mode = _decode_execution_mode(existing.get("cover_letter_storage_path", ""))
+            if bool(row_mode) == bool(existing_mode):
+                continue
+            if _legacy_run_signature(row) != _legacy_run_signature(existing):
+                continue
+
+            existing_time = _parse_history_timestamp(existing.get("run_at", ""))
+            if not row_time or not existing_time:
+                continue
+            if abs((row_time - existing_time).total_seconds()) <= 30:
+                duplicate_index = index
+                if row_mode and not existing_mode:
+                    deduped[index] = row
+                break
+
+        if duplicate_index is None:
+            deduped.append(row)
+
+    return deduped
+
+
+def _optimization_history_item(row: dict) -> dict:
+    """Map a Supabase run row to the shared dashboard/history shape."""
+    job_info = row.get("tracked_jobs") or {}
+    company = job_info.get("company", "")
+    improvements = _jl(row.get("improvements", []))
+    run_at = row.get("run_at", "")
+    return {
+        "id": row.get("id"),
+        "job_id": row.get("job_id"),
+        "company": company,
+        "company_name": company,
+        "job_title": job_info.get("job_title", ""),
+        "match_before": row.get("match_before", 0),
+        "match_after": row.get("match_after", 0),
+        "delta": row.get("delta", 0),
+        "improvements": improvements,
+        "improvements_count": len(improvements),
+        "run_at": run_at,
+        "created_at": run_at,
+        "resume_path": row.get("resume_storage_path", ""),
+        "execution_mode": _decode_execution_mode(row.get("cover_letter_storage_path", "")),
+    }
 
 
 def _profile_from_row(row: dict) -> CareerProfile:
@@ -642,35 +722,29 @@ def save_optimization_result(
 
 
 def get_optimization_history(user_id: str = "local-user") -> list[dict]:
-    """Return recent optimization runs for the dashboard."""
+    """Return complete, de-duplicated optimization history for the dashboard."""
     uid = _uid(user_id)
     try:
-        resp = (
-            _sb()
-            .table("job_optimization_runs")
-            .select("*, tracked_jobs(job_title, company)")
-            .eq("user_id", uid)
-            .order("run_at", desc=True)
-            .limit(50)
-            .execute()
-        )
-        rows = resp.data or []
-        result = []
-        for r in rows:
-            job_info = r.get("tracked_jobs") or {}
-            result.append({
-                "id": r.get("id"),
-                "company_name": job_info.get("company", ""),
-                "job_title": job_info.get("job_title", ""),
-                "match_before": r.get("match_before", 0),
-                "match_after": r.get("match_after", 0),
-                "delta": r.get("delta", 0),
-                "improvements": _jl(r.get("improvements", [])),
-                "run_at": r.get("run_at", ""),
-                "resume_path": r.get("resume_storage_path", ""),
-                "execution_mode": _decode_execution_mode(r.get("cover_letter_storage_path", "")),
-            })
-        return result
+        rows: list[dict] = []
+        page_size = 1000
+        offset = 0
+        while True:
+            resp = (
+                _sb()
+                .table("job_optimization_runs")
+                .select("*, tracked_jobs(job_title, company)")
+                .eq("user_id", uid)
+                .order("run_at", desc=True)
+                .range(offset, offset + page_size - 1)
+                .execute()
+            )
+            page = resp.data or []
+            rows.extend(page)
+            if len(page) < page_size:
+                break
+            offset += page_size
+
+        return [_optimization_history_item(row) for row in _dedupe_legacy_optimization_rows(rows)]
     except Exception as exc:
         logger.warning("get_optimization_history failed: %s", exc)
         return []
