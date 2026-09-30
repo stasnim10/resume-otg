@@ -182,18 +182,28 @@ def extract_job_description_from_html(html: str) -> str:
     return text
 
 
-def fetch_job_description_from_url(url: str, timeout: int = 15) -> Tuple[str, str, Optional[str]]:
+def fetch_job_description_from_url(url: str, timeout: int = 15, validate_url=None) -> Tuple[str, str, Optional[str]]:
     """
     Fetch a job-post page and return extracted JD text plus the final URL.
 
     Raises ValueError with friendly messages for UI display.
     """
     try:
-        response = requests.get(
-            url,
-            timeout=timeout,
-            headers={"User-Agent": USER_AGENT},
-        )
+        if validate_url is None:
+            response = requests.get(url, timeout=timeout, headers={"User-Agent": USER_AGENT})
+        else:
+            from urllib.parse import urljoin
+            for _ in range(6):
+                validate_url(url)
+                response = requests.get(url, timeout=timeout, headers={"User-Agent": USER_AGENT}, allow_redirects=False)
+                if response.status_code not in (301, 302, 303, 307, 308):
+                    break
+                location = response.headers.get("Location")
+                if not location:
+                    raise ValueError("Job link returned an invalid redirect. Paste the description directly.")
+                url = urljoin(url, location)
+            else:
+                raise ValueError("Too many redirects. Paste the description directly.")
         response.raise_for_status()
     except requests.RequestException as error:
         raise ValueError(

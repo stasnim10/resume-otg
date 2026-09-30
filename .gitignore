@@ -35,6 +35,7 @@ instance/
 **/career_profile.db
 **/career_profile.db-*
 **/saved_resumes/*
+**/mcp_exports/*
 
 # Environment
 .env

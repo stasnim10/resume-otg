@@ -8749,6 +8749,10 @@ def main() -> None:
     st.set_page_config(page_title="Resume OTG", layout="wide")
     init_session_state()
 
+    # Preserve connector consent while the existing account sign-in runs.
+    if st.query_params.get("authorization_id"):
+        st.session_state.mcp_authorization_id = st.query_params["authorization_id"]
+
     # ── Auth gate (hosted web only) ──────────────────────────────────────────
     if is_hosted_web():
         st.session_state.hosted_web_mode = True
@@ -8759,6 +8763,17 @@ def main() -> None:
         if st.session_state.get("auth_recovery_mode", False) or not is_authenticated():
             apply_apple_theme()
             render_auth_screen()
+            st.stop()
+
+        if st.session_state.get("mcp_authorization_id"):
+            from mcp_connector_ui import render_consent
+            apply_apple_theme()
+            render_consent(st.session_state.mcp_authorization_id)
+            if st.button("Back to Resume OTG", key="mcp-consent-back"):
+                st.session_state.pop("mcp_authorization_id", None)
+                if "authorization_id" in st.query_params:
+                    del st.query_params["authorization_id"]
+                st.rerun()
             st.stop()
 
     init_profile_db()

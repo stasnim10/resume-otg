@@ -41,6 +41,29 @@ pip install -r requirements.txt
 python3 -m streamlit run streamlit_app.py
 ```
 
+## Connect AI Apps with MCP (Local)
+
+Use Python 3.10 or newer. Open **Settings → MCP / AI Apps** in the local app, save a Word resume once,
+install `resume_optimizer_local/requirements-mcp.txt`, and copy the generated
+MCP configuration into a client that supports local stdio servers. Restart
+the client, then paste: “Use Resume OTG to tailor my saved resume to this job
+and export the Word file: [job URL or description].”
+
+The connected AI uses `prepare_resume_for_job` to read the source and targeting
+instructions, then `export_tailored_resume` to apply exact paragraph replacements.
+Exports preserve existing paragraph formatting, leave the original unchanged,
+and are available as binary MCP resources and in the app’s MCP settings download
+section. The AI client receives resume content; review the final claims yourself.
+No additional AI provider key is needed. Sites requiring login or JavaScript may
+require a pasted description. Only body paragraphs are editable through this flow.
+
+This local connection uses the local saved resume. A separate OAuth-protected
+remote connector for hosted accounts is prepared for `mcp.resumeotg.app`, with
+private Supabase resume storage and expiring Word download links. Deployment,
+DNS and OAuth configuration are still required; the URL is not live yet.
+See [remote connector deployment](docs/MCP_REMOTE_DEPLOYMENT.md) for setup and
+the checks required before enabling the hosted connection link.
+
 ## Required Hosted Secrets
 
 For hosted deployment, configure these secrets:

@@ -27,7 +27,7 @@ def render_settings_screen() -> None:
     if st.session_state.get("settings_open_help"):
         st.info("You can find guided help and contact options in the Help tab below.")
 
-    tab_account, tab_ai, tab_help = st.tabs(["Account", "AI Settings", "Help"])
+    tab_account, tab_ai, tab_mcp, tab_help = st.tabs(["Account", "AI Settings", "MCP / AI Apps", "Help"])
 
     with tab_account:
         _render_account_tab()
@@ -35,10 +35,68 @@ def render_settings_screen() -> None:
     with tab_ai:
         _render_ai_tab()
 
+    with tab_mcp:
+        _render_mcp_tab()
+
     with tab_help:
         _render_help_tab()
 
     render_shell_end()
+
+
+def _render_mcp_tab() -> None:
+    import json
+    import sys
+    from pathlib import Path
+
+    from hosted_mode import is_hosted_web
+
+    if is_hosted_web():
+        from mcp_connector_ui import render_hosted_connector
+        render_hosted_connector()
+        return
+
+    st.markdown("### Connect your AI app")
+    st.write("Let an AI app read your saved resume, tailor it to a job link or description, and export a Word file. Your connected AI app supplies the model; no additional provider API key is needed.")
+    st.caption("Local MCP connection for clients that support stdio servers. Public URL connectors are not supported by this local server.")
+
+    from default_resume_store import get_default_resume_metadata, save_default_resume
+    from docx import Document
+    import io
+
+    if sys.version_info < (3, 10):
+        st.warning("MCP requires Python 3.10 or newer. Restart the local app with a supported Python version before using the configuration below.")
+
+    uploaded = st.file_uploader("Resume for connected AI apps (.docx)", type=["docx"], key="mcp-resume-upload")
+    if uploaded is not None and primary_button("Save Resume for MCP", key="mcp-save-resume"):
+        try:
+            contents = uploaded.getvalue()
+            Document(io.BytesIO(contents))
+            save_default_resume(uploaded.name, contents)
+            st.success("Saved. Connected AI apps can now read this resume through MCP.")
+        except Exception:
+            st.error("Please upload a valid Word document.")
+    metadata = get_default_resume_metadata()
+    if metadata:
+        st.caption(f"Connected resume: {metadata.get('original_name', 'Saved resume')}")
+    else:
+        st.info("Save a Word resume once before using MCP.")
+    st.markdown("**1. Install the optional MCP dependency**")
+    st.code(f'"{sys.executable}" -m pip install -r "{Path(__file__).with_name("requirements-mcp.txt")}"', language="bash")
+    st.markdown("**2. Add this server to your AI app’s MCP configuration**")
+    config = json.dumps({"mcpServers": {"resume-otg": {"command": sys.executable, "args": [str(Path(__file__).with_name("mcp_server.py"))]}}}, indent=2)
+    st.code(config, language="json")
+    st.download_button("Download MCP Configuration", config, file_name="resume-otg-mcp.json", mime="application/json")
+    st.markdown("**3. Paste a job link or description in your connected AI app**")
+    st.code("Use Resume OTG to tailor my saved resume to this job and export the Word file: [paste job link or description]", language=None)
+    st.caption("The connection shares your resume with the AI app you choose. Changes preserve the Word layout and save a separate file. Check the final wording before applying. If a job site blocks extraction, paste its description instead.")
+
+    from mcp_resume_service import OUTPUT_DIR
+    exports = sorted(OUTPUT_DIR.glob("resume_*.docx"), key=lambda path: path.stat().st_mtime, reverse=True) if OUTPUT_DIR.exists() else []
+    if exports:
+        st.markdown("### Download tailored resumes")
+        selected = st.selectbox("Exported resume", exports, format_func=lambda path: path.name)
+        st.download_button("Download Word Resume", selected.read_bytes(), file_name=selected.name, mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 
 def render_help_screen() -> None:
