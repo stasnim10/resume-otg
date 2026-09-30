@@ -1,7 +1,38 @@
 # Resume OTG remote connector deployment
 
-Prepared address: `https://mcp.resumeotg.app/mcp`. This address is not live
-until the following deployment and external configuration steps are completed.
+Intended connector address: `https://mcp.resumeotg.app/mcp`. The Render service
+has deployed; custom-domain DNS and the Streamlit consent-screen rollout are
+still pending. Do not advertise this address as ready to connect yet.
+
+## Deployment status — October 1, 2026
+
+- Render service `resume-otg-mcp`, ID `srv-daulp37pn0mc7386gmf0`, runs commit
+  `c4ee63f110c189298907c93b9c54e8361e5169b0` from `codex/mcp-connector`.
+  It uses the **Free ($0/month)** compute plan.
+- Render assigned `resume-otg-mcp.onrender.com`. Its HTTPS `/health` returns
+  200; protected-resource discovery returns the intended custom-domain resource
+  and Supabase authorization server. Unauthenticated `/mcp` returns 401 with
+  the correct discovery challenge.
+- Render has registered `mcp.resumeotg.app`, awaiting DNS. Name.com needs a
+  CNAME: host `mcp`, target `resume-otg-mcp.onrender.com`, TTL 300.
+- Supabase project `xraxyqzbtpsurjyquxfy` remains on its Free plan. Migration
+  003 is applied: RLS is enabled on connector approvals, the resume bucket is
+  private, four storage policies exist, and all eight existing public tables
+  have the restrictive direct-app-session policy.
+- OAuth Server and Dynamic OAuth Apps are enabled. Auth Site URL is
+  `https://app.resumeotg.app`, authorization path `/`, and the
+  `public.mcp_access_token_hook` is enabled. The public JWKS exposes an ES256 key.
+- Live SQL checks confirmed an existing account can still read its profile
+  through a direct app session, while an OAuth session for that same account
+  sees zero profile rows and zero settings rows. An unapproved synthetic OAuth
+  session sees no resume objects or connector approvals.
+- The Render workspace currently shows an older Flask service
+  (`resume-optimizer-otg`, root `resume_optimizer_web`, start `gunicorn app:app`),
+  rather than the live Streamlit service at `resume-otg.onrender.com`. Locate the
+  correct hosting account before deploying the consent screen; do not replace
+  the older service by assumption.
+- Pending: Name.com sign-in/DNS, custom-domain TLS verification, correct
+  Streamlit deployment, and real-client consent/tool/export/revocation tests.
 
 ## Existing domains
 
@@ -65,7 +96,8 @@ until the following deployment and external configuration steps are completed.
 Local checks cover JWT validation, OAuth discovery/challenges, source-safe Word
 export, and user-scoped path construction. Database RLS, token hooks, live OAuth
 sign-in and DNS/TLS require the actual Supabase and Render deployment to validate.
-This is a prepared implementation, not a verified live connector.
+The backend is deployed and the checks listed above passed. The complete
+connector flow is not yet verified or ready to advertise.
 
 Source references:
 - https://supabase.com/docs/guides/auth/oauth-server/getting-started
