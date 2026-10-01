@@ -68,6 +68,13 @@ def apply_theme() -> None:
       padding:0 14px!important;line-height:1.3!important;justify-content:flex-start!important;border-radius:9px!important;}
     #root [data-testid="stSidebar"] button[kind="primary"] {background:var(--step-active-bg)!important;}
     #root [data-testid="stSidebar"] [data-testid="stButton"] {margin:0!important;}
+    #root [data-testid="stSidebar"] button[kind="primary"],
+    #root [data-testid="stSidebar"] button[kind="secondary"] {
+      display:flex!important;justify-content:flex-start!important;text-align:left!important;
+      min-height:44px!important;height:44px!important;padding:0 14px!important;
+      font-size:.875rem!important;border:0!important;box-shadow:none!important;}
+    #root [data-testid="stSidebar"] button[kind="primary"] *,
+    #root [data-testid="stSidebar"] button[kind="secondary"] * {text-align:left!important;}
     #root button[aria-label="Collapse sidebar"], #root button[aria-label="Expand sidebar"],
     #root [data-testid="collapsedControl"], #root [data-testid="stSidebarCollapseButton"] {display:flex!important;}
     #root [data-testid="stButton"] button, #root [data-testid="stDownloadButton"] button, #root [data-testid="stFormSubmitButton"] button {
