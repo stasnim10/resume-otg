@@ -1,46 +1,51 @@
 # Resume OTG remote connector deployment
 
-Intended connector address: `https://mcp.resumeotg.app/mcp`. The Render service
-has deployed; custom-domain DNS and the Streamlit consent-screen rollout are
-still pending. Do not advertise this address as ready to connect yet.
+Connector address: `https://mcp.resumeotg.app/mcp`.
 
 ## Deployment status — October 1, 2026
 
-- Render service `resume-otg-mcp`, ID `srv-daulp37pn0mc7386gmf0`, runs commit
-  `c4ee63f110c189298907c93b9c54e8361e5169b0` from `codex/mcp-connector`.
-  It uses the **Free ($0/month)** compute plan.
-- Render assigned `resume-otg-mcp.onrender.com`. Its HTTPS `/health` returns
-  200; protected-resource discovery returns the intended custom-domain resource
-  and Supabase authorization server. Unauthenticated `/mcp` returns 401 with
+- MCP service `resume-otg-mcp` (`srv-daulp37pn0mc7386gmf0`) runs on Render Free.
+  HTTPS health and discovery return 200; unauthenticated MCP returns 401 with
   the correct discovery challenge.
-- Render has registered `mcp.resumeotg.app`, awaiting DNS. Name.com needs a
-  CNAME: host `mcp`, target `resume-otg-mcp.onrender.com`, TTL 300.
-- Supabase project `xraxyqzbtpsurjyquxfy` remains on its Free plan. Migration
-  003 is applied: RLS is enabled on connector approvals, the resume bucket is
-  private, four storage policies exist, and all eight existing public tables
-  have the restrictive direct-app-session policy.
-- OAuth Server and Dynamic OAuth Apps are enabled. Auth Site URL is
-  `https://app.resumeotg.app`, authorization path `/`, and the
-  `public.mcp_access_token_hook` is enabled. The public JWKS exposes an ES256 key.
-- Live SQL checks confirmed an existing account can still read its profile
-  through a direct app session, while an OAuth session for that same account
-  sees zero profile rows and zero settings rows. An unapproved synthetic OAuth
-  session sees no resume objects or connector approvals.
-- The Render workspace currently shows an older Flask service
-  (`resume-optimizer-otg`, root `resume_optimizer_web`, start `gunicorn app:app`),
-  rather than the live Streamlit service at `resume-otg.onrender.com`. Locate the
-  correct hosting account before deploying the consent screen; do not replace
-  the older service by assumption.
-- Pending: Name.com sign-in/DNS, custom-domain TLS verification, correct
-  Streamlit deployment, and real-client consent/tool/export/revocation tests.
+- Replacement Streamlit service `resume-otg` (`srv-dav0p559fdbs73aoet6g`) in STOTG
+  runs `codex/mcp-connector`, application commit `9872027`.
+  Its Render URL is `https://resume-otg-uvgw.onrender.com/`.
+- Name.com CNAME `app` now points to `resume-otg-uvgw.onrender.com`, TTL 300.
+  Public resolver 1.1.1.1 confirms the new target. HTTPS serves the replacement's
+  Google callback component; the app health endpoint returns 200.
+- Name.com CNAME `mcp` points to `resume-otg-mcp.onrender.com`, TTL 300.
+  Landing-page apex and `www` records are unchanged.
+- The old Streamlit service `srv-dan9906gekts7385uueg` remains running in
+  My Workspace at `https://resume-otg.onrender.com/` (health 200). Only its app
+  custom-domain attachment was removed to transfer the hostname. It was not
+  deleted or suspended. The older STOTG Flask service is also unchanged.
+- Supabase Free project `xraxyqzbtpsurjyquxfy` has OAuth Server, dynamic client
+  registration, private resume storage, migration 003 and the audience hook.
+  Auth Site URL is `https://app.resumeotg.app`; consent path is `/`.
+  Redirect allowlists include `https://app.resumeotg.app/**` so Google sign-in
+  retains the opaque `authorization_id`. Render's redirect environment value
+  is `https://app.resumeotg.app/`.
+- Live PKCE verification completed Google sign-in, explicit consent, code/token
+  exchange, JWT signature/issuer/resource audience/client ID checks, MCP
+  initialize and tool discovery. A synthetic DOCX passed preparation, paragraph
+  replacement, export and signed download; the saved source hash was unchanged.
+- After cutover, Google sign-in returned to `app.resumeotg.app` with the consent
+  request intact and the credential fragment cleared. Denying consent returned
+  `access_denied` with no authorization code.
+- Disconnecting the temporary verification client immediately blocked its old
+  access token from running tools. Actual OAuth REST requests returned zero
+  profile and user-settings rows. Earlier SQL checks also covered unapproved
+  OAuth sessions and direct-app-session access.
+- Ten focused local regression checks passed. Supabase security advisors report
+  no RLS issues; the pre-existing leaked-password-protection warning remains.
+- A synthetic source and exported Word file remain in the verification account's
+  private MCP storage. Upload the actual resume in Settings before real use.
 
 ## Existing domains
 
-- Name.com manages DNS.
-- `www.resumeotg.app` points to Vercel (marketing site).
-- `app.resumeotg.app` points to `resume-otg.onrender.com` (Streamlit).
-- Add a separate Render web service for the MCP endpoint. Do not replace the
-  existing app or its DNS records.
+- `www.resumeotg.app`: Vercel marketing site.
+- `app.resumeotg.app`: replacement Streamlit service.
+- `mcp.resumeotg.app`: separate OAuth-protected MCP service.
 
 ## Supabase
 
@@ -54,8 +59,8 @@ still pending. Do not advertise this address as ready to connect yet.
 4. Set the Auth Site URL to `https://app.resumeotg.app` and the OAuth authorization
    path to `/`. Supabase adds `authorization_id` to the query string; the Streamlit
    app shows consent after its normal sign-in gate. Preserve existing Google
-   callback configuration. If Google sign-in loses the request on a fresh tab,
-   sign in first and restart the connector flow.
+   callback configuration. The app preserves the opaque request ID through
+   Google sign-in and transfers tokens through its local Streamlit component.
 5. Enable the Custom Access Token Hook `public.mcp_access_token_hook`. The remote
    server strictly requires `https://mcp.resumeotg.app/mcp` in the access token
    audience. Default Supabase tokens with only `authenticated` are rejected.
@@ -96,8 +101,9 @@ still pending. Do not advertise this address as ready to connect yet.
 Local checks cover JWT validation, OAuth discovery/challenges, source-safe Word
 export, and user-scoped path construction. Database RLS, token hooks, live OAuth
 sign-in and DNS/TLS require the actual Supabase and Render deployment to validate.
-The backend is deployed and the checks listed above passed. The complete
-connector flow is not yet verified or ready to advertise.
+Live protocol verification passed with a temporary PKCE client and synthetic
+resume. Claude/ChatGPT client-specific onboarding and a complete two-real-account
+browser test are not covered by that verification.
 
 Source references:
 - https://supabase.com/docs/guides/auth/oauth-server/getting-started
