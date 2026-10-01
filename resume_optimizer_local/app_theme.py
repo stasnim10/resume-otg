@@ -62,26 +62,26 @@ def apply_theme() -> None:
     #root .block-container {padding-top:1.5rem!important;max-width:1280px!important;}
     #root [data-testid="stSidebar"] {background:var(--sidebar-bg);border-right:1px solid var(--line);}
     #root [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap:.3rem!important;}
-    #root [data-testid="stSidebar"] .stButton button {height:44px!important;min-height:44px!important;
+    #root [data-testid="stSidebar"] [data-testid="stButton"] button {height:44px!important;min-height:44px!important;
       padding:0 14px!important;line-height:1.3!important;justify-content:flex-start!important;border-radius:9px!important;}
     #root [data-testid="stSidebar"] button[kind="primary"] {background:var(--step-active-bg)!important;}
     #root [data-testid="stSidebar"] [data-testid="stButton"] {margin:0!important;}
     #root button[aria-label="Collapse sidebar"], #root button[aria-label="Expand sidebar"],
     #root [data-testid="collapsedControl"], #root [data-testid="stSidebarCollapseButton"] {display:flex!important;}
-    #root .stButton button, #root .stDownloadButton button, #root .stFormSubmitButton button {
+    #root [data-testid="stButton"] button, #root [data-testid="stDownloadButton"] button, #root [data-testid="stFormSubmitButton"] button {
       border-radius:9px!important;min-height:44px!important;line-height:1.4!important;
       background:var(--btn-secondary-bg)!important;color:var(--btn-secondary-text)!important;
       border:1px solid var(--line)!important;box-shadow:none!important;}
-    #root button[kind="primary"], #root .stDownloadButton button {
+    #root button[kind="primary"], #root [data-testid="stDownloadButton"] button {
       background:var(--btn-primary-bg)!important;color:var(--btn-primary-text)!important;border-color:var(--btn-primary-bg)!important;}
-    #root button[kind="primary"] *, #root .stDownloadButton button * {color:inherit!important;}
-    #root .stButton button:hover, #root .stDownloadButton button:hover {filter:brightness(.94);transform:none!important;}
+    #root button[kind="primary"] *, #root [data-testid="stDownloadButton"] button * {color:inherit!important;}
+    #root [data-testid="stButton"] button:hover, #root [data-testid="stDownloadButton"] button:hover {filter:brightness(.94);transform:none!important;}
     #root button:disabled {background:var(--disabled-bg)!important;color:var(--disabled-text)!important;border-color:var(--line)!important;filter:none;}
     #root button:focus-visible, #root input:focus-visible, #root textarea:focus-visible {
       outline:2px solid var(--btn-primary-bg)!important;outline-offset:3px;}
     #root [data-baseweb="radio"] input {accent-color:var(--btn-primary-bg);}
     #root [data-baseweb="radio"]:has(input:checked) > div:first-child {background-color:var(--btn-primary-bg)!important;}
-    #root [data-testid="stSidebar"] .stButton button {background:transparent!important;border:0!important;}
+    #root [data-testid="stSidebar"] [data-testid="stButton"] button {background:transparent!important;border:0!important;}
     #root [data-testid="stSidebar"] button[kind="primary"] {background:var(--step-active-bg)!important;color:var(--text)!important;}
     #root .apple-hero, #root .apple-hero-dashboard {text-align:left;padding-bottom:1.5rem;}
     #root .apple-hero h1, #root .apple-page-title {font-size:clamp(1.9rem,3.3vw,3rem);line-height:1.12;letter-spacing:-.045em;max-width:22em;margin-left:0;margin-right:0;}
