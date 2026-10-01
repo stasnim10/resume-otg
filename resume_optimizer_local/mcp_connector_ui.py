@@ -9,7 +9,7 @@ import requests
 import streamlit as st
 from docx import Document
 
-from mcp_cloud_store import BUCKET, DOCX_MIME, save_source, user_folder
+from mcp_cloud_store import BUCKET, DOCX_MIME, export_download_name, read_source, save_source, user_folder
 from supabase_client import get_config_value, get_supabase
 
 
@@ -76,14 +76,34 @@ def render_hosted_connector() -> None:
         st.info("Sign in to save your resume for the connector.")
         return
     client = get_supabase()
-    uploaded = st.file_uploader("Resume for connected AI apps", type=["docx"], key="mcp-cloud-source")
-    if uploaded and st.button("Save Resume for Connector", key="mcp-cloud-save", type="primary"):
+    saved_metadata = {}
+    saved_contents = None
+    try:
+        saved_metadata, saved_contents = read_source(client, uid)
+    except Exception:
+        pass
+    styles = ["uploaded", "user_role"]
+    style = st.radio("Default connector download name", styles,
+                     index=styles.index(saved_metadata.get("naming_style", "uploaded")) if saved_metadata.get("naming_style", "uploaded") in styles else 0,
+                     format_func=lambda value: "Uploaded Resume Name_Optimized.docx" if value == "uploaded" else "User Name_Resume_Role.docx",
+                     key="mcp-cloud-naming")
+    default_name = saved_metadata.get("user_name", "")
+    if style == "user_role" and not default_name:
         try:
-            contents = uploaded.getvalue()
+            from profile_store import create_or_get_profile
+            default_name = create_or_get_profile().full_name or ""
+        except Exception:
+            pass
+    user_name = st.text_input("Name for resume downloads", value=default_name, key="mcp-cloud-download-name") if style == "user_role" else default_name
+    st.caption("Save your resume or naming settings below. The connected AI app supplies the role from the job description; if the name or role is missing, the uploaded resume name is used.")
+    uploaded = st.file_uploader("Resume for connected AI apps", type=["docx"], key="mcp-cloud-source")
+    if (uploaded or saved_contents) and st.button("Save Resume and Naming Settings", key="mcp-cloud-save", type="primary"):
+        try:
+            contents = uploaded.getvalue() if uploaded else saved_contents
             if len(contents) > 10 * 1024 * 1024:
                 raise ValueError("Resume is too large.")
             Document(io.BytesIO(contents))
-            save_source(client, uid, contents)
+            save_source(client, uid, contents, uploaded.name if uploaded else saved_metadata["original_name"], user_name, style)
             st.success("Resume saved privately to your account.")
         except Exception:
             st.error("Could not save the resume. Use a valid Word document under 10 MB and check the storage setup.")
@@ -104,9 +124,10 @@ def render_hosted_connector() -> None:
         files = client.storage.from_(BUCKET).list(f"{user_folder(uid)}/exports", {"limit": 100, "sortBy": {"column": "created_at", "order": "desc"}})
         names = [item["name"] for item in files if item.get("name", "").endswith(".docx")]
         if names:
-            selected = st.selectbox("Tailored resume", names, key="mcp-cloud-export")
+            labels = {item["name"]: f"{export_download_name(item['name'])} · {(item.get('created_at') or '')[:16].replace('T', ' ')}" for item in files if item["name"] in names}
+            selected = st.selectbox("Tailored resume", names, format_func=labels.get, key="mcp-cloud-export")
             if st.button("Prepare Download", key="mcp-cloud-prepare-download"):
                 contents = client.storage.from_(BUCKET).download(f"{user_folder(uid)}/exports/{selected}")
-                st.download_button("Download Word Resume", contents, file_name=selected, mime=DOCX_MIME)
+                st.download_button("Download Word Resume", contents, file_name=export_download_name(selected), mime=DOCX_MIME)
     except Exception:
         st.info("Connector storage is not available yet. Complete the Supabase migration before using uploads and exports.")

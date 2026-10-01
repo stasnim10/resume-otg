@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from starlette.testclient import TestClient
 
 from mcp_remote_server import SupabaseVerifier, create_remote_server
-from mcp_cloud_store import export_path
+from mcp_cloud_store import export_path, export_download_name, save_export, resolve_export_path
 
 RESOURCE = "https://mcp.resumeotg.app/mcp"
 ISSUER = "https://example.supabase.co/auth/v1"
@@ -58,3 +58,20 @@ def test_cloud_export_paths_are_user_scoped():
     assert export_path(first, export_id) != export_path(second, export_id)
     with pytest.raises(ValueError):
         export_path(first, "../../other-user/source")
+
+
+def test_named_export_download_and_legacy_resource_lookup():
+    uid = "00000000-0000-0000-0000-000000000001"
+    export_id = "a" * 32
+    name = "Simum_Resume_Planning Manager.docx"
+    client = Mock()
+    storage = client.storage.from_.return_value
+    storage.create_signed_url.return_value = {"signedURL": "https://example.test/download"}
+    assert save_export(client, uid, export_id, b"docx", name) == "https://example.test/download"
+    storage.create_signed_url.assert_called_once_with(export_path(uid, export_id, name), 600, {"download": name})
+    storage.list.return_value = [{"name": export_id + "--" + name}]
+    assert resolve_export_path(client, uid, export_id) == export_path(uid, export_id, name)
+    assert export_download_name(export_id + "--" + name) == name
+    storage.list.return_value = [{"name": export_id + ".docx"}]
+    assert resolve_export_path(client, uid, export_id) == export_path(uid, export_id)
+    assert export_download_name(export_id + ".docx") == "Resume_Optimized.docx"
