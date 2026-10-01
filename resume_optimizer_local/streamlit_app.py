@@ -83,7 +83,8 @@ from improvements_generator import generate_improvements_summary
 from review_engine import analyze_payload_against_document
 from optimization_history_ui import render_optimization_history_screen
 from ui_helpers import primary_button, primary_download_button, primary_form_submit, secondary_button
-from help_widget import render_help_section, render_support_button
+from help_widget import render_help_section
+from app_theme import apply_theme, current_theme, render_theme_control, render_support_banner
 from profile_screen import render_profile_screen
 from onboarding_screen import render_onboarding_screen
 from job_tracker_screen import render_job_tracker_screen
@@ -546,7 +547,7 @@ def apply_apple_theme() -> None:
           --input-fill-focus: #ffffff;
           --step-active-bg: #eaeaef;
           --alert-bg: #f0faf4;
-          --btn-primary-bg: #d97757;
+          --btn-primary-bg: var(--btn-primary-bg);
           --btn-primary-text: #ffffff;
           --btn-secondary-bg: #ffffff;
           --btn-secondary-text: #1d1d1f;
@@ -560,42 +561,7 @@ def apply_apple_theme() -> None:
           --disabled-border: #e1e1e6;
         }
 
-        @media (prefers-color-scheme: dark) {
-          :root {
-            --bg: #0e0f12;
-            --surface: #16181b;
-            --surface-muted: #1d2024;
-            --panel-fill: #181b1f;
-            --text: #f5f5f7;
-            --muted: #b0b3ba;
-            --muted-light: #d0d4db;
-            --line: rgba(255,255,255,0.08);
-            --line-strong: rgba(255,255,255,0.16);
-            --shadow-soft: 0 10px 30px rgba(0,0,0,0.28);
-            --shadow-raised: 0 14px 36px rgba(0,0,0,0.36);
-            --blue: #4ea1ff;
-            --green: #4ac26b;
-            --amber: #e3a54b;
-            --danger: #ff7b72;
-            --sidebar-bg: #121417;
-            --input-fill: #101215;
-            --input-fill-focus: #181c20;
-            --step-active-bg: #20242a;
-            --alert-bg: #112017;
-            --btn-primary-bg: #d97757;
-            --btn-primary-text: #ffffff;
-            --btn-secondary-bg: #16181b;
-            --btn-secondary-text: #f5f5f7;
-            --btn-secondary-border: rgba(255,255,255,0.18);
-            --header-bg: rgba(14,15,18,0.94);
-            --card-border: rgba(255,255,255,0.10);
-            --focus-blue: rgba(78,161,255,0.55);
-            --focus-blue-halo: rgba(78,161,255,0.20);
-            --disabled-bg: #24272c;
-            --disabled-text: #8a8f98;
-            --disabled-border: rgba(255,255,255,0.10);
-          }
-        }
+
 
         .stApp {
           background: var(--bg);
@@ -913,7 +879,7 @@ def apply_apple_theme() -> None:
         [data-testid="stMultiSelect"] > div:focus-within,
         [data-testid="stTextInput"] > div:focus-within,
         [data-testid="stTextArea"] > div:focus-within {
-          outline: 2px solid #d97757 !important;
+          outline: 2px solid var(--btn-primary-bg) !important;
           outline-offset: 2px !important;
           border-radius: 8px;
         }
@@ -1497,57 +1463,7 @@ def apply_apple_theme() -> None:
           color: var(--text) !important;
         }
 
-        @media (prefers-color-scheme: dark) {
-          .stTextArea textarea,
-          .stTextInput input,
-          .stSelectbox > div > div,
-          .stMultiSelect > div > div,
-          .stSelectbox [data-baseweb="select"],
-          .stMultiSelect [data-baseweb="select"] {
-            border-color: rgba(255, 255, 255, 0.18) !important;
-          }
 
-          .stTextArea textarea::placeholder,
-          .stTextInput input::placeholder {
-            color: rgba(208, 212, 219, 0.58) !important;
-          }
-
-          .stSelectbox [data-baseweb="select"] div,
-          .stSelectbox [data-baseweb="select"] span,
-          .stSelectbox [data-baseweb="select"] input,
-          .stMultiSelect [data-baseweb="select"] div,
-          .stMultiSelect [data-baseweb="select"] span,
-          .stMultiSelect [data-baseweb="select"] input {
-            color: #f5f5f7 !important;
-            -webkit-text-fill-color: #f5f5f7 !important;
-          }
-
-          .stSelectbox [data-baseweb="select"] input::placeholder,
-          .stMultiSelect [data-baseweb="select"] input::placeholder {
-            color: rgba(208, 212, 219, 0.58) !important;
-            -webkit-text-fill-color: rgba(208, 212, 219, 0.58) !important;
-          }
-
-          [data-baseweb="popover"] [role="listbox"],
-          [data-baseweb="menu"] {
-            background: #16181b !important;
-            border-color: rgba(255, 255, 255, 0.16) !important;
-          }
-
-          [data-baseweb="popover"] [role="option"],
-          [data-baseweb="popover"] li,
-          [data-baseweb="menu"] li {
-            background: #16181b !important;
-            color: #f5f5f7 !important;
-          }
-
-          [data-baseweb="popover"] [role="option"]:hover,
-          [data-baseweb="popover"] li:hover,
-          [data-baseweb="menu"] li:hover {
-            background: #1d2024 !important;
-            color: #ffffff !important;
-          }
-        }
 
         .stButton button, .stDownloadButton button {
           border-radius: 999px !important;
@@ -1616,7 +1532,7 @@ def apply_apple_theme() -> None:
 
         .stButton button:focus-visible,
         .stDownloadButton button:focus-visible {
-          outline: 2px solid #d97757 !important;
+          outline: 2px solid var(--btn-primary-bg) !important;
           outline-offset: 2px !important;
           box-shadow: 0 0 0 4px rgba(217,119,87,0.22) !important;
         }
@@ -1625,9 +1541,9 @@ def apply_apple_theme() -> None:
         .stApp .apple-primary [data-testid="stDownloadButton"] button,
         .apple-primary button,
         .apple-primary [data-testid="stDownloadButton"] button {
-          background: #d97757 !important;
+          background: var(--btn-primary-bg) !important;
           color: #ffffff !important;
-          border-color: #d97757 !important;
+          border-color: var(--btn-primary-bg) !important;
         }
 
         .stApp .apple-primary button *,
@@ -1932,26 +1848,7 @@ def apply_apple_theme() -> None:
         .stTabs [data-baseweb="tab-highlight"],
         .stTabs [data-baseweb="tab-border"] { display: none !important; }
 
-        @media (prefers-color-scheme: dark) {
-          .stTabs [data-baseweb="tab-list"] {
-            border-bottom-color: rgba(255, 255, 255, 0.14) !important;
-          }
 
-          .stTabs [data-baseweb="tab"] {
-            color: rgba(245, 245, 247, 0.74) !important;
-          }
-
-          .stTabs [data-baseweb="tab"]:hover,
-          .stTabs [data-baseweb="tab"]:focus-visible {
-            background: #1b1e22 !important;
-            color: #ffffff !important;
-          }
-
-          .stTabs [aria-selected="true"] {
-            color: #ffffff !important;
-            border-bottom-color: #ffffff !important;
-          }
-        }
 
         /* ── Form labels — consistent sizing ── */
         .stTextInput label, .stTextArea label,
@@ -2028,28 +1925,7 @@ def apply_apple_theme() -> None:
           fill: currentColor !important;
         }
 
-        @media (prefers-color-scheme: dark) {
-          [data-testid="stExpander"] details {
-            background: #111316 !important;
-            border-color: rgba(255, 255, 255, 0.12) !important;
-          }
 
-          [data-testid="stExpander"] summary {
-            background: #171a1e !important;
-            color: #f5f5f7 !important;
-          }
-
-          [data-testid="stExpander"] details[open] summary {
-            background: #24211d !important;
-            border-bottom-color: rgba(255, 255, 255, 0.12) !important;
-          }
-
-          [data-testid="stExpander"] summary:hover,
-          [data-testid="stExpander"] summary:focus-visible {
-            background: #2b2a26 !important;
-            color: #ffffff !important;
-          }
-        }
 
         /* ── Sidebar layout ── */
         [data-testid="stSidebar"] > div:first-child {
@@ -2112,12 +1988,12 @@ def apply_apple_theme() -> None:
         }
         [data-testid="stProgressBar"] > div {
           border-radius: 999px !important;
-          background: #d97757 !important;
+          background: var(--btn-primary-bg) !important;
           transition: width 0.35s cubic-bezier(0.4,0,0.2,1) !important;
         }
         [data-testid="stProgressBar"] > div > div {
           border-radius: 999px !important;
-          background: #d97757 !important;
+          background: var(--btn-primary-bg) !important;
         }
 
         /* ULTIMATE SIDEBAR OVERRIDE: ID-level specificity beats all other rules */
@@ -2146,6 +2022,9 @@ def apply_apple_theme() -> None:
 
 
 
+    apply_theme()
+
+
 def render_coral_download_button(
     label: str,
     data: bytes,
@@ -2158,40 +2037,9 @@ def render_coral_download_button(
     approach which breaks when Streamlit's markdown processor chokes on the
     very long data URL string.
     """
-    st.markdown(
-        """
-        <style>
-        [data-testid="stDownloadButton"] > button {
-            background: linear-gradient(135deg, #d97757 0%, #c9683f 100%) !important;
-            color: #ffffff !important;
-            border: none !important;
-            border-radius: 9999px !important;
-            font-size: 1rem !important;
-            font-weight: 600 !important;
-            padding: 0 1.5rem !important;
-            width: 100% !important;
-            cursor: pointer !important;
-            box-shadow: 0 2px 12px rgba(217,119,87,0.35) !important;
-            transition: all 0.18s ease !important;
-            letter-spacing: 0.01em !important;
-            min-height: 54px !important;
-            height: 54px !important;
-            line-height: 1.2 !important;
-        }
-        [data-testid="stDownloadButton"] > button:hover {
-            background: linear-gradient(135deg, #c9683f 0%, #b85934 100%) !important;
-            box-shadow: 0 4px 18px rgba(217,119,87,0.45) !important;
-            transform: translateY(-1px) !important;
-        }
-        [data-testid="stDownloadButton"] > button * {
-            color: #ffffff !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
     st.download_button(
         label=label,
+        type="primary",
         data=data,
         file_name=file_name,
         mime=mime,
@@ -2798,7 +2646,7 @@ def render_landing() -> None:
             st.session_state.local_ai_ready = False
 
     hero_eyebrow = "Welcome Back" if is_returning_user else "Resume OTG"
-    hero_title = f"Welcome back, {profile.full_name.strip()}." if is_returning_user and profile.full_name.strip() else "Make resume tailoring feel beautifully simple."
+    hero_title = f"Welcome back, {profile.full_name.strip()}." if is_returning_user and profile.full_name.strip() else ("Your next chapter starts here." if current_theme() == "warm" else "Focus on your next move.")
     hero_copy = (
         "Choose your next workflow. Resume OTG will carry your saved resume and profile context forward."
         if is_returning_user
@@ -2896,8 +2744,8 @@ def render_landing() -> None:
         _render_landing_metric_cards(optimization_history)
 
     else:
-        # --- New users: 4-column layout ---
-        col1, col2, col3, col4 = st.columns(4, gap="large")
+        # --- New users: readable two-column workflow cards ---
+        col1, col2 = st.columns(2, gap="large")
 
         with col1:
             with st.container(border=True):
@@ -2931,6 +2779,7 @@ def render_landing() -> None:
                     st.session_state.screen = "builder_input"
                     st.rerun()
 
+        col3, col4 = st.columns(2, gap="large")
         with col3:
             with st.container(border=True):
                 st.markdown(
@@ -8762,12 +8611,16 @@ def main() -> None:
         load_auth_into_session()
         if st.session_state.get("auth_recovery_mode", False) or not is_authenticated():
             apply_apple_theme()
+            with st.sidebar:
+                render_theme_control()
             render_auth_screen()
             st.stop()
 
         if st.session_state.get("mcp_authorization_id"):
             from mcp_connector_ui import render_consent
             apply_apple_theme()
+            with st.sidebar:
+                render_theme_control()
             render_consent(st.session_state.mcp_authorization_id)
             if st.button("Back to Resume OTG", key="mcp-consent-back"):
                 st.session_state.pop("mcp_authorization_id", None)
@@ -8806,36 +8659,34 @@ def main() -> None:
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     with st.sidebar:
-        st.markdown(
-            '<p style="font-size:0.95rem;font-weight:700;margin:0 0 1rem 0.25rem;'
-            'letter-spacing:-0.01em;">Resume OTG</p>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="otg-brand">Resume OTG</div>', unsafe_allow_html=True)
+        render_theme_control()
+        st.divider()
 
         if _in_onboarding:
-            if secondary_button("Skip setup", key="ob-sidebar-skip", use_container_width=True):
+            if st.button("Skip setup", key="ob-sidebar-skip", use_container_width=True):
                 from profile_store import complete_onboarding as _co
                 _co()
                 st.session_state.screen = "landing"
                 st.rerun()
         else:
             # ── Primary nav ──────────────────────────────────────────────
-            if secondary_button("Home", use_container_width=True, key="sidebar-home"):
+            if st.button("Home", type="primary" if st.session_state.screen == "landing" else "secondary", use_container_width=True, key="sidebar-home"):
                 st.session_state.screen = "landing"
                 st.rerun()
-            if secondary_button("Bulk Application", use_container_width=True, key="sidebar-bulk-application"):
+            if st.button("Bulk Application", type="primary" if st.session_state.screen == "bulk_application" else "secondary", use_container_width=True, key="sidebar-bulk-application"):
                 st.session_state.screen = "bulk_application"
                 st.rerun()
-            if secondary_button("Career Profile", use_container_width=True, key="sidebar-profile"):
+            if st.button("Career Profile", type="primary" if st.session_state.screen == "profile" else "secondary", use_container_width=True, key="sidebar-profile"):
                 st.session_state.screen = "profile"
                 st.rerun()
-            if secondary_button("Job Tracker", use_container_width=True, key="sidebar-job-tracker"):
+            if st.button("Job Tracker", type="primary" if st.session_state.screen == "job_tracker" else "secondary", use_container_width=True, key="sidebar-job-tracker"):
                 st.session_state.screen = "job_tracker"
                 st.rerun()
-            if secondary_button("Need Help", use_container_width=True, key="sidebar-need-help"):
+            if st.button("Need Help", type="primary" if st.session_state.screen == "help" else "secondary", use_container_width=True, key="sidebar-need-help"):
                 st.session_state.screen = "help"
                 st.rerun()
-            if secondary_button("Settings", use_container_width=True, key="sidebar-settings"):
+            if st.button("Settings", type="primary" if st.session_state.screen == "settings" else "secondary", use_container_width=True, key="sidebar-settings"):
                 st.session_state.screen = "settings"
                 st.session_state.settings_open_help = False
                 st.rerun()
@@ -8854,94 +8705,11 @@ def main() -> None:
                         f'{user_email}</p>',
                         unsafe_allow_html=True,
                     )
-                if secondary_button("Sign Out", use_container_width=True, key="sidebar-sign-out"):
+                if st.button("Sign Out", use_container_width=True, key="sidebar-sign-out"):
                     sign_out()
                     st.rerun()
-            render_support_button()
-            components.html(
-                """
-                <script>
-                const doc = window.parent && window.parent.document ? window.parent.document : document;
 
-                const hideSidebarArtifacts = () => {
-                  const candidates = Array.from(doc.querySelectorAll("button, div, span"));
-                  candidates.forEach((node) => {
-                    const text = (node.innerText || node.textContent || "").trim();
-                    if (!text || !text.includes("keyboard_double_arrow_right")) return;
-                    const clickable = node.closest("button, [role='button'], [data-testid='collapsedControl'], [data-testid='stSidebarCollapseButton']");
-                    const target = clickable || node;
-                    if (target instanceof HTMLElement) {
-                      target.style.display = "none";
-                      const wrapper = target.parentElement;
-                      if (wrapper && wrapper.childElementCount === 1) {
-                        wrapper.style.display = "none";
-                      }
-                    }
-                  });
-                };
-
-                const CLAUDE_CORAL = "#d97757";
-                const CLAUDE_CORAL_HOVER = "#c9683f";
-
-                const applyCoralStyle = (btn) => {
-                  if (btn.closest("[data-testid='stSidebar']")) return;
-                  btn.style.setProperty("background-color", CLAUDE_CORAL, "important");
-                  btn.style.setProperty("background", CLAUDE_CORAL, "important");
-                  btn.style.setProperty("color", "#ffffff", "important");
-                  btn.style.setProperty("border-color", CLAUDE_CORAL, "important");
-                  btn.querySelectorAll("p, span, div").forEach((el) => {
-                    el.style.setProperty("color", "#ffffff", "important");
-                  });
-                  if (!btn._coralHooked) {
-                    btn._coralHooked = true;
-                    btn.addEventListener("mouseenter", () => {
-                      btn.style.setProperty("background-color", CLAUDE_CORAL_HOVER, "important");
-                      btn.style.setProperty("background", CLAUDE_CORAL_HOVER, "important");
-                    });
-                    btn.addEventListener("mouseleave", () => {
-                      btn.style.setProperty("background-color", CLAUDE_CORAL, "important");
-                      btn.style.setProperty("background", CLAUDE_CORAL, "important");
-                    });
-                  }
-                };
-
-                const applyButtonStyles = () => {
-                  // All primary/secondary wrappers — includes st.button and st.download_button
-                  doc.querySelectorAll(
-                    ".apple-primary button, .apple-primary a[download], " +
-                    ".apple-secondary button, .apple-secondary a[download], " +
-                    ".apple-primary [data-testid='stDownloadButton'] button, " +
-                    ".apple-secondary [data-testid='stDownloadButton'] button"
-                  ).forEach(applyCoralStyle);
-
-                  // Also target stDownloadButton directly when inside our wrappers
-                  doc.querySelectorAll(
-                    ".apple-primary [data-testid='stDownloadButton'], " +
-                    ".apple-secondary [data-testid='stDownloadButton']"
-                  ).forEach((wrapper) => {
-                    wrapper.querySelectorAll("button, a").forEach(applyCoralStyle);
-                  });
-                };
-
-                const runFixes = () => {
-                  hideSidebarArtifacts();
-                  applyButtonStyles();
-                };
-
-                // Run immediately and after Streamlit renders
-                runFixes();
-                setTimeout(runFixes, 100);
-                setTimeout(runFixes, 400);
-                setTimeout(runFixes, 1200);
-
-                // Watch for DOM changes (Streamlit re-renders buttons dynamically)
-                const observer = new MutationObserver(() => applyButtonStyles());
-                observer.observe(doc.body, { childList: true, subtree: true });
-                </script>
-                """,
-                height=0,
-            )
-
+    render_support_banner()
     screen = st.session_state.screen
     # NOTE: _prev_rendered_screen is updated at the END of the routing block so that
     # render functions can read it and see the *previous* screen, not the current one.

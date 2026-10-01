@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Appearance preference</title></head><body>
+<script>
+const send = (type, data = {}) => window.parent.postMessage({isStreamlitMessage:true, type, ...data}, '*');
+let lastSent = null;
+window.addEventListener('message', ({data}) => {
+  if (data.type !== 'streamlit:render') return;
+  const {selected, explicit} = data.args;
+  const valid = value => value === 'warm' || value === 'night';
+  let mode = selected;
+  try {
+    const saved = localStorage.getItem('resume-otg-appearance');
+    if (!explicit && valid(saved)) mode = saved;
+    localStorage.setItem('resume-otg-appearance', mode);
+  } catch (_) { /* Storage-disabled browsers can still use the URL preference. */ }
+  if (mode !== lastSent) {
+    lastSent = mode;
+    send('streamlit:setComponentValue', {value:mode, dataType:'json'});
+  }
+  send('streamlit:setFrameHeight', {height:0});
+});
+send('streamlit:componentReady', {apiVersion:1});
+send('streamlit:setFrameHeight', {height:0});
+</script></body></html>

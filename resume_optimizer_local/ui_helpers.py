@@ -22,7 +22,7 @@ def primary_button(label: str, key: str, **kwargs: Any) -> bool:
 def secondary_button(label: str, key: str, **kwargs: Any) -> bool:
     """Render a secondary-styled button. Returns True when clicked."""
     st.markdown('<div class="apple-secondary">', unsafe_allow_html=True)
-    clicked = st.button(label, key=key, type="primary", **kwargs)
+    clicked = st.button(label, key=key, type="secondary", **kwargs)
     st.markdown("</div>", unsafe_allow_html=True)
     return clicked
 
