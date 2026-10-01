@@ -84,7 +84,7 @@ from review_engine import analyze_payload_against_document
 from optimization_history_ui import render_optimization_history_screen
 from ui_helpers import primary_button, primary_download_button, primary_form_submit, secondary_button
 from help_widget import render_help_section
-from app_theme import apply_theme, current_theme, render_theme_control, render_support_banner
+from app_theme import apply_theme, current_theme, render_theme_control, render_support_banner, render_sidebar_support
 from profile_screen import render_profile_screen
 from onboarding_screen import render_onboarding_screen
 from job_tracker_screen import render_job_tracker_screen
@@ -8708,6 +8708,8 @@ def main() -> None:
                 if st.button("Sign Out", use_container_width=True, key="sidebar-sign-out"):
                     sign_out()
                     st.rerun()
+
+            render_sidebar_support()
 
     render_support_banner()
     screen = st.session_state.screen

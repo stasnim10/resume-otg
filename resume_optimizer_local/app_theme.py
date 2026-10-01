@@ -116,6 +116,9 @@ def apply_theme() -> None:
       font-weight:650;text-decoration:none!important;white-space:nowrap;}
     .otg-coffee:hover {filter:brightness(.95);}
     .otg-coffee:focus-visible {outline:2px solid var(--btn-primary-bg);outline-offset:3px;}
+    .otg-sidebar-support {border-top:1px solid var(--line);margin-top:16px;padding-top:16px;}
+    .otg-sidebar-support p {color:var(--muted)!important;font-size:.82rem;margin:0 0 10px;}
+    .otg-sidebar-support .otg-coffee {display:flex;width:100%;box-sizing:border-box;}
     @media(max-width:640px) {
       .otg-support {align-items:flex-start;flex-direction:column;padding:14px;gap:10px;}
       #root .apple-hero-panel {padding:20px;}
@@ -135,5 +138,13 @@ def render_support_banner() -> None:
     from help_widget import DONATE_URL
     st.markdown(f'''<div class="otg-support"><div class="otg-support-copy">
       <strong>A little support goes a long way.</strong>Help keep Resume OTG growing.</div>
+      <a class="otg-coffee" href="{DONATE_URL}" target="_blank" rel="noopener noreferrer">☕ Buy me a coffee</a></div>''',
+      unsafe_allow_html=True)
+
+
+def render_sidebar_support() -> None:
+    from help_widget import DONATE_URL
+    st.markdown(f'''<div class="otg-sidebar-support">
+      <p>Help keep Resume OTG growing.</p>
       <a class="otg-coffee" href="{DONATE_URL}" target="_blank" rel="noopener noreferrer">☕ Buy me a coffee</a></div>''',
       unsafe_allow_html=True)
