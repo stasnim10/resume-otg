@@ -320,8 +320,9 @@ def _with_pending_consent(url: str) -> str:
     authorization_id = st.session_state.get("mcp_authorization_id")
     if not authorization_id:
         return url
-    from uuid import UUID
-    authorization_id = str(UUID(authorization_id))
+    import re
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", str(authorization_id)):
+        raise ValueError("Invalid authorization request.")
     parts = urlsplit(url)
     return urlunsplit((parts.scheme, parts.netloc, parts.path,
                       urlencode({"authorization_id": authorization_id}), ""))

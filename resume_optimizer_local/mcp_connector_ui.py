@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import io
-from uuid import UUID
+import re
 from urllib.parse import urlsplit
 
 import requests
@@ -27,7 +27,8 @@ def auth_request(method: str, path: str, **kwargs) -> dict:
 def render_consent(authorization_id: str) -> None:
     st.title("Connect an AI app to Resume OTG")
     try:
-        authorization_id = str(UUID(authorization_id))
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", authorization_id):
+            raise ValueError("Invalid authorization request.")
         details = auth_request("GET", f"oauth/authorizations/{authorization_id}")
         if "authorization_id" not in details and details.get("redirect_url"):
             _return_to_client(details["redirect_url"])
