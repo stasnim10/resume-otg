@@ -13,10 +13,15 @@ import streamlit.components.v1 as components
 
 from auth_state import (
     get_google_implicit_oauth_url,
+    handle_google_token_callback,
     send_password_reset_email,
     sign_in_with_password,
     sign_up_with_password,
     update_password,
+)
+
+_google_callback = components.declare_component(
+    "google_callback", path=str(Path(__file__).resolve().parent / "google_callback")
 )
 
 
@@ -109,40 +114,9 @@ def _render_auth_notices() -> None:
 def _render_google_sign_in() -> None:
     st.markdown("#### Continue with Google")
     st.caption("Use your Google account for a faster sign-in.")
-    components.html(
-        """
-        <script>
-          (function() {
-            const topWindow = window.top || window.parent || window;
-            const currentUrl = new URL(topWindow.location.href);
-            const hash = (topWindow.location.hash || "").replace(/^#/, "");
-            if (!hash) {
-              return;
-            }
-
-            const hashParams = new URLSearchParams(hash);
-            const accessToken = hashParams.get("access_token");
-            const refreshToken = hashParams.get("refresh_token");
-            const hashError = hashParams.get("error_description") || hashParams.get("error");
-
-            if (hashError) {
-              currentUrl.hash = "";
-              currentUrl.searchParams.set("oauth_error", hashError);
-              topWindow.location.replace(currentUrl.toString());
-              return;
-            }
-
-            if (accessToken && refreshToken) {
-              currentUrl.hash = "";
-              currentUrl.searchParams.set("sb_access_token", accessToken);
-              currentUrl.searchParams.set("sb_refresh_token", refreshToken);
-              topWindow.location.replace(currentUrl.toString());
-            }
-          })();
-        </script>
-        """,
-        height=0,
-    )
+    callback = _google_callback(key="google-token-callback", default=None)
+    if isinstance(callback, dict):
+        handle_google_token_callback(callback)
     try:
         oauth_url = get_google_implicit_oauth_url()
     except Exception as exc:

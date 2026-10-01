@@ -1,0 +1,17 @@
+# Create the MCP service alongside the existing Streamlit service.
+services:
+  - type: web
+    name: resume-otg-mcp
+    runtime: docker
+    plan: free
+    branch: codex/mcp-connector
+    dockerfilePath: ./resume_optimizer_local/Dockerfile.mcp
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: MCP_PUBLIC_URL
+        value: https://mcp.resumeotg.app/mcp

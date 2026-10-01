@@ -17,3 +17,12 @@ def build_resume_download_filename(user_name: str, role: str) -> str:
     safe_name = _filename_component(user_name, "Candidate")
     safe_role = _filename_component(role, "Target Role")
     return f"{safe_name}_Resume_{safe_role}.docx"
+
+
+def build_connector_download_filename(original_name: str, user_name: str = "", role: str = "", naming_style: str = "uploaded") -> str:
+    """Use the saved naming preference, with a readable fallback for older uploads."""
+    if naming_style == "user_role" and user_name.strip() and role.strip():
+        return build_resume_download_filename(user_name, role)
+    stem = re.split(r"[/\\]", str(original_name or "Resume.docx"))[-1]
+    stem = re.sub(r"(?i)\.docx$", "", stem)
+    return f"{_filename_component(stem, 'Resume')}_Optimized.docx"

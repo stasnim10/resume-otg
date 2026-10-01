@@ -1,0 +1,3 @@
+# Optional local MCP server. SDK v1 uses the stable FastMCP interface.
+-r requirements.txt
+mcp>=1.12,<2
