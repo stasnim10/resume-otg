@@ -30,3 +30,15 @@ def test_unknown_theme_falls_back_to_warm():
     app.run()
     assert not app.exception
     assert app.radio[0].value == "Warm"
+
+
+def test_restoring_browser_preference_does_not_rewrite_auth_callback_url(monkeypatch):
+    import app_theme
+    monkeypatch.setattr(app_theme, "_preference", lambda **kwargs: "night")
+    app = AppTest.from_string(APP)
+    app.query_params["authorization_id"] = "pending-consent"
+    app.run()
+    assert not app.exception
+    assert app.radio[0].value == "Night"
+    assert "theme" not in app.query_params
+    assert app.query_params["authorization_id"] == ["pending-consent"]

@@ -1,7 +1,7 @@
 """Warm editorial and Night workspace themes, shared by every app screen.
 
-The preference is browser-local. The URL carries it through Streamlit reruns;
-a tiny browser bridge restores it on a later visit without a database change.
+The preference is browser-local. Explicit selections travel in the URL; a browser component restores later
+visits into session state without rewriting an in-flight OAuth callback URL.
 """
 from __future__ import annotations
 
@@ -23,12 +23,14 @@ PALETTES = {
 
 
 def current_theme() -> str:
-    value = st.query_params.get("theme", "warm")
+    value = st.query_params.get("theme", st.session_state.get("appearance_mode", "warm"))
     return value if value in PALETTES else "warm"
 
 
 def _change_theme() -> None:
-    st.query_params["theme"] = st.session_state["appearance_choice"].lower()
+    mode = st.session_state["appearance_choice"].lower()
+    st.session_state.appearance_mode = mode
+    st.query_params["theme"] = mode
 
 
 def render_theme_control() -> None:
@@ -116,7 +118,9 @@ def apply_theme() -> None:
     saved = _preference(selected=mode, explicit=st.query_params.get("theme") in PALETTES,
                         default=mode, key="otg-appearance-preference")
     if st.query_params.get("theme") not in PALETTES and saved in PALETTES and saved != mode:
-        st.query_params["theme"] = saved
+        # Google sign-in returns tokens in the browser URL fragment. Updating
+        # query params here can erase it before the auth bridge consumes it.
+        st.session_state.appearance_mode = saved
         st.rerun()
 
 
