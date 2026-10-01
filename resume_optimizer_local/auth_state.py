@@ -73,16 +73,17 @@ def get_google_implicit_oauth_url() -> str:
     return f"{supabase_url.rstrip('/')}/auth/v1/authorize?{query}"
 
 
-def handle_google_token_callback() -> bool:
+def handle_google_token_callback(callback: dict | None = None) -> bool:
     """
-    Complete a browser-managed Google sign-in when tokens return via query params.
+    Complete Google sign-in from the browser bridge (or a legacy callback URL).
 
     Returns True when the callback was handled and triggered a rerun.
     """
     query_params = st.query_params
-    access = query_params.get("sb_access_token")
-    refresh = query_params.get("sb_refresh_token")
-    oauth_error = query_params.get("oauth_error")
+    values = callback if callback is not None else query_params
+    access = values.get("sb_access_token")
+    refresh = values.get("sb_refresh_token")
+    oauth_error = values.get("oauth_error")
 
     if oauth_error:
         st.session_state.auth_notice_error = f"Google sign-in failed: {oauth_error}"
@@ -295,23 +296,35 @@ def _get_oauth_redirect_url() -> str:
     """
     configured = get_config_value("SUPABASE_OAUTH_REDIRECT_TO")
     if configured:
-        return configured
+        return _with_pending_consent(configured)
 
     current_url = getattr(st.context, "url", "") or ""
     if current_url:
         parts = urlsplit(str(current_url))
-        return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+        return _with_pending_consent(urlunsplit((parts.scheme, parts.netloc, parts.path, "", "")))
 
     headers = getattr(st.context, "headers", {}) or {}
     host = headers.get("host", "")
     proto = headers.get("x-forwarded-proto", "https" if host else "")
     if host and proto:
-        return f"{proto}://{host}"
+        return _with_pending_consent(f"{proto}://{host}")
 
     raise RuntimeError(
         "Unable to determine the app URL for Google sign-in. "
         "Set SUPABASE_OAUTH_REDIRECT_TO in your Streamlit secrets or environment."
     )
+
+
+def _with_pending_consent(url: str) -> str:
+    """Keep an MCP request across the fresh Streamlit session after Google login."""
+    authorization_id = st.session_state.get("mcp_authorization_id")
+    if not authorization_id:
+        return url
+    from uuid import UUID
+    authorization_id = str(UUID(authorization_id))
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path,
+                      urlencode({"authorization_id": authorization_id}), ""))
 
 
 def _clear_auth_query_params() -> None:
